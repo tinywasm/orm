@@ -1,7 +1,7 @@
 package orm
 
-type Orm struct {}
+type Orm struct{}
 
 func New() *Orm {
-    return &Orm{}
+	return &Orm{}
 }
