@@ -98,7 +98,7 @@ func RunCoreTests(t *testing.T) {
 		mockExec.ReturnQueryRow = &MockScanner{}
 
 		err := db.Query(model).
-			Where(orm.Eq("id", 1)).
+			Where("id").Eq(1).
 			OrderBy("created_at", "DESC").
 			ReadOne()
 

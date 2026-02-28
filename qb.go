@@ -10,12 +10,70 @@ type QB struct {
 	groupBy []string
 	limit   int
 	offset  int
+	nextOr  bool
 }
 
-// Where adds conditions to the query.
-func (qb *QB) Where(conds ...Condition) *QB {
-	qb.conds = append(qb.conds, conds...)
+// Clause represents an intermediate state for building a query condition.
+type Clause struct {
+	qb    *QB
+	field string
+}
+
+// Where starts a new condition clause for the given column.
+func (qb *QB) Where(column string) *Clause {
+	return &Clause{qb: qb, field: column}
+}
+
+// Or sets the next condition to use OR logic instead of AND.
+func (qb *QB) Or() *QB {
+	qb.nextOr = true
 	return qb
+}
+
+func (qb *QB) addCondition(c Condition) *QB {
+	if qb.nextOr {
+		c.logic = "OR"
+		qb.nextOr = false
+	} else {
+		c.logic = "AND"
+	}
+	qb.conds = append(qb.conds, c)
+	return qb
+}
+
+// Eq creates an equality condition.
+func (c *Clause) Eq(value any) *QB {
+	return c.qb.addCondition(Eq(c.field, value))
+}
+
+// Neq creates an inequality condition.
+func (c *Clause) Neq(value any) *QB {
+	return c.qb.addCondition(Neq(c.field, value))
+}
+
+// Gt creates a greater-than condition.
+func (c *Clause) Gt(value any) *QB {
+	return c.qb.addCondition(Gt(c.field, value))
+}
+
+// Gte creates a greater-than-or-equal condition.
+func (c *Clause) Gte(value any) *QB {
+	return c.qb.addCondition(Gte(c.field, value))
+}
+
+// Lt creates a less-than condition.
+func (c *Clause) Lt(value any) *QB {
+	return c.qb.addCondition(Lt(c.field, value))
+}
+
+// Lte creates a less-than-or-equal condition.
+func (c *Clause) Lte(value any) *QB {
+	return c.qb.addCondition(Lte(c.field, value))
+}
+
+// Like creates a LIKE condition.
+func (c *Clause) Like(value any) *QB {
+	return c.qb.addCondition(Like(c.field, value))
 }
 
 // Limit sets the limit for the query.
