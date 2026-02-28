@@ -88,10 +88,27 @@ func (qb *QB) Offset(offset int) *QB {
 	return qb
 }
 
-// OrderBy adds an order clause to the query.
-func (qb *QB) OrderBy(column, dir string) *QB {
-	qb.orderBy = append(qb.orderBy, Order{column: column, dir: dir})
-	return qb
+// OrderClause represents an intermediate state for building an order by clause.
+type OrderClause struct {
+	qb    *QB
+	field string
+}
+
+// OrderBy starts a new order clause for the given column.
+func (qb *QB) OrderBy(column string) *OrderClause {
+	return &OrderClause{qb: qb, field: column}
+}
+
+// Asc sets the order direction to ascending.
+func (o *OrderClause) Asc() *QB {
+	o.qb.orderBy = append(o.qb.orderBy, Order{column: o.field, dir: "ASC"})
+	return o.qb
+}
+
+// Desc sets the order direction to descending.
+func (o *OrderClause) Desc() *QB {
+	o.qb.orderBy = append(o.qb.orderBy, Order{column: o.field, dir: "DESC"})
+	return o.qb
 }
 
 // GroupBy adds a group by clause to the query.
