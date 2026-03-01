@@ -18,7 +18,7 @@ func RunCoreTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "users",
-			Cols:  []string{"name", "age"},
+			Sch:   []orm.Field{{Name: "name"}, {Name: "age"}},
 			Vals:  []any{"Alice", 30},
 		}
 
@@ -46,7 +46,7 @@ func RunCoreTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "users",
-			Cols:  []string{"age"},
+			Sch:   []orm.Field{{Name: "age"}},
 			Vals:  []any{31},
 		}
 
@@ -187,7 +187,7 @@ func RunCoreTests(t *testing.T) {
 		db := orm.New(&MockExecutor{}, &MockCompiler{})
 		model := &MockModel{
 			Table: "users",
-			Cols:  []string{"col1"},
+			Sch:   []orm.Field{{Name: "col1"}},
 			Vals:  []any{1, 2}, // Mismatch
 		}
 
@@ -204,7 +204,7 @@ func RunCoreTests(t *testing.T) {
 		db := orm.New(&MockExecutor{}, &MockCompiler{})
 		model := &MockModel{
 			Table: "users",
-			Cols:  []string{"col1"},
+			Sch:   []orm.Field{{Name: "col1"}},
 			Vals:  []any{1, 2}, // Mismatch
 		}
 
@@ -422,9 +422,57 @@ func RunCoreTests(t *testing.T) {
 		}
 	})
 
+	// Test DDL Actions
+	t.Run("DDL", func(t *testing.T) {
+		mockCompiler := &MockCompiler{}
+		mockExec := &MockExecutor{}
+		db := orm.New(mockExec, mockCompiler)
+
+		model := &MockModel{Table: "users"}
+
+		// CreateTable
+		err := db.CreateTable(model)
+		if err != nil {
+			t.Fatalf("CreateTable failed: %v", err)
+		}
+		if mockCompiler.LastQuery.Action != orm.ActionCreateTable {
+			t.Errorf("Expected ActionCreateTable, got %v", mockCompiler.LastQuery.Action)
+		}
+		if mockCompiler.LastQuery.Table != "users" {
+			t.Errorf("Expected table 'users', got '%s'", mockCompiler.LastQuery.Table)
+		}
+
+		// DropTable
+		err = db.DropTable(model)
+		if err != nil {
+			t.Fatalf("DropTable failed: %v", err)
+		}
+		if mockCompiler.LastQuery.Action != orm.ActionDropTable {
+			t.Errorf("Expected ActionDropTable, got %v", mockCompiler.LastQuery.Action)
+		}
+		if mockCompiler.LastQuery.Table != "users" {
+			t.Errorf("Expected table 'users', got '%s'", mockCompiler.LastQuery.Table)
+		}
+
+		// CreateDatabase
+		err = db.CreateDatabase("testdb")
+		if err != nil {
+			t.Fatalf("CreateDatabase failed: %v", err)
+		}
+		if mockCompiler.LastQuery.Action != orm.ActionCreateDatabase {
+			t.Errorf("Expected ActionCreateDatabase, got %v", mockCompiler.LastQuery.Action)
+		}
+		if mockCompiler.LastQuery.Database != "testdb" {
+			t.Errorf("Expected database 'testdb', got '%s'", mockCompiler.LastQuery.Database)
+		}
+		if mockCompiler.LastQuery.Table != "" {
+			t.Errorf("Expected empty table for CreateDatabase, got '%s'", mockCompiler.LastQuery.Table)
+		}
+	})
+
 	// 16. Errors coverage
 	t.Run("Errors", func(t *testing.T) {
-		model := &MockModel{Table: "t", Cols: []string{"a"}, Vals: []any{1}}
+		model := &MockModel{Table: "t", Sch: []orm.Field{{Name: "a"}}, Vals: []any{1}}
 
 		// Create Plan Error
 		db1 := orm.New(&MockExecutor{}, &MockCompiler{ReturnErr: errors.New("plan err")})
@@ -453,6 +501,33 @@ func RunCoreTests(t *testing.T) {
 		}
 		// Delete Exec Error
 		if err := db2.Delete(model); err == nil || err.Error() != "exec err" {
+			t.Errorf("Expected exec err, got %v", err)
+		}
+
+		// CreateTable Plan Error
+		if err := db1.CreateTable(model); err == nil || err.Error() != "plan err" {
+			t.Errorf("Expected plan err, got %v", err)
+		}
+		// CreateTable Exec Error
+		if err := db2.CreateTable(model); err == nil || err.Error() != "exec err" {
+			t.Errorf("Expected exec err, got %v", err)
+		}
+
+		// DropTable Plan Error
+		if err := db1.DropTable(model); err == nil || err.Error() != "plan err" {
+			t.Errorf("Expected plan err, got %v", err)
+		}
+		// DropTable Exec Error
+		if err := db2.DropTable(model); err == nil || err.Error() != "exec err" {
+			t.Errorf("Expected exec err, got %v", err)
+		}
+
+		// CreateDatabase Plan Error
+		if err := db1.CreateDatabase("t"); err == nil || err.Error() != "plan err" {
+			t.Errorf("Expected plan err, got %v", err)
+		}
+		// CreateDatabase Exec Error
+		if err := db2.CreateDatabase("t"); err == nil || err.Error() != "exec err" {
 			t.Errorf("Expected exec err, got %v", err)
 		}
 

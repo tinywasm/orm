@@ -20,10 +20,15 @@ func (db *DB) Create(m Model) error {
 	if err := validate(ActionCreate, m); err != nil {
 		return err
 	}
+	schema := m.Schema()
+	columns := make([]string, len(schema))
+	for i, f := range schema {
+		columns[i] = f.Name
+	}
 	q := Query{
 		Action:  ActionCreate,
 		Table:   m.TableName(),
-		Columns: m.Columns(),
+		Columns: columns,
 		Values:  m.Values(),
 	}
 	plan, err := db.compiler.Compile(q, m)
@@ -38,12 +43,74 @@ func (db *DB) Update(m Model, conds ...Condition) error {
 	if err := validate(ActionUpdate, m); err != nil {
 		return err
 	}
+	schema := m.Schema()
+	columns := make([]string, len(schema))
+	for i, f := range schema {
+		columns[i] = f.Name
+	}
 	q := Query{
 		Action:     ActionUpdate,
 		Table:      m.TableName(),
-		Columns:    m.Columns(),
+		Columns:    columns,
 		Values:     m.Values(),
 		Conditions: conds,
+	}
+	plan, err := db.compiler.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return db.exec.Exec(plan.Query, plan.Args...)
+}
+
+// emptyModel is a private zero-value type used only for CreateDatabase.
+type emptyModel struct{}
+
+func (e emptyModel) TableName() string { return "" }
+func (e emptyModel) Schema() []Field   { return nil }
+func (e emptyModel) Values() []any     { return nil }
+func (e emptyModel) Pointers() []any   { return nil }
+
+// CreateTable creates a new table for the given model.
+func (db *DB) CreateTable(m Model) error {
+	if err := validate(ActionCreateTable, m); err != nil {
+		return err
+	}
+	q := Query{
+		Action: ActionCreateTable,
+		Table:  m.TableName(),
+	}
+	plan, err := db.compiler.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return db.exec.Exec(plan.Query, plan.Args...)
+}
+
+// DropTable drops the table for the given model.
+func (db *DB) DropTable(m Model) error {
+	if err := validate(ActionDropTable, m); err != nil {
+		return err
+	}
+	q := Query{
+		Action: ActionDropTable,
+		Table:  m.TableName(),
+	}
+	plan, err := db.compiler.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return db.exec.Exec(plan.Query, plan.Args...)
+}
+
+// CreateDatabase creates a new database.
+func (db *DB) CreateDatabase(name string) error {
+	m := emptyModel{}
+	if err := validate(ActionCreateDatabase, m); err != nil {
+		return err
+	}
+	q := Query{
+		Action:   ActionCreateDatabase,
+		Database: name,
 	}
 	plan, err := db.compiler.Compile(q, m)
 	if err != nil {

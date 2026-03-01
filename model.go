@@ -4,7 +4,7 @@ package orm
 // Consumers implement this interface.
 type Model interface {
 	TableName() string
-	Columns() []string
+	Schema() []Field
 	Values() []any
 	Pointers() []any
 }

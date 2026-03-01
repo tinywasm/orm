@@ -99,14 +99,14 @@ func (m *MockRows) Err() error {
 // MockModel is a mock implementation of the Model interface.
 type MockModel struct {
 	Table string
-	Cols  []string
+	Sch   []orm.Field
 	Vals  []any
 }
 
-func (m MockModel) TableName() string { return m.Table }
-func (m MockModel) Columns() []string { return m.Cols }
-func (m MockModel) Values() []any     { return m.Vals }
-func (m MockModel) Pointers() []any   { return nil }
+func (m MockModel) TableName() string   { return m.Table }
+func (m MockModel) Schema() []orm.Field { return m.Sch }
+func (m MockModel) Values() []any       { return m.Vals }
+func (m MockModel) Pointers() []any     { return nil }
 
 // MockTxExecutor ...
 type MockTxExecutor struct {

@@ -3,20 +3,24 @@
 package orm
 
 import (
-	"flag"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"log"
 	"os"
+	"path/filepath"
 
-	"github.com/tinywasm/fmt"
+	. "github.com/tinywasm/fmt"
 )
 
 type FieldInfo struct {
-	Name       string
-	ColumnName string
-	IsPK       bool
+	Name        string
+	ColumnName  string
+	Type        FieldType
+	Constraints Constraint
+	Ref         string
+	RefColumn   string
+	IsPK        bool
 }
 
 type StructInfo struct {
@@ -28,19 +32,19 @@ type StructInfo struct {
 
 // GenerateCodeForStruct reads the Go File and generates the ORM implementations for a given struct name.
 // This func is made public to allow easy programmatic testing.
-func GenerateCodeForStruct(structName string, goFile string) {
+func GenerateCodeForStruct(structName string, goFile string) error {
 	if structName == "" {
-		log.Fatal("Please provide a struct name")
+		return Err("Please provide a struct name")
 	}
 
 	if goFile == "" {
-		log.Fatal("goFile path cannot be empty")
+		return Err("goFile path cannot be empty")
 	}
 
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, goFile, nil, parser.ParseComments)
 	if err != nil {
-		log.Fatalf("Failed to parse file %s: %v", goFile, err)
+		return Err(err, "Failed to parse file")
 	}
 
 	var targetStruct *ast.StructType
@@ -60,10 +64,10 @@ func GenerateCodeForStruct(structName string, goFile string) {
 	})
 
 	if !structFound {
-		log.Fatalf("Struct %s not found in file %s", structName, goFile)
+		return Err("Struct not found in file")
 	}
 
-	tableName := fmt.Convert(structName + "s").SnakeLow().String()
+	tableName := Convert(structName + "s").SnakeLow().String()
 
 	info := StructInfo{
 		Name:        structName,
@@ -82,80 +86,205 @@ func GenerateCodeForStruct(structName string, goFile string) {
 			continue
 		}
 
-		colName := fmt.Convert(fieldName).SnakeLow().String()
-		isID, isPK := fmt.IDorPrimaryKey(tableName, fieldName)
+		// Field Type mapping
+		var fieldType FieldType
+		var typeStr string
+
+		if ident, ok := field.Type.(*ast.Ident); ok {
+			typeStr = ident.Name
+		} else if sel, ok := field.Type.(*ast.SelectorExpr); ok {
+			if pkgIdent, ok := sel.X.(*ast.Ident); ok {
+				typeStr = pkgIdent.Name + "." + sel.Sel.Name
+			}
+		} else if arr, ok := field.Type.(*ast.ArrayType); ok {
+			if eltIdent, ok := arr.Elt.(*ast.Ident); ok && eltIdent.Name == "byte" {
+				typeStr = "[]byte"
+			}
+		}
+
+		if typeStr == "time.Time" {
+			return Err("time.Time not allowed, use int64 with tinywasm/time")
+		}
+
+		switch typeStr {
+		case "string":
+			fieldType = TypeText
+		case "int", "int32", "int64", "uint", "uint32", "uint64":
+			fieldType = TypeInt64
+		case "float32", "float64":
+			fieldType = TypeFloat64
+		case "bool":
+			fieldType = TypeBool
+		case "[]byte":
+			fieldType = TypeBlob
+		default:
+			log.Printf("Warning: unsupported type %s for field %s. Skipping.", typeStr, fieldName)
+			continue
+		}
+
+		colName := Convert(fieldName).SnakeLow().String()
+		isID, isPK := IDorPrimaryKey(tableName, fieldName)
+
+		constraints := ConstraintNone
+		var ref, refCol string
 
 		fieldIsPK := false
 		if (isID || isPK) && !pkFound {
 			fieldIsPK = true
 			pkFound = true
+			constraints |= ConstraintPK
+		}
+
+		if field.Tag != nil {
+			tagVal := Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
+			dbTag := ""
+			parts := Convert(tagVal).Split(" ")
+			for _, p := range parts {
+				if HasPrefix(p, "db:\"") {
+					dbTag = Convert(p).TrimPrefix(`db:"`).TrimSuffix(`"`).String()
+					break
+				}
+			}
+
+			if dbTag != "" {
+				tagParts := Convert(dbTag).Split(",")
+				for _, p := range tagParts {
+					switch {
+					case p == "pk":
+						if !fieldIsPK {
+							constraints |= ConstraintPK
+							fieldIsPK = true
+							pkFound = true
+						}
+					case p == "unique":
+						constraints |= ConstraintUnique
+					case p == "not_null":
+						constraints |= ConstraintNotNull
+					case p == "autoincrement":
+						if fieldType == TypeText {
+							return Err("autoincrement not allowed on TypeText")
+						}
+						constraints |= ConstraintAutoIncrement
+					case HasPrefix(p, "ref="):
+						refVal := Convert(p).TrimPrefix("ref=").String()
+						refParts := Convert(refVal).Split(":")
+						ref = refParts[0]
+						if len(refParts) > 1 {
+							refCol = refParts[1]
+						}
+					}
+				}
+			}
 		}
 
 		info.Fields = append(info.Fields, FieldInfo{
-			Name:       fieldName,
-			ColumnName: colName,
-			IsPK:       fieldIsPK,
+			Name:        fieldName,
+			ColumnName:  colName,
+			Type:        fieldType,
+			Constraints: constraints,
+			Ref:         ref,
+			RefColumn:   refCol,
+			IsPK:        fieldIsPK,
 		})
 	}
 
-	generateCodeFile(info, goFile)
+	return generateCodeFile(info, goFile)
 }
 
-func generateCodeFile(info StructInfo, sourceFile string) {
-	buf := fmt.Convert()
+func generateCodeFile(info StructInfo, sourceFile string) error {
+	buf := Convert()
 
 	// File Header
-	buf.Write(fmt.Sprintf("// Code generated by ormc; DO NOT EDIT.\n"))
-	buf.Write(fmt.Sprintf("package %s\n\n", info.PackageName))
+	buf.Write(Sprintf("// Code generated by ormc; DO NOT EDIT.\n"))
+	buf.Write(Sprintf("// NOTE: Schema() and Values() must always be in the same field order.\n"))
+	buf.Write(Sprintf("// String PK: set via github.com/tinywasm/unixid before calling db.Create().\n"))
+	buf.Write(Sprintf("package %s\n\n", info.PackageName))
 
 	buf.Write("import (\n")
 	buf.Write("\t\"github.com/tinywasm/orm\"\n")
 	buf.Write(")\n\n")
 
 	// Model Interface Methods
-	buf.Write(fmt.Sprintf("func (m *%s) TableName() string {\n", info.Name))
-	buf.Write(fmt.Sprintf("\treturn \"%s\"\n", info.TableName))
+	buf.Write(Sprintf("func (m *%s) TableName() string {\n", info.Name))
+	buf.Write(Sprintf("\treturn \"%s\"\n", info.TableName))
 	buf.Write("}\n\n")
 
-	buf.Write(fmt.Sprintf("func (m *%s) Columns() []string {\n", info.Name))
-	buf.Write("\treturn []string{\n")
+	buf.Write(Sprintf("func (m *%s) Schema() []orm.Field {\n", info.Name))
+	buf.Write("\treturn []orm.Field{\n")
 	for _, f := range info.Fields {
-		buf.Write(fmt.Sprintf("\t\t\"%s\",\n", f.ColumnName))
+		typeStr := "orm.TypeText"
+		switch f.Type {
+		case TypeInt64:
+			typeStr = "orm.TypeInt64"
+		case TypeFloat64:
+			typeStr = "orm.TypeFloat64"
+		case TypeBool:
+			typeStr = "orm.TypeBool"
+		case TypeBlob:
+			typeStr = "orm.TypeBlob"
+		}
+
+		var constraintStr []string
+		if f.Constraints == ConstraintNone {
+			constraintStr = append(constraintStr, "orm.ConstraintNone")
+		} else {
+			if f.Constraints&ConstraintPK != 0 {
+				constraintStr = append(constraintStr, "orm.ConstraintPK")
+			}
+			if f.Constraints&ConstraintUnique != 0 {
+				constraintStr = append(constraintStr, "orm.ConstraintUnique")
+			}
+			if f.Constraints&ConstraintNotNull != 0 {
+				constraintStr = append(constraintStr, "orm.ConstraintNotNull")
+			}
+			if f.Constraints&ConstraintAutoIncrement != 0 {
+				constraintStr = append(constraintStr, "orm.ConstraintAutoIncrement")
+			}
+		}
+
+		buf.Write(Sprintf("\t\t{Name: \"%s\", Type: %s, Constraints: %s", f.ColumnName, typeStr, Convert(constraintStr).Join(" | ").String()))
+		if f.Ref != "" {
+			buf.Write(Sprintf(", Ref: \"%s\"", f.Ref))
+		}
+		if f.RefColumn != "" {
+			buf.Write(Sprintf(", RefColumn: \"%s\"", f.RefColumn))
+		}
+		buf.Write("},\n")
 	}
 	buf.Write("\t}\n")
 	buf.Write("}\n\n")
 
-	buf.Write(fmt.Sprintf("func (m *%s) Values() []any {\n", info.Name))
+	buf.Write(Sprintf("func (m *%s) Values() []any {\n", info.Name))
 	buf.Write("\treturn []any{\n")
 	for _, f := range info.Fields {
-		buf.Write(fmt.Sprintf("\t\tm.%s,\n", f.Name))
+		buf.Write(Sprintf("\t\tm.%s,\n", f.Name))
 	}
 	buf.Write("\t}\n")
 	buf.Write("}\n\n")
 
-	buf.Write(fmt.Sprintf("func (m *%s) Pointers() []any {\n", info.Name))
+	buf.Write(Sprintf("func (m *%s) Pointers() []any {\n", info.Name))
 	buf.Write("\treturn []any{\n")
 	for _, f := range info.Fields {
-		buf.Write(fmt.Sprintf("\t\t&m.%s,\n", f.Name))
+		buf.Write(Sprintf("\t\t&m.%s,\n", f.Name))
 	}
 	buf.Write("\t}\n")
 	buf.Write("}\n\n")
 
 	// Metadata Descriptors
-	buf.Write(fmt.Sprintf("var %sMeta = struct {\n", info.Name))
+	buf.Write(Sprintf("var %sMeta = struct {\n", info.Name))
 	buf.Write("\tTableName string\n")
 	for _, f := range info.Fields {
-		buf.Write(fmt.Sprintf("\t%s string\n", f.Name))
+		buf.Write(Sprintf("\t%s string\n", f.Name))
 	}
 	buf.Write("}{\n")
-	buf.Write(fmt.Sprintf("\tTableName: \"%s\",\n", info.TableName))
+	buf.Write(Sprintf("\tTableName: \"%s\",\n", info.TableName))
 	for _, f := range info.Fields {
-		buf.Write(fmt.Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
+		buf.Write(Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
 	}
 	buf.Write("}\n\n")
 
 	// Typed Read Operations
-	buf.Write(fmt.Sprintf("func ReadOne%s(qb *orm.QB, model *%s) (*%s, error) {\n", info.Name, info.Name, info.Name))
+	buf.Write(Sprintf("func ReadOne%s(qb *orm.QB, model *%s) (*%s, error) {\n", info.Name, info.Name, info.Name))
 	buf.Write("\terr := qb.ReadOne()\n")
 	buf.Write("\tif err != nil {\n")
 	buf.Write("\t\treturn nil, err\n")
@@ -163,35 +292,75 @@ func generateCodeFile(info StructInfo, sourceFile string) {
 	buf.Write("\treturn model, nil\n")
 	buf.Write("}\n\n")
 
-	buf.Write(fmt.Sprintf("func ReadAll%s(qb *orm.QB) ([]*%s, error) {\n", info.Name, info.Name))
-	buf.Write(fmt.Sprintf("\tvar results []*%s\n", info.Name))
+	buf.Write(Sprintf("func ReadAll%s(qb *orm.QB) ([]*%s, error) {\n", info.Name, info.Name))
+	buf.Write(Sprintf("\tvar results []*%s\n", info.Name))
 	buf.Write("\terr := qb.ReadAll(\n")
-	buf.Write(fmt.Sprintf("\t\tfunc() orm.Model { return &%s{} },\n", info.Name))
-	buf.Write(fmt.Sprintf("\t\tfunc(m orm.Model) { results = append(results, m.(*%s)) },\n", info.Name))
+	buf.Write(Sprintf("\t\tfunc() orm.Model { return &%s{} },\n", info.Name))
+	buf.Write(Sprintf("\t\tfunc(m orm.Model) { results = append(results, m.(*%s)) },\n", info.Name))
 	buf.Write("\t)\n")
 	buf.Write("\treturn results, err\n")
 	buf.Write("}\n")
 
-	outName := fmt.Convert(sourceFile).TrimSuffix(".go").String() + "_orm.go"
-	err := os.WriteFile(outName, buf.Bytes(), 0644)
-	if err != nil {
-		log.Fatalf("Failed to write output file: %v", err)
-	}
+	outName := Convert(sourceFile).TrimSuffix(".go").String() + "_orm.go"
+	return os.WriteFile(outName, buf.Bytes(), 0644)
 }
 
 // RunOrmcCLI is the entry point for the CLI tool.
 func RunOrmcCLI() {
-	structName := flag.String("struct", "", "Name of the struct to generate ORM code for")
-	flag.Parse()
-
-	if *structName == "" {
-		log.Fatal("Please provide a struct name using -struct flag")
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get working directory: %v", err)
 	}
 
-	goFile := os.Getenv("GOFILE")
-	if goFile == "" {
-		log.Fatal("GOFILE environment variable is not set. Are you running this via go:generate?")
+	foundAny := false
+
+	err = filepath.Walk(cwd, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			dirName := info.Name()
+			if dirName == "vendor" || dirName == ".git" || dirName == "testdata" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		fileName := info.Name()
+		if fileName == "model.go" || fileName == "models.go" {
+			fset := token.NewFileSet()
+			node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			if err != nil {
+				return nil // Skip unparseable files
+			}
+
+			for _, decl := range node.Decls {
+				if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
+					for _, spec := range genDecl.Specs {
+						if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+							if _, ok := typeSpec.Type.(*ast.StructType); ok {
+								err := GenerateCodeForStruct(typeSpec.Name.Name, path)
+								if err != nil {
+									log.Printf("Failed to generate code for %s in %s: %v", typeSpec.Name.Name, path, err)
+								} else {
+									foundAny = true
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Fatalf("Error walking directory: %v", err)
 	}
 
-	GenerateCodeForStruct(*structName, goFile)
+	if !foundAny {
+		log.Fatal("No models found")
+	}
 }
