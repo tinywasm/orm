@@ -9,6 +9,9 @@ const (
 	ActionUpdate
 	ActionDelete
 	ActionReadAll
+	ActionCreateTable
+	ActionDropTable
+	ActionCreateDatabase
 )
 
 // Order represents a sort order for a query.
@@ -26,6 +29,7 @@ func (o Order) Dir() string    { return o.dir }
 type Query struct {
 	Action     Action
 	Table      string
+	Database   string
 	Columns    []string
 	Values     []any
 	Conditions []Condition
