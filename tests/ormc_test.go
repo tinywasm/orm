@@ -126,4 +126,67 @@ func TestOrmc(t *testing.T) {
 			t.Errorf("Expected 'Ch' to be absent in output, but it was generated")
 		}
 	})
+
+	t.Run("Numeric Type Mapping and Bitmask", func(t *testing.T) {
+		err := orm.GenerateCodeForStruct("NumericTypes", "mock_generator_model.go")
+		if err != nil {
+			t.Fatalf("Failed to generate code for NumericTypes: %v", err)
+		}
+
+		outFile := "mock_generator_model_orm.go"
+		contentBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("Failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		content := string(contentBytes)
+
+		expectedStrings := []string{
+			// int32 → TypeInt64
+			`{Name: "idnumeric", Type: orm.TypeInt64, Constraints: orm.ConstraintPK | orm.ConstraintNotNull}`,
+			// uint64 → TypeInt64
+			`{Name: "count_uint", Type: orm.TypeInt64, Constraints: orm.ConstraintNone}`,
+			// float32 → TypeFloat64
+			`{Name: "ratio_f32", Type: orm.TypeFloat64, Constraints: orm.ConstraintNone}`,
+		}
+
+		for _, expected := range expectedStrings {
+			if !strings.Contains(content, expected) {
+				t.Errorf("Generated file missing expected string: %s", expected)
+			}
+		}
+
+		// Bitmask correctness: ConstraintPK | ConstraintNotNull = 1 | 4 = 5
+		pkConstraint := orm.ConstraintPK
+		notNullConstraint := orm.ConstraintNotNull
+		combined := pkConstraint | notNullConstraint
+		if combined != 5 {
+			t.Errorf("Expected ConstraintPK | ConstraintNotNull = 5, got %d", combined)
+		}
+	})
+
+	t.Run("Ref Without Column", func(t *testing.T) {
+		err := orm.GenerateCodeForStruct("RefNoColumn", "mock_generator_model.go")
+		if err != nil {
+			t.Fatalf("Failed to generate code for RefNoColumn: %v", err)
+		}
+
+		outFile := "mock_generator_model_orm.go"
+		contentBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("Failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		content := string(contentBytes)
+
+		// Ref present, RefColumn must be absent (empty string omitted from generated code)
+		if !strings.Contains(content, `Ref: "parents"`) {
+			t.Errorf("Expected Ref=parents in generated file")
+		}
+		if strings.Contains(content, "RefColumn") {
+			t.Errorf("RefColumn must be absent when ref tag has no column")
+		}
+	})
 }

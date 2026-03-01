@@ -32,3 +32,16 @@ type BadAutoInc struct {
 type Unsupp struct {
 	Ch chan int
 }
+
+// NumericTypes covers int32, uint64, float32 mapping and bitmask constraints.
+type NumericTypes struct {
+	IDNumeric int32   `db:"pk,not_null"` // PK + NotNull → bitmask 5
+	CountUint uint64
+	RatioF32  float32
+}
+
+// RefNoColumn covers db:"ref=table" without a specific column (RefColumn must be "").
+type RefNoColumn struct {
+	IDRef    string `db:"pk"`
+	ParentID int64  `db:"ref=parents"`
+}
