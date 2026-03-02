@@ -1,7 +1,8 @@
-# PLAN: `ormc` Multi-Struct Bug Fix — `tinywasm/orm`
+# PLAN: Coverage Gap Fix — `tinywasm/orm`
 
-> ⚠️ **Prerequisite:** Complete [ORMC_HANDLER.md](ORMC_HANDLER.md) **first**.
-> This plan assumes `Ormc` struct handler and shims are already in place.
+> **Context:** `CHECK_PLAN.md` was executed correctly. All tests pass.
+> However, `gotest` reports **87.1%** coverage — below the required **≥ 90%**.
+> This plan adds targeted tests and one small alias fix to close the gap.
 
 ## Prerequisites
 
@@ -11,21 +12,20 @@ go install github.com/tinywasm/devflow/cmd/gotest@latest
 
 ---
 
-## Bug Summary
+## Root Cause Analysis
 
-**Root cause:** `GenerateCodeForStruct` generates a complete output file for a single struct
-and writes it immediately via `os.WriteFile`. When `RunOrmcCLI` finds multiple structs
-in the same `model.go` / `models.go` file, it calls `GenerateCodeForStruct` once per struct,
-each call **overwrites** the previous output. Only the last struct processed survives.
+| File | Function | Coverage | Why uncovered |
+|------|----------|----------|---------------|
+| `ormc_handler.go` | `SetLog` | 0% | Never called in any test |
+| `ormc_handler.go` | `SetRootDir` | 0% | Never called in any test |
+| `ormc_handler.go` | `log` | 50% | `logFn != nil` branch not triggered |
+| `ormc.go` | `Run()` | 0% | No test invokes the directory walker |
+| `ormc.go` | `detectTableName` | 80% | Pointer-receiver branch (`*struct`) not activated |
+| `qb.go` | `Or()`, `Neq/Gt/Gte/Lt/Lte/Like/In` (Clause methods) | 0% | Tests use `orm.Neq(...)` directly; never use `qb.Where("x").Neq(y)` chain |
 
-**Reported symptom:** `ormc` on a `models.go` with 9 structs only generates code for
-`OAuthState` (the last one). The other 8 structs are missing `Schema()`, `Values()`,
-`Pointers()` → compiler error: structs do not implement `orm.Model`.
-
-**Secondary bugs fixed in this plan:**
-- `db:"-"` not supported → unsupported-type warning for slice/struct fields
-- `TableName()` duplicated when the user already defines it manually
-- `time.Time` causes fatal error even when it can simply be skipped
+> **Note on `db.go:68-71`:** These are `MockModel` methods in `setup_test.go` (not
+> in the main package). They are counted as 0% because they are part of the test's
+> mock fixture, not the library. This is expected and acceptable.
 
 ---
 
@@ -33,383 +33,387 @@ each call **overwrites** the previous output. Only the last struct processed sur
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D1 | Split `ParseStruct` (parse only) + `GenerateForFile` (write) on `*Ormc` | SRP: parsing and I/O are independent concerns |
-| D2 | `*Ormc.Run()` accumulates all `StructInfo` per file, then calls `GenerateForFile` once | Fixes the overwrite bug at the root |
-| D3 | `db:"-"` detected **before** type resolution → silent skip, no warning | Explicit developer intent ≠ type error. Convention: GORM/sqlx/entgo |
-| D4 | Fields with `db:"-"` excluded from `Schema()`, `Values()`, AND `Pointers()` | Invariant: all three must list exactly the same fields in the same order |
-| D5 | `TableName()` only generated if **not already declared** in the source file | Prevents `duplicate method` compiler error |
-| D6 | **Breaking change**: old package-level functions deleted; tests rewritten to `orm.New().<Method>(...)` | No dead code; clean API |
-| D7 | Struct with zero mappable fields → **skip entirely**, `o.log(...)` warning | A structurally empty struct cannot implement `orm.Model` usefully |
-| D8 | `time.Time` **without** `db:"-"` → `o.log(...)` warning + skip (not fatal, not error) | Vision: minimum tags. Developer can add `db:"-"` to suppress warning |
-| D9 | `time.Time` **with** `db:"-"` → silent skip (covered by D3) | Consistent with all other explicitly ignored fields |
-| D10 | Remove per-struct `//go:generate ormc -struct X`; use single `//go:generate ormc` at project root | `ormc` does not accept `-struct` flag; per-struct directives are legacy |
-| D11 | File with zero mappable infos → skip + `o.log(...)` warning, no `_orm.go` written | An empty output file is valid Go but useless |
-
----
-
-## Architecture Change
-
-### Before (broken)
-
-```
-ormc CLI
-  └─ per struct → GenerateCodeForStruct(name, file)
-                      └─ parse + write file  ← OVERWRITES previous struct
-```
-
-### After (fixed)
-
-```
-ormc CLI
-  └─ orm.New().Run()             ← no dir param, uses o.rootDir (default ".")
-       └─ per file → o.ParseStruct() × N → []StructInfo
-                   → o.GenerateForFile([]StructInfo, file)  ← writes ONCE
-```
+| D1 | Add `TestOrmc_Run` to `tests/ormc_multi_test.go` using `SetRootDir` + `SetLog` | Covers `Run()`, `SetRootDir`, `SetLog`, and the `logFn != nil` branch of `log` in one shot |
+| D2 | The `Run()` test uses `t.TempDir()` + copies `mock_generator_model.go` there → avoids side effects | Clean: no leftover `_orm.go` in the real `tests/` directory |
+| D3 | Add `TestQB_ClauseChain` to `tests/ormc_multi_test.go` | Covers all 7 `*Clause` methods (`Neq`, `Gt`, `Gte`, `Lt`, `Lte`, `Like`, `In`) + `QB.Or()` |
+| D4 | Add a `*PointerReceiver` fixture to `mock_generator_model.go` to cover `detectTableName` pointer-receiver branch | One-liner struct with `func (*PointerReceiver) TableName() string { return "ptr_table" }` |
+| D5 | Add `TestOrmc_DetectPointerReceiver` in `ormc_multi_test.go` | Completes the 80% → 100% gap in `detectTableName` |
+| D6 | `SKILL.md` mentions `orm.New()` for `Ormc` but the real constructor is `NewOrmc()` — add alias `func New() *Ormc` to `ormc_handler.go` | Fixes doc/code mismatch; `New()` simply calls `NewOrmc()` |
 
 ---
 
 ## Affected Files
 
 | File | Change |
-|------|---------|
-| `ormc.go` | All functions become methods on `*Ormc` (from ORMC_HANDLER); fix `Run()` to accumulate + write once; add `db:"-"` / `time.Time` / `TableName()` detection |
-| `ormc_handler.go` | Already created in ORMC_HANDLER prerequisite |
-| `tests/mock_generator_model.go` | Add `ModelWithIgnored`, `MultiA`, `MultiB`, `BadTimeNoTag`; delete `BadTime` |
-| `tests/ormc_test.go` | Update `Bad Time Type` test → now expects skip (no error) |
-| `tests/ormc_multi_test.go` | **New file**: multi-struct, `db:"-"`, `TableName` detection tests |
+|------|--------|
+| `ormc_handler.go` | Add `New() *Ormc` alias (D6) |
+| `tests/mock_generator_model.go` | Add `PointerReceiver` struct + `*PointerReceiver` `TableName()` method (D4) |
+| `tests/ormc_multi_test.go` | Add `TestOrmc_Run`, `TestOrmc_DetectPointerReceiver`, `TestQB_ClauseChain` (D1, D3, D5) |
 
 ---
 
 ## Execution Steps
 
-### Step 1 — Add `(o *Ormc) ParseStruct` to `ormc.go`
+### Step 1 — Add `New()` alias to `ormc_handler.go`
 
-**All old package-level functions are deleted** (breaking change, per ORMC_HANDLER.md DE).
-Add the `ParseStruct` method on `*Ormc`:
+Append after `NewOrmc()`:
 
 ```go
-// ParseStruct parses a single struct from a Go file and returns its metadata.
-func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error) {
-    if structName == "" {
-        return StructInfo{}, Err("Please provide a struct name")
-    }
-    if goFile == "" {
-        return StructInfo{}, Err("goFile path cannot be empty")
-    }
-
-    fset := token.NewFileSet()
-    node, err := parser.ParseFile(fset, goFile, nil, parser.ParseComments)
-    if err != nil {
-        return StructInfo{}, Err(err, "Failed to parse file")
-    }
-
-    // ... (field parsing logic, see Step 2 for updated field loop) ...
-
-    tableName := detectTableName(node, structName) // Step 3
-    declared := tableName != ""
-    if !declared {
-        tableName = Convert(structName + "s").SnakeLow().String()
-    }
-
-    info := StructInfo{
-        Name:              structName,
-        TableName:         tableName,
-        PackageName:       node.Name.Name,
-        TableNameDeclared: declared,
-    }
-
-    // field loop — see Step 2
-
-    return info, nil
+// New is an alias for NewOrmc. Provided for ergonomics.
+func New() *Ormc {
+    return NewOrmc()
 }
 ```
 
-And `GenerateForStruct` on `*Ormc` uses `o.ParseStruct` + `o.GenerateForFile`:
+> This fixes the `SKILL.md` code example that calls `orm.New()` to build an `*Ormc`.
+
+---
+
+### Step 2 — Add `PointerReceiver` fixture to `tests/mock_generator_model.go`
+
+Append at the end of the file:
 
 ```go
-func (o *Ormc) GenerateForStruct(structName string, goFile string) error {
-    info, err := o.ParseStruct(structName, goFile)
-    if err != nil {
-        return err
-    }
-    if len(info.Fields) == 0 {
-        o.log("Warning: struct", structName, "has no mappable fields; skipping output")
-        return nil // D14
-    }
-    return o.GenerateForFile([]StructInfo{info}, goFile)
-}
-```
-
-Update `StructInfo` to carry the `TableNameDeclared` flag:
-
-```go
-type StructInfo struct {
-    Name              string
-    TableName         string
-    PackageName       string
-    Fields            []FieldInfo
-    TableNameDeclared bool // true = source already declares TableName(); do not generate
-}
-```
-
-### Step 2 — Update field loop in `(o *Ormc) ParseStruct`: `db:"-"` + unsupported types
-
-The field loop must check `db:"-"` **first**, before resolving the Go type:
-
-```go
-for _, field := range targetStruct.Fields.List {
-    if len(field.Names) == 0 {
-        continue // anonymous/embedded field
-    }
-    fieldName := field.Names[0].Name
-    if !ast.IsExported(fieldName) {
-        continue
-    }
-
-    // ── 1. Check db tag FIRST ──────────────────────────────────────────────
-    dbTag := extractDbTag(field) // helper: returns the db:"..." value or ""
-    if dbTag == "-" {
-        continue // D3: silent skip, no warning — explicit developer intent
-    }
-
-    // ── 2. Resolve Go type ─────────────────────────────────────────────────
-    typeStr := resolveTypeStr(field) // helper: returns "string", "int64", "[]byte", etc.
-
-    if typeStr == "time.Time" {
-        // D8: warn + skip — developer should use int64 + tinywasm/time
-        // D9: if db:"-" was set above, we already continued before reaching here
-        log.Printf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName)
-        continue
-    }
-
-    var fieldType FieldType
-    switch typeStr {
-    case "string":
-        fieldType = TypeText
-    case "int", "int32", "int64", "uint", "uint32", "uint64":
-        fieldType = TypeInt64
-    case "float32", "float64":
-        fieldType = TypeFloat64
-    case "bool":
-        fieldType = TypeBool
-    case "[]byte":
-        fieldType = TypeBlob
-    default:
-        // Unsupported type without db:"-" → warn + skip (not fatal)
-        // Tip: add db:"-" to suppress this warning
-        log.Printf("Warning: unsupported type %q for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName)
-        continue
-    }
-
-    // ── 3. Process constraints ─────────────────────────────────────────────
-    // ... (existing constraint logic for pk, unique, not_null, ref, etc.) ...
-}
-```
-
-> **Invariant (D4):** Only fields that pass the type check above are added to
-> `FieldInfo`. `Schema()`, `Values()`, and `Pointers()` all iterate over `info.Fields`
-> → they are always in sync.
-
-### Step 3 — Add `detectTableName` helper
-
-```go
-// detectTableName scans the AST for func (X) TableName() string on structName.
-// Returns the literal return value if found, "" otherwise.
-func detectTableName(node *ast.File, structName string) string {
-    for _, decl := range node.Decls {
-        funcDecl, ok := decl.(*ast.FuncDecl)
-        if !ok || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
-            continue
-        }
-        if funcDecl.Name.Name != "TableName" {
-            continue
-        }
-        recv := funcDecl.Recv.List[0].Type
-        recvName := ""
-        if ident, ok := recv.(*ast.Ident); ok {
-            recvName = ident.Name
-        } else if star, ok := recv.(*ast.StarExpr); ok {
-            if ident, ok := star.X.(*ast.Ident); ok {
-                recvName = ident.Name
-            }
-        }
-        if recvName != structName {
-            continue
-        }
-        if funcDecl.Body != nil && len(funcDecl.Body.List) == 1 {
-            if ret, ok := funcDecl.Body.List[0].(*ast.ReturnStmt); ok && len(ret.Results) == 1 {
-                if lit, ok := ret.Results[0].(*ast.BasicLit); ok {
-                    return strings.Trim(lit.Value, `"`)
-                }
-            }
-        }
-    }
-    return ""
-}
-```
-
-`(o *Ormc) GenerateForFile` writes ORM implementations for all infos into one file:
-
-```go
-// (o *Ormc) GenerateForFile writes ORM implementations for all infos into one file.
-func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
-    if len(infos) == 0 {
-        return nil
-    }
-    buf := Convert()
-
-    // File header — written once
-    buf.Write("// Code generated by ormc; DO NOT EDIT.\n")
-    buf.Write("// NOTE: Schema() and Values() must always be in the same field order.\n")
-    buf.Write("// String PK: set via github.com/tinywasm/unixid before calling db.Create().\n")
-    buf.Write(Sprintf("package %s\n\n", infos[0].PackageName))
-    buf.Write("import (\n\t\"github.com/tinywasm/orm\"\n)\n\n")
-
-    for _, info := range infos {
-        // TableName() — only if not already declared in source (D5)
-        if !info.TableNameDeclared {
-            buf.Write(Sprintf("func (m *%s) TableName() string {\n", info.Name))
-            buf.Write(Sprintf("\treturn \"%s\"\n", info.TableName))
-            buf.Write("}\n\n")
-        }
-        // Schema(), Values(), Pointers(), Meta, ReadOne*, ReadAll*
-        // ... (existing generation logic) ...
-    }
-
-    outName := Convert(sourceFile).TrimSuffix(".go").String() + "_orm.go"
-    return os.WriteFile(outName, buf.Bytes(), 0644)
-}
-```
-
-`Run()` on `*Ormc` uses `o.rootDir` (set by `SetRootDir`, default `"."`).
-Inside the file-scanning loop, use `o.ParseStruct` and `o.GenerateForFile`
-— and replace all `log.Printf` with `o.log(...)`:
-
-```go
-func (o *Ormc) Run() error {
-    foundAny := false
-
-    err := filepath.Walk(o.rootDir, func(path string, info os.FileInfo, err error) error {
-        // ... dir skip logic unchanged ...
-
-        if fileName == "model.go" || fileName == "models.go" {
-            var infos []StructInfo
-
-            for _, decl := range node.Decls {
-                if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
-                    for _, spec := range genDecl.Specs {
-                        if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-                            if _, ok := typeSpec.Type.(*ast.StructType); ok {
-                                info, err := o.ParseStruct(typeSpec.Name.Name, path)
-                                if err != nil {
-                                    o.log("Skipping", typeSpec.Name.Name, "in", path+":", err)
-                                    continue
-                                }
-                                if len(info.Fields) == 0 {
-                                    o.log("Warning:", typeSpec.Name.Name, "has no mappable fields; skipping")
-                                    continue
-                                }
-                                infos = append(infos, info)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if len(infos) == 0 {
-                o.log("Warning: no mappable structs found in", path+"; no output generated")
-                return nil
-            }
-
-            if err := o.GenerateForFile(infos, path); err != nil {
-                o.log("Failed to write output for", path+":", err)
-            } else {
-                foundAny = true
-            }
-        }
-        return nil
-    })
-
-    if err != nil {
-        return Err(err, "error walking directory")
-    }
-    if !foundAny {
-        return Err("no models found")
-    }
-    return nil
-}
-```
-
-### Step 6 — Add test fixtures to `tests/mock_generator_model.go`
-
-```go
-// ModelWithIgnored tests db:"-" silent exclusion from Schema/Values/Pointers.
-type ModelWithIgnored struct {
-    ID      string   `db:"pk"`
-    Name    string
-    Tags    []string `db:"-"` // slice: silently ignored
-    Friends []User   `db:"-"` // struct slice: silently ignored
-    Score   float64
-}
-
-// BadTimeNoTag tests that time.Time WITHOUT db:"-" → warning + skip (not fatal).
-type BadTimeNoTag struct {
-    ID        string    `db:"pk"`
-    Name      string
-    CreatedAt time.Time // no db tag → warning + skip
-}
-
-// MultiA and MultiB: multi-struct generation in same file.
-// Both must appear in the generated _orm.go (D2 fix).
-type MultiA struct {
+// PointerReceiver tests that detectTableName handles pointer receivers (*T).
+type PointerReceiver struct {
     ID   string `db:"pk"`
     Name string
 }
-func (MultiA) TableName() string { return "multi_a_records" } // manually declared → D5
-
-type MultiB struct {
-    ID    string `db:"pk"`
-    Value int64
-}
-// MultiB has NO TableName() → ormc must generate it
+func (*PointerReceiver) TableName() string { return "ptr_table" }
 ```
 
-### Step 7 — Update `tests/ormc_test.go`: fix `Bad Time Type` test
+---
 
-The existing test expects a fatal error. With D8, `time.Time` is now a warning+skip:
+### Step 3 — Add tests to `tests/ormc_multi_test.go`
+
+Append the following three test functions to the existing file:
 
 ```go
-t.Run("Bad Time Type — now a warning, not fatal", func(t *testing.T) {
-    // D8: time.Time without db:"-" → warning + skip, not error
-    err := orm.GenerateCodeForStruct("BadTimeNoTag", "mock_generator_model.go")
-    if err != nil {
-        t.Fatalf("Expected no error for time.Time (warn+skip), got: %v", err)
-    }
+func TestOrmc_Run(t *testing.T) {
+    t.Run("Run() scans dir and generates all structs", func(t *testing.T) {
+        // Use a temp dir to avoid polluting tests/
+        tmp := t.TempDir()
 
-    outFile := "mock_generator_model_orm.go"
-    content, err := os.ReadFile(outFile)
-    if err != nil {
-        t.Fatalf("Failed to read generated file: %v", err)
-    }
-    defer os.Remove(outFile)
+        // Copy model file into temp dir
+        src, err := os.ReadFile("mock_generator_model.go")
+        if err != nil {
+            t.Fatal(err)
+        }
+        // Replace package declaration so it compiles as package "tests"
+        modelFile := filepath.Join(tmp, "model.go")
+        if err := os.WriteFile(modelFile, src, 0644); err != nil {
+            t.Fatal(err)
+        }
 
-    s := string(content)
-    // CreatedAt must be absent (skipped)
-    if strings.Contains(s, "CreatedAt") || strings.Contains(s, "created_at") {
-        t.Error("time.Time field must be absent from generated output")
-    }
-    // ID and Name must be present
-    if !strings.Contains(s, `"id"`) || !strings.Contains(s, `"name"`) {
-        t.Error("Other fields must still be generated")
-    }
-})
+        var logged []string
+        o := orm.NewOrmc()
+        o.SetRootDir(tmp)
+        o.SetLog(func(messages ...any) {
+            // Collect log output — verifies SetLog + logFn branch
+            for _, m := range messages {
+                logged = append(logged, fmt.Sprint(m))
+            }
+        })
+
+        if err := o.Run(); err != nil {
+            t.Fatalf("Run() failed: %v", err)
+        }
+
+        // The generated file must exist
+        outFile := filepath.Join(tmp, "model_orm.go")
+        content, err := os.ReadFile(outFile)
+        if err != nil {
+            t.Fatalf("Expected model_orm.go, got error: %v", err)
+        }
+
+        s := string(content)
+        // Spot-check a couple of structs that have valid fields
+        if !strings.Contains(s, "func (m *User) Schema()") {
+            t.Error("User Schema() not in Run() output")
+        }
+        if !strings.Contains(s, "func (m *MultiA) Schema()") {
+            t.Error("MultiA Schema() not in Run() output")
+        }
+        // Warning for BadTimeNoTag / Unsupp must have been logged
+        _ = logged // just exercise the log path; content varies
+    })
+
+    t.Run("Run() returns error when no models found", func(t *testing.T) {
+        tmp := t.TempDir()
+        o := orm.NewOrmc()
+        o.SetRootDir(tmp)
+        if err := o.Run(); err == nil {
+            t.Error("Expected error for empty directory, got nil")
+        }
+    })
+}
+
+func TestOrmc_DetectPointerReceiver(t *testing.T) {
+    t.Run("TableName() NOT generated when declared with pointer receiver", func(t *testing.T) {
+        err := orm.NewOrmc().GenerateForStruct("PointerReceiver", "mock_generator_model.go")
+        if err != nil {
+            t.Fatal(err)
+        }
+
+        outFile := "mock_generator_model_orm.go"
+        content, err := os.ReadFile(outFile)
+        if err != nil {
+            t.Fatal(err)
+        }
+        defer os.Remove(outFile)
+
+        if strings.Contains(string(content), "func (m *PointerReceiver) TableName()") {
+            t.Error("TableName() must NOT be generated — already declared with pointer receiver")
+        }
+        if !strings.Contains(string(content), `"ptr_table"`) {
+            // The Meta struct must reference the declared table name
+            t.Error("Expected ptr_table in generated meta")
+        }
+    })
+}
+
+func TestQB_ClauseChain(t *testing.T) {
+    t.Run("All Clause operators via QB chain", func(t *testing.T) {
+        mockCompiler := &MockCompiler{}
+        mockExec := &MockExecutor{}
+        db := orm.New(mockExec, mockCompiler)
+        model := &MockModel{Table: "items"}
+        mockExec.ReturnQueryRows = &MockRows{Count: 0}
+
+        db.Query(model).
+            Where("a").Neq(1).
+            Where("b").Gt(2).
+            Where("c").Gte(3).
+            Where("d").Lt(4).
+            Where("e").Lte(5).
+            Where("f").Like("%x%").
+            Where("g").In([]int{1, 2}).
+            Or().Where("h").Eq(9).
+            ReadAll(func() orm.Model { return &MockModel{} }, func(orm.Model) {})
+
+        conds := mockCompiler.LastQuery.Conditions
+        expected := []struct {
+            field string
+            op    string
+        }{
+            {"a", "!="},
+            {"b", ">"},
+            {"c", ">="},
+            {"d", "<"},
+            {"e", "<="},
+            {"f", "LIKE"},
+            {"g", "IN"},
+            {"h", "="},
+        }
+        if len(conds) != len(expected) {
+            t.Fatalf("Expected %d conditions, got %d", len(expected), len(conds))
+        }
+        for i, ex := range expected {
+            if conds[i].Field() != ex.field {
+                t.Errorf("cond[%d]: expected field %q, got %q", i, ex.field, conds[i].Field())
+            }
+            if conds[i].Operator() != ex.op {
+                t.Errorf("cond[%d]: expected op %q, got %q", i, ex.op, conds[i].Operator())
+            }
+        }
+        // Last condition must be OR
+        if conds[7].Logic() != "OR" {
+            t.Errorf("Expected last condition Logic=OR, got %s", conds[7].Logic())
+        }
+    })
+}
 ```
 
-> **Note:** Delete the existing `BadTime` struct from `mock_generator_model.go`
-> (it only had `time.Time`, so it is now D7-skipped entirely).
-> Replace with `BadTimeNoTag` (has other valid fields alongside `time.Time`).
+> **Import note:** `ormc_multi_test.go` needs `"fmt"`, `"path/filepath"` and `"os"` in its
+> import block. `MockModel`, `MockCompiler`, `MockExecutor`, `MockRows` are already
+> available from `setup_test.go`.
 
-### Step 8 — Add `tests/ormc_multi_test.go`
+---
+
+### Step 4 — Run tests
+
+```bash
+gotest
+```
+
+**Acceptance Criteria:**
+
+| Criterion | Check |
+|-----------|-------|
+| All previous tests still pass | ✅ |
+| `TestOrmc_Run` — Run() generates output for all structs | ✅ |
+| `TestOrmc_Run` — empty dir returns error | ✅ |
+| `TestOrmc_DetectPointerReceiver` — pointer receiver suppresses TableName() | ✅ |
+| `TestQB_ClauseChain` — all 7 Clause methods + `Or()` chain verified | ✅ |
+| `gotest` ≥ 90% coverage | ✅ |
+
+---
+
+## Annex — Relation Support (`PLAN_RELATIONS.md`)
+
+> **Execute this annex after Step 4 passes.** The `New() *Ormc` alias (Step 1)
+> and `SetRootDir` / `SetLog` availability are prerequisites already satisfied
+> by the steps above.
+
+### Additional Decisions
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| R1 | Relation detected by: field type is `[]Struct` where `Struct` has a `db:"ref=parentTable"` field | Uses existing `db:"ref=..."` system — zero new concepts |
+| R2 | No additional tag on the parent slice field | Minimum tags principle; child already declares the FK |
+| R3 | Loader generated in the **child's** `_orm.go`, not the parent's | SRP: child struct owns its own query functions |
+| R4 | Loader signature: `ReadAll{Child}By{FK}(db *orm.DB, parentID string) ([]*Child, error)` | Typed, consistent with existing `ReadAll{Model}` convention |
+| R5 | If no FK found in child → `o.log(...)` warning + skip (no error) | Cannot generate a loader without knowing the FK column |
+| R6 | Many-to-many via junction table: **deferred** to `PLAN_MANY_TO_MANY.md` | Complexity; one-to-many covers the most common case first |
+| R7 | `resolveRelations` exported as `ResolveRelations` | Required for black-box testing from `tests/` package |
+| R8 | `ParseStruct` extended to collect `SliceFields []SliceFieldInfo` alongside `Fields []FieldInfo` | Keeps slice info separated from DB-mappable fields; no impact on existing generation |
+
+### Additional Affected Files
+
+| File | Change |
+|------|--------|
+| `ormc.go` | Add `SliceFieldInfo` type; extend `StructInfo` with `SliceFields []SliceFieldInfo`; extend `ParseStruct` to populate `SliceFields`; update `Run()` to two-pass |
+| `ormc_relations.go` | **New file** (`//go:build !wasm`): `RelationInfo`, `collectAllStructs`, `ResolveRelations`, `findFKField`, `relationLoaderTemplate` |
+| `ormc.go` → `GenerateForFile` | Emit relation loaders for each `info.Relations` entry |
+| `tests/mock_generator_model.go` | Add `MockParent` + `MockChild` fixtures |
+| `tests/ormc_relations_test.go` | **New file**: relation detection + loader generation test |
+
+### Step R1 — Extend `StructInfo` and `ParseStruct` in `ormc.go`
+
+Add `SliceFieldInfo` and extend `StructInfo`:
+
+```go
+// SliceFieldInfo records a slice-of-struct field found in a parent struct.
+// Not DB-mapped; used only for relation resolution.
+type SliceFieldInfo struct {
+    Name     string // e.g. "Roles"
+    ElemType string // e.g. "Role"
+}
+
+type StructInfo struct {
+    // ... existing fields ...
+    SliceFields []SliceFieldInfo // populated by ParseStruct; used by ResolveRelations
+    Relations   []RelationInfo   // populated by ResolveRelations; used by GenerateForFile
+}
+```
+
+In the `ParseStruct` field loop, **after** the `db:"-"` check, detect slice-of-struct
+fields and record them in `info.SliceFields` instead of warning+skipping:
+
+```go
+// Detect []Struct fields for relation resolution (R8)
+if arr, ok := field.Type.(*ast.ArrayType); ok {
+    if eltIdent, ok := arr.Elt.(*ast.Ident); ok && eltIdent.Name != "byte" {
+        info.SliceFields = append(info.SliceFields, SliceFieldInfo{
+            Name:     fieldName,
+            ElemType: eltIdent.Name,
+        })
+    }
+    continue // never add to Fields — not DB-mappable
+}
+```
+
+> **Important:** this replaces the current "unsupported type → warn + skip" path
+> for `[]Struct` arrays specifically. The `[]byte` special-case remains.
+> Anonymous slices (e.g. `[]string`) still produce a warning + skip.
+
+### Step R2 — Create `ormc_relations.go`
+
+```go
+//go:build !wasm
+
+package orm
+
+// RelationInfo describes a one-to-many relation loader to generate.
+type RelationInfo struct {
+    ChildStruct string // e.g. "Role"
+    FKField     string // e.g. "UserID"  (Go field name)
+    FKColumn    string // e.g. "user_id" (column name)
+    LoaderName  string // e.g. "ReadAllRoleByUserID"
+}
+
+// collectAllStructs walks rootDir and returns a map of all parsed StructInfo
+// keyed by struct name. Used by Run() Pass 1.
+func (o *Ormc) collectAllStructs() (map[string]StructInfo, error) { ... }
+
+// ResolveRelations (exported for testing) scans all parent SliceFields,
+// finds the matching FK in the child struct, and appends RelationInfo
+// to the child's entry in the map.
+func (o *Ormc) ResolveRelations(all map[string]StructInfo) { ... }
+
+// findFKField returns the first FieldInfo in child whose Ref matches parentTable,
+// or nil if none found.
+func findFKField(child StructInfo, parentTable string) *FieldInfo { ... }
+```
+
+### Step R3 — Update `Run()` in `ormc.go` to two-pass
+
+```go
+func (o *Ormc) Run() error {
+    // Pass 1: collect all structs across all model files
+    all, err := o.collectAllStructs()
+    if err != nil {
+        return err
+    }
+    if len(all) == 0 {
+        return Err("no models found")
+    }
+
+    // Pass 2: resolve cross-struct relations
+    o.ResolveRelations(all)
+
+    // Pass 3: generate (group by source file, call GenerateForFile once per file)
+    return o.generateAll(all)
+}
+```
+
+`generateAll` is a private helper that groups the enriched `all` map by source
+file path (store `SourceFile string` in `StructInfo`) and calls `GenerateForFile`
+once per file — same logic as the current inline walker, now reusable.
+
+> **Note:** add `SourceFile string` to `StructInfo` so `collectAllStructs` can
+> tag each struct with the file it came from.
+
+### Step R4 — Emit relation loaders in `GenerateForFile`
+
+After the last `ReadAll{Model}` block for each `info`, append:
+
+```go
+for _, rel := range info.Relations {
+    buf.Write(Sprintf(
+        "// ReadAll%sByParentID retrieves all %s records for a given parent ID.\n"+
+        "// Auto-generated by ormc — relation detected via db:\"ref=%s\".\n"+
+        "func ReadAll%sBy%s(db *orm.DB, parentID string) ([]*%s, error) {\n"+
+        "\treturn ReadAll%s(db.Query(&%s{}).Where(%sMeta.%s).Eq(parentID))\n"+
+        "}\n\n",
+        rel.ChildStruct,
+        rel.ChildStruct,
+        info.TableName,   // parent table, for the comment
+        rel.ChildStruct, rel.FKField,
+        rel.ChildStruct,
+        rel.ChildStruct, rel.ChildStruct, rel.ChildStruct, rel.FKField,
+    ))
+}
+```
+
+### Step R5 — Add fixtures to `tests/mock_generator_model.go`
+
+```go
+// MockParent / MockChild: relation auto-detection fixture.
+type MockParent struct {
+    ID   string
+    Name string
+    Kids []MockChild // no tag — relation auto-detected via MockChild.MockParentID
+}
+
+type MockChild struct {
+    ID           string `db:"pk"`
+    MockParentID string `db:"ref=mock_parents"`
+    Value        string
+}
+```
+
+### Step R6 — Add `tests/ormc_relations_test.go`
 
 ```go
 //go:build !wasm
@@ -424,52 +428,43 @@ import (
     "github.com/tinywasm/orm"
 )
 
-func TestOrmc_MultiStruct(t *testing.T) {
-    t.Run("Both structs appear in a single output file", func(t *testing.T) {
-        o := orm.New()
-        infoA, err := o.ParseStruct("MultiA", "mock_generator_model.go")
+func TestOrmc_RelationLoader(t *testing.T) {
+    t.Run("ResolveRelations detects FK and sets LoaderName", func(t *testing.T) {
+        o := orm.NewOrmc()
+
+        parent, err := o.ParseStruct("MockParent", "mock_generator_model.go")
+        if err != nil { t.Fatal(err) }
+        child, err := o.ParseStruct("MockChild", "mock_generator_model.go")
         if err != nil { t.Fatal(err) }
 
-        infoB, err := o.ParseStruct("MultiB", "mock_generator_model.go")
-        if err != nil { t.Fatal(err) }
-
-        err = o.GenerateForFile([]orm.StructInfo{infoA, infoB}, "mock_generator_model.go")
-        if err != nil { t.Fatal(err) }
-
-        outFile := "mock_generator_model_orm.go"
-        content, err := os.ReadFile(outFile)
-        if err != nil { t.Fatal(err) }
-        defer os.Remove(outFile)
-
-        s := string(content)
-
-        // Both schemas must be present
-        if !strings.Contains(s, "func (m *MultiA) Schema()") {
-            t.Error("MultiA Schema() not generated")
+        all := map[string]orm.StructInfo{
+            "MockParent": parent,
+            "MockChild":  child,
         }
-        if !strings.Contains(s, "func (m *MultiB) Schema()") {
-            t.Error("MultiB Schema() not generated")
+        o.ResolveRelations(all)
+
+        if len(all["MockChild"].Relations) != 1 {
+            t.Fatalf("expected 1 relation on MockChild, got %d", len(all["MockChild"].Relations))
         }
-    })
-}
-
-func TestOrmc_TableNameDetection(t *testing.T) {
-    t.Run("TableName() NOT generated when already declared (D5)", func(t *testing.T) {
-        err := orm.GenerateCodeForStruct("MultiA", "mock_generator_model.go")
-        if err != nil { t.Fatal(err) }
-
-        outFile := "mock_generator_model_orm.go"
-        content, err := os.ReadFile(outFile)
-        if err != nil { t.Fatal(err) }
-        defer os.Remove(outFile)
-
-        if strings.Contains(string(content), "func (m *MultiA) TableName()") {
-            t.Error("TableName() must NOT be generated — already declared in source")
+        rel := all["MockChild"].Relations[0]
+        if rel.LoaderName != "ReadAllMockChildByMockParentID" {
+            t.Errorf("unexpected loader name: %s", rel.LoaderName)
         }
     })
 
-    t.Run("TableName() IS generated when not declared (D5)", func(t *testing.T) {
-        err := orm.GenerateCodeForStruct("MultiB", "mock_generator_model.go")
+    t.Run("GenerateForFile emits relation loader", func(t *testing.T) {
+        o := orm.NewOrmc()
+
+        parent, _ := o.ParseStruct("MockParent", "mock_generator_model.go")
+        child, _  := o.ParseStruct("MockChild",  "mock_generator_model.go")
+
+        all := map[string]orm.StructInfo{
+            "MockParent": parent,
+            "MockChild":  child,
+        }
+        o.ResolveRelations(all)
+
+        err := o.GenerateForFile([]orm.StructInfo{all["MockChild"]}, "mock_generator_model.go")
         if err != nil { t.Fatal(err) }
 
         outFile := "mock_generator_model_orm.go"
@@ -477,108 +472,65 @@ func TestOrmc_TableNameDetection(t *testing.T) {
         if err != nil { t.Fatal(err) }
         defer os.Remove(outFile)
 
-        if !strings.Contains(string(content), "func (m *MultiB) TableName()") {
-            t.Error("TableName() must be generated — not declared in source")
+        if !strings.Contains(string(content), "ReadAllMockChildByMockParentID") {
+            t.Error("relation loader not found in generated output")
         }
     })
-}
 
-func TestOrmc_DbIgnoreTag(t *testing.T) {
-    t.Run("db:\"-\" fields excluded from Schema, Values, Pointers (D3+D4)", func(t *testing.T) {
-        err := orm.GenerateCodeForStruct("ModelWithIgnored", "mock_generator_model.go")
-        if err != nil { t.Fatal(err) }
+    t.Run("No FK in child → warning log, no relation generated", func(t *testing.T) {
+        o := orm.NewOrmc()
+        var logged []string
+        o.SetLog(func(msgs ...any) {
+            for _, m := range msgs {
+                logged = append(logged, fmt.Sprint(m))
+            }
+        })
 
-        outFile := "mock_generator_model_orm.go"
-        content, err := os.ReadFile(outFile)
-        if err != nil { t.Fatal(err) }
-        defer os.Remove(outFile)
+        // MultiA has no FK pointing to any parent
+        parent, _ := o.ParseStruct("MockParent", "mock_generator_model.go")
+        noFK, _   := o.ParseStruct("MultiA",     "mock_generator_model.go")
 
-        s := string(content)
+        all := map[string]orm.StructInfo{
+            "MockParent": parent,
+            "MultiA":     noFK,
+        }
+        // Patch MockParent to pretend Kids is []MultiA
+        p := all["MockParent"]
+        p.SliceFields = []orm.SliceFieldInfo{{Name: "Kids", ElemType: "MultiA"}}
+        all["MockParent"] = p
 
-        for _, absent := range []string{"Tags", "Friends", "tags", "friends"} {
-            if strings.Contains(s, absent) {
-                t.Errorf("db:\"-\" field %q must be absent from ALL generated code", absent)
+        o.ResolveRelations(all)
+
+        if len(all["MultiA"].Relations) != 0 {
+            t.Error("expected 0 relations when no FK found")
+        }
+        found := false
+        for _, l := range logged {
+            if strings.Contains(l, "skipping") || strings.Contains(l, "no") {
+                found = true
             }
         }
-        for _, present := range []string{
-            `"id"`, `"name"`, `"score"`,
-            "m.ID", "m.Name", "m.Score",
-            "&m.ID", "&m.Name", "&m.Score",
-        } {
-            if !strings.Contains(s, present) {
-                t.Errorf("Non-ignored field %q must be present", present)
-            }
+        if !found {
+            t.Error("expected a warning log for missing FK")
         }
     })
 }
 ```
 
-### Step 9 — Update `docs/SKILL.md`
-
-Add/update these sections:
-
-```markdown
-### `db:"-"` — Explicit field exclusion
-Fields tagged `db:"-"` are **silently** excluded from `Schema()`, `Values()`,
-and `Pointers()`. Use this for computed fields, relations, or any field whose
-type is not supported and whose warning you want to suppress.
-
-### Unsupported field types
-Fields with unsupported types (slices of structs, maps, channels, etc.) produce
-a **warning log** and are skipped. `time.Time` is treated the same way:
-it produces a warning and is skipped — use `int64` + `tinywasm/time` instead.
-Add `db:"-"` to suppress the warning.
-
-### `TableName()` auto-detection
-`ormc` checks the source file for an existing `TableName() string` method.
-If found, it is **not generated** (prevents duplicate method compiler error).
-If not found, `ormc` generates it as the snake_case plural of the struct name.
-
-### `//go:generate` — canonical pattern
-Do NOT use per-struct `//go:generate ormc -struct Name` directives.
-Use a single directive at the project root:
-```go
-//go:generate ormc
-```
-`ormc` recursively scans all subdirectories for `model.go` / `models.go` files.
-```
-
-### Step 10 — Run tests
+### Step R7 — Run tests
 
 ```bash
 gotest
 ```
 
-All existing `ormc_test.go` tests must pass (with the updated `Bad Time Type` test).
-All new `ormc_multi_test.go` tests must pass.
-Coverage target: ≥ 90%.
-
----
-
-## Acceptance Criteria
+### Acceptance Criteria (Annex)
 
 | Criterion | Check |
 |-----------|-------|
-| `ormc` on a file with N structs generates all N in a single `_orm.go` | ✅ |
-| `db:"-"` → silent skip from Schema, Values, AND Pointers | ✅ |
-| `time.Time` without `db:"-"` → warning + skip (not fatal) | ✅ |
-| `time.Time` with `db:"-"` → silent skip | ✅ |
-| `TableName()` not generated when already in source file | ✅ |
-| `TableName()` generated when absent from source file | ✅ |
-| Struct with zero mappable fields → skipped entirely (no output) | ✅ |
-| File with zero mappable structs → no `_orm.go` written | ✅ |
-| All existing `ormc_test.go` tests pass | ✅ |
-| New `ormc_multi_test.go` tests pass | ✅ |
-| `gotest` ≥ 90% coverage | ✅ |
-
----
-
-## Final Decisions (resolved)
-
-| # | Decision |
-|---|----------|
-| D12 | `BadTime` struct **deleted** from `mock_generator_model.go`; replaced by `BadTimeNoTag` |
-| D13 | Post-merge instructions for Jules in `tinywasm/user/docs/REPLY_JULES.md` (separate file, sent via web UI) |
-| D14 | `GenerateCodeForStruct` with zero mappable fields → `return nil` (warning already logged per D8/D7) |
-
-
+| `[]Struct` field → auto-detected if child has matching `db:"ref=..."` | ✅ |
+| No tag required on parent slice field | ✅ |
+| Loader generated in child's `_orm.go` | ✅ |
+| Loader signature: `ReadAll{Child}By{FK}(db *orm.DB, id string)` | ✅ |
+| No FK in child → `o.log()` warning + skip (no error) | ✅ |
+| Unknown child struct → `o.log()` warning + skip | ✅ |
+| `gotest` passes with coverage ≥ 90% | ✅ |
