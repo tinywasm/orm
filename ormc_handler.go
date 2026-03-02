@@ -13,6 +13,7 @@ func NewOrmc() *Ormc {
 	return &Ormc{rootDir: "."}
 }
 
+
 // SetLog sets the log function for warnings and informational messages.
 // If not set, messages are silently discarded.
 func (o *Ormc) SetLog(fn func(messages ...any)) {

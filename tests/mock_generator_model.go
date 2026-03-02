@@ -66,3 +66,24 @@ type RefNoColumn struct {
 	IDRef    string `db:"pk"`
 	ParentID int64  `db:"ref=parents"`
 }
+
+// PointerReceiver tests that detectTableName handles pointer receivers (*T).
+type PointerReceiver struct {
+	ID   string `db:"pk"`
+	Name string
+}
+
+func (*PointerReceiver) TableName() string { return "ptr_table" }
+
+// MockParent / MockChild: relation auto-detection fixture.
+type MockParent struct {
+	ID   string
+	Name string
+	Kids []MockChild // no tag — relation auto-detected via MockChild.MockParentID
+}
+
+type MockChild struct {
+	ID           string `db:"pk"`
+	MockParentID string `db:"ref=mock_parents"`
+	Value        string
+}
