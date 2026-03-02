@@ -6,7 +6,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -24,27 +23,61 @@ type FieldInfo struct {
 }
 
 type StructInfo struct {
-	Name        string
-	TableName   string
-	PackageName string
-	Fields      []FieldInfo
+	Name              string
+	TableName         string
+	PackageName       string
+	Fields            []FieldInfo
+	TableNameDeclared bool
 }
 
-// GenerateCodeForStruct reads the Go File and generates the ORM implementations for a given struct name.
-// This func is made public to allow easy programmatic testing.
-func GenerateCodeForStruct(structName string, goFile string) error {
+// detectTableName scans the AST for func (X) TableName() string on structName.
+// Returns the literal return value if found, "" otherwise.
+func detectTableName(node *ast.File, structName string) string {
+	for _, decl := range node.Decls {
+		funcDecl, ok := decl.(*ast.FuncDecl)
+		if !ok || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
+			continue
+		}
+		if funcDecl.Name.Name != "TableName" {
+			continue
+		}
+		recv := funcDecl.Recv.List[0].Type
+		recvName := ""
+		if ident, ok := recv.(*ast.Ident); ok {
+			recvName = ident.Name
+		} else if star, ok := recv.(*ast.StarExpr); ok {
+			if ident, ok := star.X.(*ast.Ident); ok {
+				recvName = ident.Name
+			}
+		}
+		if recvName != structName {
+			continue
+		}
+		if funcDecl.Body != nil && len(funcDecl.Body.List) == 1 {
+			if ret, ok := funcDecl.Body.List[0].(*ast.ReturnStmt); ok && len(ret.Results) == 1 {
+				if lit, ok := ret.Results[0].(*ast.BasicLit); ok {
+					return Convert(lit.Value).TrimPrefix(`"`).TrimSuffix(`"`).String()
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// ParseStruct parses a single struct from a Go file and returns its metadata.
+func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error) {
 	if structName == "" {
-		return Err("Please provide a struct name")
+		return StructInfo{}, Err("Please provide a struct name")
 	}
 
 	if goFile == "" {
-		return Err("goFile path cannot be empty")
+		return StructInfo{}, Err("goFile path cannot be empty")
 	}
 
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, goFile, nil, parser.ParseComments)
 	if err != nil {
-		return Err(err, "Failed to parse file")
+		return StructInfo{}, Err(err, "Failed to parse file")
 	}
 
 	var targetStruct *ast.StructType
@@ -64,15 +97,20 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 	})
 
 	if !structFound {
-		return Err("Struct not found in file")
+		return StructInfo{}, Err("Struct not found in file")
 	}
 
-	tableName := Convert(structName + "s").SnakeLow().String()
+	tableName := detectTableName(node, structName)
+	declared := tableName != ""
+	if !declared {
+		tableName = Convert(structName + "s").SnakeLow().String()
+	}
 
 	info := StructInfo{
-		Name:        structName,
-		TableName:   tableName,
-		PackageName: node.Name.Name,
+		Name:              structName,
+		TableName:         tableName,
+		PackageName:       node.Name.Name,
+		TableNameDeclared: declared,
 	}
 
 	pkFound := false
@@ -83,6 +121,22 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 
 		fieldName := field.Names[0].Name
 		if !ast.IsExported(fieldName) {
+			continue
+		}
+
+		dbTag := ""
+		if field.Tag != nil {
+			tagVal := Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
+			parts := Convert(tagVal).Split(" ")
+			for _, p := range parts {
+				if HasPrefix(p, "db:\"") {
+					dbTag = Convert(p).TrimPrefix(`db:"`).TrimSuffix(`"`).String()
+					break
+				}
+			}
+		}
+
+		if dbTag == "-" {
 			continue
 		}
 
@@ -103,7 +157,8 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 		}
 
 		if typeStr == "time.Time" {
-			return Err("time.Time not allowed, use int64 with tinywasm/time")
+			o.log(Sprintf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName))
+			continue
 		}
 
 		switch typeStr {
@@ -118,7 +173,7 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 		case "[]byte":
 			fieldType = TypeBlob
 		default:
-			log.Printf("Warning: unsupported type %s for field %s. Skipping.", typeStr, fieldName)
+			o.log(Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
 			continue
 		}
 
@@ -135,43 +190,31 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 			constraints |= ConstraintPK
 		}
 
-		if field.Tag != nil {
-			tagVal := Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
-			dbTag := ""
-			parts := Convert(tagVal).Split(" ")
-			for _, p := range parts {
-				if HasPrefix(p, "db:\"") {
-					dbTag = Convert(p).TrimPrefix(`db:"`).TrimSuffix(`"`).String()
-					break
-				}
-			}
-
-			if dbTag != "" {
-				tagParts := Convert(dbTag).Split(",")
-				for _, p := range tagParts {
-					switch {
-					case p == "pk":
-						if !fieldIsPK {
-							constraints |= ConstraintPK
-							fieldIsPK = true
-							pkFound = true
-						}
-					case p == "unique":
-						constraints |= ConstraintUnique
-					case p == "not_null":
-						constraints |= ConstraintNotNull
-					case p == "autoincrement":
-						if fieldType == TypeText {
-							return Err("autoincrement not allowed on TypeText")
-						}
-						constraints |= ConstraintAutoIncrement
-					case HasPrefix(p, "ref="):
-						refVal := Convert(p).TrimPrefix("ref=").String()
-						refParts := Convert(refVal).Split(":")
-						ref = refParts[0]
-						if len(refParts) > 1 {
-							refCol = refParts[1]
-						}
+		if dbTag != "" {
+			tagParts := Convert(dbTag).Split(",")
+			for _, p := range tagParts {
+				switch {
+				case p == "pk":
+					if !fieldIsPK {
+						constraints |= ConstraintPK
+						fieldIsPK = true
+						pkFound = true
+					}
+				case p == "unique":
+					constraints |= ConstraintUnique
+				case p == "not_null":
+					constraints |= ConstraintNotNull
+				case p == "autoincrement":
+					if fieldType == TypeText {
+						return StructInfo{}, Err("autoincrement not allowed on TypeText")
+					}
+					constraints |= ConstraintAutoIncrement
+				case HasPrefix(p, "ref="):
+					refVal := Convert(p).TrimPrefix("ref=").String()
+					refParts := Convert(refVal).Split(":")
+					ref = refParts[0]
+					if len(refParts) > 1 {
+						refCol = refParts[1]
 					}
 				}
 			}
@@ -188,133 +231,148 @@ func GenerateCodeForStruct(structName string, goFile string) error {
 		})
 	}
 
-	return generateCodeFile(info, goFile)
+	return info, nil
 }
 
-func generateCodeFile(info StructInfo, sourceFile string) error {
+// GenerateForStruct reads the Go File and generates the ORM implementations for a given struct name.
+func (o *Ormc) GenerateForStruct(structName string, goFile string) error {
+	info, err := o.ParseStruct(structName, goFile)
+	if err != nil {
+		return err
+	}
+	if len(info.Fields) == 0 {
+		return nil
+	}
+	return o.GenerateForFile([]StructInfo{info}, goFile)
+}
+
+// GenerateForFile writes ORM implementations for all infos into one file.
+func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
+	if len(infos) == 0 {
+		return nil
+	}
 	buf := Convert()
 
 	// File Header
 	buf.Write(Sprintf("// Code generated by ormc; DO NOT EDIT.\n"))
 	buf.Write(Sprintf("// NOTE: Schema() and Values() must always be in the same field order.\n"))
 	buf.Write(Sprintf("// String PK: set via github.com/tinywasm/unixid before calling db.Create().\n"))
-	buf.Write(Sprintf("package %s\n\n", info.PackageName))
+	buf.Write(Sprintf("package %s\n\n", infos[0].PackageName))
 
 	buf.Write("import (\n")
 	buf.Write("\t\"github.com/tinywasm/orm\"\n")
 	buf.Write(")\n\n")
 
-	// Model Interface Methods
-	buf.Write(Sprintf("func (m *%s) TableName() string {\n", info.Name))
-	buf.Write(Sprintf("\treturn \"%s\"\n", info.TableName))
-	buf.Write("}\n\n")
-
-	buf.Write(Sprintf("func (m *%s) Schema() []orm.Field {\n", info.Name))
-	buf.Write("\treturn []orm.Field{\n")
-	for _, f := range info.Fields {
-		typeStr := "orm.TypeText"
-		switch f.Type {
-		case TypeInt64:
-			typeStr = "orm.TypeInt64"
-		case TypeFloat64:
-			typeStr = "orm.TypeFloat64"
-		case TypeBool:
-			typeStr = "orm.TypeBool"
-		case TypeBlob:
-			typeStr = "orm.TypeBlob"
+	for _, info := range infos {
+		// Model Interface Methods
+		if !info.TableNameDeclared {
+			buf.Write(Sprintf("func (m *%s) TableName() string {\n", info.Name))
+			buf.Write(Sprintf("\treturn \"%s\"\n", info.TableName))
+			buf.Write("}\n\n")
 		}
 
-		var constraintStr []string
-		if f.Constraints == ConstraintNone {
-			constraintStr = append(constraintStr, "orm.ConstraintNone")
-		} else {
-			if f.Constraints&ConstraintPK != 0 {
-				constraintStr = append(constraintStr, "orm.ConstraintPK")
+		buf.Write(Sprintf("func (m *%s) Schema() []orm.Field {\n", info.Name))
+		buf.Write("\treturn []orm.Field{\n")
+		for _, f := range info.Fields {
+			typeStr := "orm.TypeText"
+			switch f.Type {
+			case TypeInt64:
+				typeStr = "orm.TypeInt64"
+			case TypeFloat64:
+				typeStr = "orm.TypeFloat64"
+			case TypeBool:
+				typeStr = "orm.TypeBool"
+			case TypeBlob:
+				typeStr = "orm.TypeBlob"
 			}
-			if f.Constraints&ConstraintUnique != 0 {
-				constraintStr = append(constraintStr, "orm.ConstraintUnique")
+
+			var constraintStr []string
+			if f.Constraints == ConstraintNone {
+				constraintStr = append(constraintStr, "orm.ConstraintNone")
+			} else {
+				if f.Constraints&ConstraintPK != 0 {
+					constraintStr = append(constraintStr, "orm.ConstraintPK")
+				}
+				if f.Constraints&ConstraintUnique != 0 {
+					constraintStr = append(constraintStr, "orm.ConstraintUnique")
+				}
+				if f.Constraints&ConstraintNotNull != 0 {
+					constraintStr = append(constraintStr, "orm.ConstraintNotNull")
+				}
+				if f.Constraints&ConstraintAutoIncrement != 0 {
+					constraintStr = append(constraintStr, "orm.ConstraintAutoIncrement")
+				}
 			}
-			if f.Constraints&ConstraintNotNull != 0 {
-				constraintStr = append(constraintStr, "orm.ConstraintNotNull")
+
+			buf.Write(Sprintf("\t\t{Name: \"%s\", Type: %s, Constraints: %s", f.ColumnName, typeStr, Convert(constraintStr).Join(" | ").String()))
+			if f.Ref != "" {
+				buf.Write(Sprintf(", Ref: \"%s\"", f.Ref))
 			}
-			if f.Constraints&ConstraintAutoIncrement != 0 {
-				constraintStr = append(constraintStr, "orm.ConstraintAutoIncrement")
+			if f.RefColumn != "" {
+				buf.Write(Sprintf(", RefColumn: \"%s\"", f.RefColumn))
 			}
+			buf.Write("},\n")
 		}
+		buf.Write("\t}\n")
+		buf.Write("}\n\n")
 
-		buf.Write(Sprintf("\t\t{Name: \"%s\", Type: %s, Constraints: %s", f.ColumnName, typeStr, Convert(constraintStr).Join(" | ").String()))
-		if f.Ref != "" {
-			buf.Write(Sprintf(", Ref: \"%s\"", f.Ref))
+		buf.Write(Sprintf("func (m *%s) Values() []any {\n", info.Name))
+		buf.Write("\treturn []any{\n")
+		for _, f := range info.Fields {
+			buf.Write(Sprintf("\t\tm.%s,\n", f.Name))
 		}
-		if f.RefColumn != "" {
-			buf.Write(Sprintf(", RefColumn: \"%s\"", f.RefColumn))
+		buf.Write("\t}\n")
+		buf.Write("}\n\n")
+
+		buf.Write(Sprintf("func (m *%s) Pointers() []any {\n", info.Name))
+		buf.Write("\treturn []any{\n")
+		for _, f := range info.Fields {
+			buf.Write(Sprintf("\t\t&m.%s,\n", f.Name))
 		}
-		buf.Write("},\n")
-	}
-	buf.Write("\t}\n")
-	buf.Write("}\n\n")
+		buf.Write("\t}\n")
+		buf.Write("}\n\n")
 
-	buf.Write(Sprintf("func (m *%s) Values() []any {\n", info.Name))
-	buf.Write("\treturn []any{\n")
-	for _, f := range info.Fields {
-		buf.Write(Sprintf("\t\tm.%s,\n", f.Name))
-	}
-	buf.Write("\t}\n")
-	buf.Write("}\n\n")
+		// Metadata Descriptors
+		buf.Write(Sprintf("var %sMeta = struct {\n", info.Name))
+		buf.Write("\tTableName string\n")
+		for _, f := range info.Fields {
+			buf.Write(Sprintf("\t%s string\n", f.Name))
+		}
+		buf.Write("}{\n")
+		buf.Write(Sprintf("\tTableName: \"%s\",\n", info.TableName))
+		for _, f := range info.Fields {
+			buf.Write(Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
+		}
+		buf.Write("}\n\n")
 
-	buf.Write(Sprintf("func (m *%s) Pointers() []any {\n", info.Name))
-	buf.Write("\treturn []any{\n")
-	for _, f := range info.Fields {
-		buf.Write(Sprintf("\t\t&m.%s,\n", f.Name))
-	}
-	buf.Write("\t}\n")
-	buf.Write("}\n\n")
+		// Typed Read Operations
+		buf.Write(Sprintf("func ReadOne%s(qb *orm.QB, model *%s) (*%s, error) {\n", info.Name, info.Name, info.Name))
+		buf.Write("\terr := qb.ReadOne()\n")
+		buf.Write("\tif err != nil {\n")
+		buf.Write("\t\treturn nil, err\n")
+		buf.Write("\t}\n")
+		buf.Write("\treturn model, nil\n")
+		buf.Write("}\n\n")
 
-	// Metadata Descriptors
-	buf.Write(Sprintf("var %sMeta = struct {\n", info.Name))
-	buf.Write("\tTableName string\n")
-	for _, f := range info.Fields {
-		buf.Write(Sprintf("\t%s string\n", f.Name))
+		buf.Write(Sprintf("func ReadAll%s(qb *orm.QB) ([]*%s, error) {\n", info.Name, info.Name))
+		buf.Write(Sprintf("\tvar results []*%s\n", info.Name))
+		buf.Write("\terr := qb.ReadAll(\n")
+		buf.Write(Sprintf("\t\tfunc() orm.Model { return &%s{} },\n", info.Name))
+		buf.Write(Sprintf("\t\tfunc(m orm.Model) { results = append(results, m.(*%s)) },\n", info.Name))
+		buf.Write("\t)\n")
+		buf.Write("\treturn results, err\n")
+		buf.Write("}\n")
 	}
-	buf.Write("}{\n")
-	buf.Write(Sprintf("\tTableName: \"%s\",\n", info.TableName))
-	for _, f := range info.Fields {
-		buf.Write(Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
-	}
-	buf.Write("}\n\n")
-
-	// Typed Read Operations
-	buf.Write(Sprintf("func ReadOne%s(qb *orm.QB, model *%s) (*%s, error) {\n", info.Name, info.Name, info.Name))
-	buf.Write("\terr := qb.ReadOne()\n")
-	buf.Write("\tif err != nil {\n")
-	buf.Write("\t\treturn nil, err\n")
-	buf.Write("\t}\n")
-	buf.Write("\treturn model, nil\n")
-	buf.Write("}\n\n")
-
-	buf.Write(Sprintf("func ReadAll%s(qb *orm.QB) ([]*%s, error) {\n", info.Name, info.Name))
-	buf.Write(Sprintf("\tvar results []*%s\n", info.Name))
-	buf.Write("\terr := qb.ReadAll(\n")
-	buf.Write(Sprintf("\t\tfunc() orm.Model { return &%s{} },\n", info.Name))
-	buf.Write(Sprintf("\t\tfunc(m orm.Model) { results = append(results, m.(*%s)) },\n", info.Name))
-	buf.Write("\t)\n")
-	buf.Write("\treturn results, err\n")
-	buf.Write("}\n")
 
 	outName := Convert(sourceFile).TrimSuffix(".go").String() + "_orm.go"
 	return os.WriteFile(outName, buf.Bytes(), 0644)
 }
 
-// RunOrmcCLI is the entry point for the CLI tool.
-func RunOrmcCLI() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Failed to get working directory: %v", err)
-	}
-
+// Run is the entry point for the CLI tool.
+func (o *Ormc) Run() error {
 	foundAny := false
 
-	err = filepath.Walk(cwd, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(o.rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -335,21 +393,38 @@ func RunOrmcCLI() {
 				return nil // Skip unparseable files
 			}
 
+			var infos []StructInfo
+
 			for _, decl := range node.Decls {
 				if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
 					for _, spec := range genDecl.Specs {
 						if typeSpec, ok := spec.(*ast.TypeSpec); ok {
 							if _, ok := typeSpec.Type.(*ast.StructType); ok {
-								err := GenerateCodeForStruct(typeSpec.Name.Name, path)
+								info, err := o.ParseStruct(typeSpec.Name.Name, path)
 								if err != nil {
-									log.Printf("Failed to generate code for %s in %s: %v", typeSpec.Name.Name, path, err)
-								} else {
-									foundAny = true
+									o.log(Sprintf("Skipping %s in %s: %v", typeSpec.Name.Name, path, err))
+									continue
 								}
+								if len(info.Fields) == 0 {
+									o.log(Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
+									continue
+								}
+								infos = append(infos, info)
 							}
 						}
 					}
 				}
+			}
+
+			if len(infos) == 0 {
+				o.log(Sprintf("Warning: no mappable structs found in %s; no output generated", path))
+				return nil
+			}
+
+			if err := o.GenerateForFile(infos, path); err != nil {
+				o.log(Sprintf("Failed to write output for %s: %v", path, err))
+			} else {
+				foundAny = true
 			}
 		}
 
@@ -357,10 +432,12 @@ func RunOrmcCLI() {
 	})
 
 	if err != nil {
-		log.Fatalf("Error walking directory: %v", err)
+		return Err(err, "error walking directory")
 	}
 
 	if !foundAny {
-		log.Fatal("No models found")
+		return Err("no models found")
 	}
+
+	return nil
 }

@@ -21,8 +21,29 @@ type Order struct {
 	Total     float64
 }
 
-type BadTime struct {
+type BadTimeNoTag struct {
+	ID        string `db:"pk"`
+	Name      string
 	CreatedAt time.Time
+}
+
+type ModelWithIgnored struct {
+	ID      string   `db:"pk"`
+	Name    string
+	Tags    []string `db:"-"` // slice: silently ignored
+	Friends []User   `db:"-"` // struct slice: silently ignored
+	Score   float64
+}
+
+type MultiA struct {
+	ID   string `db:"pk"`
+	Name string
+}
+func (MultiA) TableName() string { return "multi_a_records" } // manually declared → D5
+
+type MultiB struct {
+	ID    string `db:"pk"`
+	Value int64
 }
 
 type BadAutoInc struct {
