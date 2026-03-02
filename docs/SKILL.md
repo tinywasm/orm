@@ -76,7 +76,7 @@ Use a single `//go:generate` at the project root — **not** per struct:
 ### Programmatic usage (`ormc` embedded in another tool)
 
 ```go
-o := orm.New()
+o := orm.NewOrmc()
 o.SetLog(func(messages ...any) {   // optional: silently discarded if not set
     myLogger.Warn(messages...)
 })
@@ -90,7 +90,7 @@ if err := o.Run(); err != nil {    // Run() uses o.rootDir, no parameter
 
 | Method | Description |
 |--------|-------------|
-| `New() *Ormc` | Create handler; `rootDir` defaults to `"."` |
+| `NewOrmc() *Ormc` | Create handler; `rootDir` defaults to `"."` |
 | `(o) SetLog(func(...any))` | Set warning/info log function |
 | `(o) SetRootDir(dir string)` | Set scan root (useful for tests: no `os.Chdir` needed) |
 | `(o) Run() error` | Scan `rootDir` for `model.go`/`models.go`, generate `_orm.go` |
@@ -111,17 +111,18 @@ For a `struct User`, `ormc` generates in `model_orm.go`:
 
 Fields tagged `db:"-"` are **silently** excluded from `Schema()`, `Values()`, and `Pointers()`.
 
-Slice-of-struct fields (e.g. `[]Role`) are **not yet mapped** — `ormc` logs a warning
-and skips them. Relation auto-detection is planned ([PLAN_RELATIONS.md](PLAN_RELATIONS.md)).
-Until then, add `db:"-"` to suppress the warning on intentional relation fields:
+Slice-of-struct fields (e.g. `[]Role`) are **automatically mapped** to one-to-many relations if the child struct has a matching `db:"ref=..."` field pointing to the parent table.
 
 ```go
 type User struct {
     ID    string
     Name  string
-    Roles []Role `db:"-"` // intentional: suppress warning until PLAN_RELATIONS is done
+    Roles []Role // auto-mapped via Role.UserID db:"ref=users"
 }
 ```
+
+This generates `ReadAllRoleByUserID(db, id)` in the child's `_orm.go`.
+
 
 ### `TableName()` auto-detection
 
