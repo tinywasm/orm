@@ -35,7 +35,7 @@ type Model interface {
 | `float32`, `float64` | `TypeFloat64` |
 | `bool` | `TypeBool` |
 | `[]byte` | `TypeBlob` |
-| `time.Time` | ❌ **not allowed** — use `int64` + `tinywasm/time` |
+| `time.Time` | ⚠️ **not allowed** — `ormc` warns and skips the field; use `int64` + `tinywasm/time`. Add `db:"-"` to suppress the warning |
 
 ### Schema Constraints (`orm.Constraint`, bitmask)
 | Constant | db tag | Notes |
@@ -45,12 +45,16 @@ type Model interface {
 | `ConstraintNotNull` | `db:"not_null"` | |
 | `ConstraintAutoIncrement` | `db:"autoincrement"` | Numeric fields only |
 | FK reference | `db:"ref=table"` or `db:"ref=table:column"` | `Field.Ref` + `Field.RefColumn` |
+| Ignore field | `db:"-"` | Silently excluded from `Schema()`, `Values()`, `Pointers()` |
 
 > **String PKs:** must be set by caller via `github.com/tinywasm/unixid` before calling `db.Create()`. The ORM does not generate IDs.
 
 ### Auto-Generated Code (`cmd/ormc`)
 
-Run `ormc` from the **project root**. It recursively scans all subdirectories looking for `model.go` or `models.go`, and generates `model_orm.go` **next to each source file found** (always overwritten). Fatal error if no model files are found anywhere.
+Run `ormc` from the **project root**. It recursively scans all subdirectories looking
+for `model.go` or `models.go`, and generates a single `model_orm.go` next to each
+source file found (always overwritten). All structs in the same file are generated
+into one output file.
 
 ```bash
 ormc
@@ -60,23 +64,69 @@ Typical project structure:
 ```
 project/
   modules/
-    user/model.go      → generates modules/user/model_orm.go
-    product/models.go  → generates modules/product/model_orm.go
+    user/model.go      → generates modules/user/model_orm.go  (all structs)
+    product/models.go  → generates modules/product/model_orm.go (all structs)
 ```
 
-Or trigger via `//go:generate` at the project root:
+Use a single `//go:generate` at the project root — **not** per struct:
 ```go
 //go:generate ormc
 ```
+
+### Programmatic usage (`ormc` embedded in another tool)
+
+```go
+o := orm.New()
+o.SetLog(func(messages ...any) {   // optional: silently discarded if not set
+    myLogger.Warn(messages...)
+})
+o.SetRootDir("/path/to/project")   // optional: defaults to "."
+if err := o.Run(); err != nil {    // Run() uses o.rootDir, no parameter
+    return err
+}
+```
+
+**`Ormc` methods** (all return `error`, never call `os.Exit`):
+
+| Method | Description |
+|--------|-------------|
+| `New() *Ormc` | Create handler; `rootDir` defaults to `"."` |
+| `(o) SetLog(func(...any))` | Set warning/info log function |
+| `(o) SetRootDir(dir string)` | Set scan root (useful for tests: no `os.Chdir` needed) |
+| `(o) Run() error` | Scan `rootDir` for `model.go`/`models.go`, generate `_orm.go` |
+| `(o) GenerateForStruct(name, file string) error` | Generate for a single named struct |
+| `(o) ParseStruct(name, file string) (StructInfo, error)` | Parse struct metadata only |
+| `(o) GenerateForFile(infos []StructInfo, file string) error` | Write all infos to one `_orm.go` |
 
 For a `struct User`, `ormc` generates in `model_orm.go`:
 - `func (m *User) Schema() []orm.Field`
 - `func (m *User) Values() []any`
 - `func (m *User) Pointers() []any`
-- `func (m *User) TableName() string`
+- `func (m *User) TableName() string` *(only if NOT already declared in source)*
 - `UserMeta` struct with typed column name constants
 - `ReadOneUser(qb *orm.QB, model *User) (*User, error)`
 - `ReadAllUser(qb *orm.QB) ([]*User, error)`
+
+### `db:"-"` — field exclusion
+
+Fields tagged `db:"-"` are **silently** excluded from `Schema()`, `Values()`, and `Pointers()`.
+
+Slice-of-struct fields (e.g. `[]Role`) are **not yet mapped** — `ormc` logs a warning
+and skips them. Relation auto-detection is planned ([PLAN_RELATIONS.md](PLAN_RELATIONS.md)).
+Until then, add `db:"-"` to suppress the warning on intentional relation fields:
+
+```go
+type User struct {
+    ID    string
+    Name  string
+    Roles []Role `db:"-"` // intentional: suppress warning until PLAN_RELATIONS is done
+}
+```
+
+### `TableName()` auto-detection
+
+If the source file already declares `func (X) TableName() string`, `ormc` **will not generate
+a duplicate**. If absent, `ormc` generates it as the snake_case plural of the struct name.
 
 ### Core Structs
 - `DB`: `New(Executor, Compiler)`, `Create`, `Update`, `Delete`, `Query`, `Tx`, `Close`, `RawExecutor`, `CreateTable`, `DropTable`, `CreateDatabase`
