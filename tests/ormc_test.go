@@ -17,7 +17,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Failed to generate code for User: %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		contentBytes, err := os.ReadFile(outFile)
 		if err != nil {
 			// File may not be created if no fields are mappable
@@ -76,7 +76,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Failed to generate code for Order: %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		contentBytes, err := os.ReadFile(outFile)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -107,7 +107,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Expected no error for time.Time (warn+skip), got: %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		content, err := os.ReadFile(outFile)
 		if err != nil {
 			t.Fatalf("Failed to read generated file: %v", err)
@@ -138,7 +138,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Did not expect error for unsupported type, got %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		contentBytes, err := os.ReadFile(outFile)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -160,7 +160,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Failed to generate code for NumericTypes: %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		contentBytes, err := os.ReadFile(outFile)
 		if err != nil {
 			t.Fatalf("Failed to read generated file: %v", err)
@@ -199,7 +199,7 @@ func TestOrmc(t *testing.T) {
 			t.Fatalf("Failed to generate code for RefNoColumn: %v", err)
 		}
 
-		outFile := "mock_generator_model_db.go"
+		outFile := "mock_generator_model_orm.go"
 		contentBytes, err := os.ReadFile(outFile)
 		if err != nil {
 			t.Fatalf("Failed to read generated file: %v", err)
