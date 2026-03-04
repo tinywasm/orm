@@ -402,7 +402,7 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 		}
 	}
 
-	outName := Convert(sourceFile).TrimSuffix(".go").String() + "_db.go"
+	outName := Convert(sourceFile).TrimSuffix(".go").String() + "_orm.go"
 	return os.WriteFile(outName, buf.Bytes(), 0644)
 }
 

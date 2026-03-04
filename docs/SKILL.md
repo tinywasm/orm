@@ -52,7 +52,7 @@ type Model interface {
 ### Auto-Generated Code (`cmd/ormc`)
 
 Run `ormc` from the **project root**. It recursively scans all subdirectories looking
-for `model.go` or `models.go`, and generates a single `model_db.go` next to each
+for `model.go` or `models.go`, and generates a single `model_orm.go` next to each
 source file found (always overwritten). All structs in the same file are generated
 into one output file.
 
@@ -64,8 +64,8 @@ Typical project structure:
 ```
 project/
   modules/
-    user/model.go      → generates modules/user/model_db.go  (all structs)
-    product/models.go  → generates modules/product/model_db.go (all structs)
+    user/model.go      → generates modules/user/model_orm.go  (all structs)
+    product/models.go  → generates modules/product/model_orm.go (all structs)
 ```
 
 Use a single `//go:generate` at the project root — **not** per struct:
@@ -93,12 +93,12 @@ if err := o.Run(); err != nil {    // Run() uses o.rootDir, no parameter
 | `NewOrmc() *Ormc` | Create handler; `rootDir` defaults to `"."` |
 | `(o) SetLog(func(...any))` | Set warning/info log function |
 | `(o) SetRootDir(dir string)` | Set scan root (useful for tests: no `os.Chdir` needed) |
-| `(o) Run() error` | Scan `rootDir` for `model.go`/`models.go`, generate `_db.go` |
+| `(o) Run() error` | Scan `rootDir` for `model.go`/`models.go`, generate `_orm.go` |
 | `(o) GenerateForStruct(name, file string) error` | Generate for a single named struct |
 | `(o) ParseStruct(name, file string) (StructInfo, error)` | Parse struct metadata only |
-| `(o) GenerateForFile(infos []StructInfo, file string) error` | Write all infos to one `_db.go` |
+| `(o) GenerateForFile(infos []StructInfo, file string) error` | Write all infos to one `_orm.go` |
 
-For a `struct User`, `ormc` generates in `model_db.go`:
+For a `struct User`, `ormc` generates in `model_orm.go`:
 - `func (m *User) Schema() []orm.Field`
 - `func (m *User) Values() []any`
 - `func (m *User) Pointers() []any`
@@ -121,7 +121,7 @@ type User struct {
 }
 ```
 
-This generates `ReadAllRoleByUserID(db, id)` in the child's `_db.go`.
+This generates `ReadAllRoleByUserID(db, id)` in the child's `_orm.go`.
 
 
 ### `TableName()` auto-detection
