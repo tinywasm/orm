@@ -1,6 +1,6 @@
 # Why tinywasm/orm?
 
-## What Problem This Library Solves?
+## What Problem This Library Solves:
 
 Modern applications often need to integrate a database before the final storage engine is known, or while keeping the project easily testable and portable across environments (backend, edge, or WebAssembly). Traditional ORMs and database libraries typically bind the application too early to a specific database driver, SQL dialect, or runtime environment.
 
