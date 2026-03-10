@@ -10,3 +10,55 @@
 - [Why use this ORM?](docs/WHY.md)
 - [Architecture](docs/ARQUITECTURE.md)
 - [Skill](docs/SKILL.md)
+
+## Quick Start
+
+### 1. Define your Model
+
+```go
+// modules/user/model.go
+package user
+
+type User struct {
+    ID    string `db:"pk"           json:"id"`
+    Name  string                    `json:"name"`
+    Email string `db:"unique"       json:"email"   form:"email"`
+    Bio   string `form:"textarea"   json:"bio,omitempty"`
+}
+```
+
+### 2. Generate the Boilerplate
+
+Run `ormc` from your project root.
+
+```bash
+go install github.com/tinywasm/orm/cmd/ormc@latest
+ormc
+```
+
+This generates `modules/user/model_orm.go` with the `Model` implementation and typed helpers.
+
+### 3. Use it
+
+```go
+import (
+    "github.com/tinywasm/orm"
+    "yourproject/modules/user"
+)
+
+func GetActiveUsers(db *orm.DB) ([]*user.User, error) {
+    return user.ReadAllUser(
+        db.Query(&user.User{}).
+            Where(user.User_.Email).Like("%@gmail.com").
+            Limit(10),
+    )
+}
+```
+
+## Features
+
+- **Standard Library Only**: No external assertion libraries or heavy dependencies.
+- **Isomorphic**: Works identically in Go (backend) and WASM (frontend).
+- **Interface over Reflection**: Zero use of `reflect` at runtime for maximum performance.
+- **Typed Schema**: Uses `github.com/tinywasm/fmt` for deterministic field mapping.
+- **Boilerplate Generator**: `ormc` CLI tool automates the `Model` interface implementation.

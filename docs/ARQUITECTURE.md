@@ -30,11 +30,19 @@ The application developer must make their structs implement this interface. The 
 
 ```go
 type Model interface {
+    fmt.Fielder
     // TableName returns the physical name of the table or store.
     TableName() string
-    // Columns returns the ordered list of column names.
-    Columns() []string
-    // Values returns the entity values in the same order as Columns(). Used in Create/Update.
+}
+```
+
+The `fmt.Fielder` interface (from `github.com/tinywasm/fmt`) requires:
+
+```go
+type Fielder interface {
+    // Schema returns the list of fields with their types and metadata.
+    Schema() []Field
+    // Values returns the entity values in the same order as Schema(). Used in Create/Update.
     Values() []any
     // Pointers returns pointers to the entity fields to inject data during a Read.
     Pointers() []any

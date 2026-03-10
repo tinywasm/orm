@@ -17,35 +17,49 @@ go install github.com/tinywasm/orm/cmd/ormc@latest
 - `TxBoundExecutor`: Embeds `Executor`, `Commit()`, `Rollback()`
 
 ### Model Interface
-`Columns() []string` has been **replaced** by `Schema() []orm.Field`:
+`Columns() []string` has been **replaced** by `Schema() []fmt.Field`:
 ```go
 type Model interface {
+    fmt.Fielder
     TableName() string
-    Schema() []orm.Field   // Key: column name, includes type + constraints
+}
+```
+
+The `fmt.Fielder` interface requires:
+```go
+type Fielder interface {
+    Schema() []Field
     Values() []any
     Pointers() []any
 }
 ```
 
-### Schema Field Types (`orm.FieldType`)
+### Schema Field Types (`fmt.FieldType`)
 | Go Type | FieldType |
 |---|---|
-| `string` | `TypeText` |
-| `int`, `int32`, `int64` | `TypeInt64` |
-| `float32`, `float64` | `TypeFloat64` |
-| `bool` | `TypeBool` |
-| `[]byte` | `TypeBlob` |
+| `string` | `FieldText` |
+| `int`, `int32`, `int64`, `uint`, `uint64` | `FieldInt` |
+| `float32`, `float64` | `FieldFloat` |
+| `bool` | `FieldBool` |
+| `[]byte` | `FieldBlob` |
+| `struct` | `FieldStruct` |
 | `time.Time` | ⚠️ **not allowed** — `ormc` warns and skips the field; use `int64` + `tinywasm/time`. Add `db:"-"` to suppress the warning |
 
-### Schema Constraints (`orm.Constraint`, bitmask)
-| Constant | db tag | Notes |
+### Schema Field Flags and Tags
+| Field Flag | db tag | Notes |
 |---|---|---|
-| `ConstraintPK` | `db:"pk"` | Auto-detected via `tinywasm/fmt.IDorPrimaryKey` |
-| `ConstraintUnique` | `db:"unique"` | |
-| `ConstraintNotNull` | `db:"not_null"` | |
-| `ConstraintAutoIncrement` | `db:"autoincrement"` | Numeric fields only |
-| FK reference | `db:"ref=table"` or `db:"ref=table:column"` | `Field.Ref` + `Field.RefColumn` |
-| Ignore field | `db:"-"` | Silently excluded from `Schema()`, `Values()`, `Pointers()` |
+| `PK` | `db:"pk"` | Auto-detected via `tinywasm/fmt.IDorPrimaryKey` |
+| `Unique` | `db:"unique"` | |
+| `NotNull` | `db:"not_null"` | |
+| `AutoInc` | `db:"autoincrement"` | Numeric fields only |
+
+### Additional Tags support in `ormc`
+| Tag | Field Property | Notes |
+|---|---|---|
+| `form:"..."` | `Field.Input` | Used by `tinywasm/form` for UI generation |
+| `json:"..."` | `Field.JSON` | Used by JSON codecs for field mapping |
+| `db:"ref=..."` | `Field.Ref` | FK reference (`ref=table` or `ref=table:column`) |
+| `db:"-"` | - | Silently excluded from `Schema()`, `Values()`, `Pointers()` |
 
 > **String PKs:** must be set by caller via `github.com/tinywasm/unixid` before calling `db.Create()`. The ORM does not generate IDs.
 

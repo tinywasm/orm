@@ -1,8 +1,12 @@
 package tests
 
-import "time"
+import (
+	"time"
 
-//go:generate ormgen -struct User
+	"github.com/tinywasm/fmt"
+)
+
+//go:generate ormc
 
 type User struct {
 	ID        int     `db:"pk"`
@@ -101,4 +105,27 @@ type UserForm struct {
 type LoginForm struct {
 	Email    string `form:"email"`
 	Password string `form:"password"`
+}
+
+type Address struct {
+	Street string
+	City   string
+}
+
+func (Address) Schema() []fmt.Field { return nil }
+func (Address) Values() []any       { return nil }
+func (Address) Pointers() []any     { return nil }
+
+type UserWithJSON struct {
+	ID       string  `db:"pk"           json:"id"`
+	Name     string  `json:"name"`
+	Email    string  `form:"email"      json:"email"`
+	Bio      string  `form:"textarea"   json:"bio,omitempty"`
+	HomeAddr Address `json:"home_addr"`
+}
+
+type WithPointers struct {
+	ID    string  `db:"pk"`
+	Count *int    // pointer to primitive -> should be skipped with warning
+	Addr  *Address // pointer to struct -> FieldStruct
 }

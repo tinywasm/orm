@@ -26,6 +26,7 @@ type FieldInfo struct {
 	IsPK       bool
 	GoType     string
 	Input      string
+	JSON       string
 }
 
 // SliceFieldInfo records a slice-of-struct field found in a parent struct.
@@ -157,6 +158,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 
 		dbTag := ""
 		formTag := ""
+		jsonTag := ""
 		if field.Tag != nil {
 			tagVal := Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
 			parts := Convert(tagVal).Split(" ")
@@ -165,6 +167,8 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 					dbTag = Convert(p).TrimPrefix(`db:"`).TrimSuffix(`"`).String()
 				} else if HasPrefix(p, "form:\"") {
 					formTag = Convert(p).TrimPrefix(`form:"`).TrimSuffix(`"`).String()
+				} else if HasPrefix(p, "json:\"") {
+					jsonTag = Convert(p).TrimPrefix(`json:"`).TrimSuffix(`"`).String()
 				}
 			}
 		}
@@ -187,14 +191,21 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		// Field Type mapping
 		var fieldType FieldType
 		var typeStr string
+		var isPointer bool
 
-		if ident, ok := field.Type.(*ast.Ident); ok {
+		fType := field.Type
+		if star, ok := fType.(*ast.StarExpr); ok {
+			isPointer = true
+			fType = star.X
+		}
+
+		if ident, ok := fType.(*ast.Ident); ok {
 			typeStr = ident.Name
-		} else if sel, ok := field.Type.(*ast.SelectorExpr); ok {
+		} else if sel, ok := fType.(*ast.SelectorExpr); ok {
 			if pkgIdent, ok := sel.X.(*ast.Ident); ok {
 				typeStr = pkgIdent.Name + "." + sel.Sel.Name
 			}
-		} else if arr, ok := field.Type.(*ast.ArrayType); ok {
+		} else if arr, ok := fType.(*ast.ArrayType); ok {
 			if eltIdent, ok := arr.Elt.(*ast.Ident); ok && eltIdent.Name == "byte" {
 				typeStr = "[]byte"
 			}
@@ -217,7 +228,17 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		case "[]byte":
 			fieldType = FieldBlob
 		default:
-			o.log(Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
+			// If it's a struct (but not time.Time, not slice, not chan), map to FieldStruct
+			if typeStr != "" && !strings.Contains(typeStr, "[") && !strings.Contains(typeStr, "chan ") {
+				fieldType = FieldStruct
+			} else {
+				o.log(Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
+				continue
+			}
+		}
+
+		if isPointer && fieldType != FieldStruct {
+			o.log(Sprintf("Warning: pointers to primitive types not supported for field %s.%s; skipping. Add db:\"-\" to suppress.", structName, fieldName))
 			continue
 		}
 
@@ -277,6 +298,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 			IsPK:       fieldIsPK,
 			GoType:     typeStr,
 			Input:      formTag,
+			JSON:       jsonTag,
 		})
 	}
 
@@ -349,6 +371,8 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 				typeStr = "fmt.FieldBool"
 			case FieldBlob:
 				typeStr = "fmt.FieldBlob"
+			case FieldStruct:
+				typeStr = "fmt.FieldStruct"
 			}
 
 			buf.Write(Sprintf("\t\t{Name: \"%s\", Type: %s", f.ColumnName, typeStr))
@@ -366,6 +390,9 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 			}
 			if f.Input != "" {
 				buf.Write(Sprintf(", Input: \"%s\"", f.Input))
+			}
+			if f.JSON != "" {
+				buf.Write(Sprintf(", JSON: \"%s\"", f.JSON))
 			}
 			buf.Write("},\n")
 		}
