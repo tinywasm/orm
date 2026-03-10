@@ -281,4 +281,60 @@ func TestOrmc(t *testing.T) {
 			t.Errorf("Ref should NOT be in Input anymore, got:\n%s", content)
 		}
 	})
+
+	t.Run("JSON tags and Nested structs", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("UserWithJSON", "mock_generator_model.go")
+		if err != nil {
+			t.Fatalf("Failed to generate code for UserWithJSON: %v", err)
+		}
+
+		outFile := "mock_generator_model_orm.go"
+		contentBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("Failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		content := string(contentBytes)
+
+		expectedStrings := []string{
+			`{Name: "id", Type: fmt.FieldText, PK: true, JSON: "id"}`,
+			`{Name: "name", Type: fmt.FieldText, JSON: "name"}`,
+			`{Name: "email", Type: fmt.FieldText, Input: "email", JSON: "email"}`,
+			`{Name: "bio", Type: fmt.FieldText, Input: "textarea", JSON: "bio,omitempty"}`,
+			`{Name: "home_addr", Type: fmt.FieldStruct, JSON: "home_addr"}`,
+		}
+
+		for _, expected := range expectedStrings {
+			if !strings.Contains(content, expected) {
+				t.Errorf("Generated file missing expected string: %s\nContent:\n%s", expected, content)
+			}
+		}
+	})
+
+	t.Run("Pointers to primitives vs structs", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("WithPointers", "mock_generator_model.go")
+		if err != nil {
+			t.Fatalf("Failed to generate code for WithPointers: %v", err)
+		}
+
+		outFile := "mock_generator_model_orm.go"
+		contentBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("Failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		content := string(contentBytes)
+
+		// Addr (*Address) should be present as FieldStruct
+		if !strings.Contains(content, `{Name: "addr", Type: fmt.FieldStruct}`) {
+			t.Errorf("Generated file missing expected string for Addr:\n%s", content)
+		}
+
+		// Count (*int) should be ABSENT
+		if strings.Contains(content, "Count") || strings.Contains(content, "count") {
+			t.Errorf("Generated file should NOT contain 'count' field (pointer to primitive):\n%s", content)
+		}
+	})
 }
