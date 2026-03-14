@@ -23,15 +23,25 @@ func (db *DB) Create(m Model) error {
 		return err
 	}
 	schema := m.Schema()
-	columns := make([]string, len(schema))
+	ptrs := m.Pointers()
+	allValues := fmt.ReadValues(schema, ptrs)
+	var columns []string
+	var values []any
 	for i, f := range schema {
-		columns[i] = f.Name
+		// Skip autoincrement PK fields with zero value — let the DB assign them.
+		if f.PK && f.AutoInc {
+			if v, ok := allValues[i].(int); ok && v == 0 {
+				continue
+			}
+		}
+		columns = append(columns, f.Name)
+		values = append(values, allValues[i])
 	}
 	q := Query{
 		Action:  ActionCreate,
 		Table:   m.TableName(),
 		Columns: columns,
-		Values:  fmt.ReadValues(schema, m.Pointers()),
+		Values:  values,
 	}
 	plan, err := db.compiler.Compile(q, m)
 	if err != nil {
