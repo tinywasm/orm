@@ -1,6 +1,11 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import (
+	"database/sql"
+	"errors"
+
+	"github.com/tinywasm/fmt"
+)
 
 // QB represents a query builder.
 // Consumers hold a *QB reference in variables for incremental building.
@@ -145,6 +150,9 @@ func (qb *QB) ReadOne() error {
 
 	row := qb.db.exec.QueryRow(plan.Query, plan.Args...)
 	if err := row.Scan(qb.model.Pointers()...); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
 		return err
 	}
 	return nil
