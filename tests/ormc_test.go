@@ -128,7 +128,6 @@ func TestOrmc(t *testing.T) {
 			"&m.FirstName",
 			"&m.LastName",
 			"var User_ = struct {",
-			"ModelName: \"user\"",
 			"ID: \"id\"",
 			"func ReadOneUser(qb *orm.QB, model *User) (*User, error) {",
 			"func ReadAllUser(qb *orm.QB) ([]*User, error) {",

@@ -131,10 +131,6 @@ func TestOrmc_DetectPointerReceiver(t *testing.T) {
 		if strings.Contains(string(content), "func (m *PointerReceiver) ModelName()") {
 			t.Error("ModelName() must NOT be generated — already declared with pointer receiver")
 		}
-		if !strings.Contains(string(content), `"ptr_table"`) {
-			// The Meta struct must reference the declared model name
-			t.Error("Expected ptr_table in generated meta")
-		}
 	})
 }
 

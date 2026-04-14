@@ -128,12 +128,10 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 		if !info.FormOnly {
 			// Metadata Descriptors
 			buf.Write(fmt.Sprintf("var %s_ = struct {\n", info.Name))
-			buf.Write("\tModelName string\n")
 			for _, f := range info.Fields {
 				buf.Write(fmt.Sprintf("\t%s string\n", f.Name))
 			}
 			buf.Write("}{\n")
-			buf.Write(fmt.Sprintf("\tModelName: \"%s\",\n", info.ModelName))
 			for _, f := range info.Fields {
 				buf.Write(fmt.Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
 			}
