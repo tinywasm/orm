@@ -75,7 +75,7 @@ Generates `model_orm.go` next to each source file.
 ### 3. Use it
 
 ```go
-func GetActiveUsers(db *orm.DB) ([]*user.User, error) {
+func GetActiveUsers(db *orm.DB) (*user.UserList, error) {
     return user.ReadAllUser(
         db.Query(&user.User{}).
             Where(user.User_.Email).Like("%@gmail.com").
@@ -206,7 +206,7 @@ project/
 | `Validate(action byte) error` | When struct has validation rules or is a form |
 | `ModelName() string` | DB structs only (not `formonly`) |
 | `T_` metadata struct | DB structs only |
-| `ReadOneT()`, `ReadAllT()` | DB structs only |
+| `ReadOneT()`, `ReadAllT()`, `TList` type | DB structs only |
 
 **Programmatic API:**
 

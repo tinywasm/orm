@@ -40,13 +40,14 @@ func TestOrmc(t *testing.T) {
 			}
 		}
 
-		// MUST NOT generate ModelName or ORM helpers
+		// MUST NOT generate ModelName, ORM helpers, or List type
 		forbiddenStrings := []string{
 			"func (m *LoginForm) ModelName() string",
 			"func (m *LoginForm) FormName() string",
 			"func ReadOneLoginForm",
 			"func ReadAllLoginForm",
 			"var LoginForm_ =",
+			"type LoginFormList",
 			"\"github.com/tinywasm/orm\"", // Import should be missing
 		}
 		for _, forbidden := range forbiddenStrings {
@@ -132,6 +133,10 @@ func TestOrmc(t *testing.T) {
 			"func ReadOneUser(qb *orm.QB, model *User) (*User, error) {",
 			"func ReadAllUser(qb *orm.QB) (*UserList, error) {",
 			"type UserList []*User",
+			"func (s *UserList) Schema() []fmt.Field { return nil }",
+			"func (s *UserList) Pointers() []any     { return nil }",
+			"func (s *UserList) Len() int             { return len(*s) }",
+			"func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }",
 			"func (s *UserList) Append() fmt.Fielder",
 		}
 
