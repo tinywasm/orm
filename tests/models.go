@@ -106,6 +106,15 @@ type LoginForm struct {
 	Password string `input:"password,required"`
 }
 
+// TimeSlotResponse is a pure transport struct: formonly, no db: tags, no input: tags.
+// Represents the pattern used by MCP tools that return computed results (e.g. availability slots).
+// It must generate a {Name}List for json.Encode slice support even though it has no DB layer.
+// ormc:formonly
+type TimeSlotResponse struct {
+	StartUTC int64
+	EndUTC   int64
+}
+
 type Address struct {
 	Street string
 	City   string

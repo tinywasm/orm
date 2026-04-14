@@ -11,6 +11,62 @@ import (
 )
 
 func TestOrmc(t *testing.T) {
+	// Regression: formonly structs with only primitive fields (no db: / input: tags)
+	// must still generate {Name}List for fmt.FielderSlice support.
+	//
+	// This was broken: {Name}List was guarded by !info.FormOnly, so transport-only
+	// structs (e.g. TimeSlot returned by MCP list tools) never received a List type
+	// and could not be encoded with json.Encode as a root array.
+	//
+	// Fix: {Name}List generation is unconditional — it is a transport concern, not a DB concern.
+	t.Run("formonly pure transport struct generates List", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("TimeSlotResponse", "models.go")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		outFile := "models_orm.go"
+		content, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		s := string(content)
+
+		// MUST generate Schema/Pointers (Fielder contract)
+		mustHave := []string{
+			"func (m *TimeSlotResponse) Schema() []fmt.Field {",
+			"func (m *TimeSlotResponse) Pointers() []any {",
+			// MUST generate List with all five FielderSlice methods
+			"type TimeSlotResponseList []*TimeSlotResponse",
+			"func (s *TimeSlotResponseList) Schema() []fmt.Field { return nil }",
+			"func (s *TimeSlotResponseList) Pointers() []any     { return nil }",
+			"func (s *TimeSlotResponseList) Len() int",
+			"func (s *TimeSlotResponseList) At(i int) fmt.Fielder",
+			"func (s *TimeSlotResponseList) Append() fmt.Fielder",
+		}
+		for _, want := range mustHave {
+			if !strings.Contains(s, want) {
+				t.Errorf("missing: %s", want)
+			}
+		}
+
+		// MUST NOT generate DB helpers — no DB layer for formonly
+		mustNotHave := []string{
+			"func (m *TimeSlotResponse) ModelName()",
+			"func ReadOneTimeSlotResponse",
+			"func ReadAllTimeSlotResponse",
+			"var TimeSlotResponse_ =",
+			`"github.com/tinywasm/orm"`,
+		}
+		for _, bad := range mustNotHave {
+			if strings.Contains(s, bad) {
+				t.Errorf("must not contain: %s", bad)
+			}
+		}
+	})
+
 	t.Run("formonly directive", func(t *testing.T) {
 		err := orm.NewOrmc().GenerateForStruct("LoginForm", "models.go")
 		if err != nil {
@@ -40,15 +96,18 @@ func TestOrmc(t *testing.T) {
 			}
 		}
 
-		// MUST NOT generate ModelName, ORM helpers, or List type
+		// MUST NOT generate ModelName or ORM helpers
 		forbiddenStrings := []string{
 			"func (m *LoginForm) ModelName() string",
 			"func (m *LoginForm) FormName() string",
 			"func ReadOneLoginForm",
 			"func ReadAllLoginForm",
 			"var LoginForm_ =",
-			"type LoginFormList",
 			"\"github.com/tinywasm/orm\"", // Import should be missing
+		}
+		// MUST generate List type for json.Encode support (formonly structs are also list-encodable)
+		if !strings.Contains(content, "type LoginFormList []*LoginForm") {
+			t.Error("formonly struct must generate LoginFormList for FielderSlice support")
 		}
 		for _, forbidden := range forbiddenStrings {
 			if strings.Contains(content, forbidden) {

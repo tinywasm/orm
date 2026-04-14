@@ -108,14 +108,12 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 		buf.Write("\t}\n")
 		buf.Write("}\n\n")
 
-		if !info.FormOnly {
-			buf.Write(fmt.Sprintf("type %sList []*%s\n\n", info.Name, info.Name))
-			buf.Write(fmt.Sprintf("func (s *%sList) Schema() []fmt.Field { return nil }\n", info.Name))
-			buf.Write(fmt.Sprintf("func (s *%sList) Pointers() []any     { return nil }\n", info.Name))
-			buf.Write(fmt.Sprintf("func (s *%sList) Len() int             { return len(*s) }\n", info.Name))
-			buf.Write(fmt.Sprintf("func (s *%sList) At(i int) fmt.Fielder { return (*s)[i] }\n", info.Name))
-			buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n\n", info.Name, info.Name))
-		}
+		buf.Write(fmt.Sprintf("type %sList []*%s\n\n", info.Name, info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Schema() []fmt.Field { return nil }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Pointers() []any     { return nil }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Len() int             { return len(*s) }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) At(i int) fmt.Fielder { return (*s)[i] }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n\n", info.Name, info.Name))
 
 		hasValidation := info.IsForm
 		if !hasValidation {
