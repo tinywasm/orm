@@ -46,6 +46,16 @@ func TestOrmc_MultiStruct(t *testing.T) {
 		if !strings.Contains(s, "func (m *MultiB) Schema()") {
 			t.Error("MultiB Schema() not generated")
 		}
+
+		// List types and methods must be present
+		for _, name := range []string{"MultiA", "MultiB"} {
+			if !strings.Contains(s, "type "+name+"List []*"+name) {
+				t.Errorf("%sList type not generated", name)
+			}
+			if !strings.Contains(s, "func ReadAll"+name+"(qb *orm.QB) (*"+name+"List, error)") {
+				t.Errorf("ReadAll%s signature not updated", name)
+			}
+		}
 	})
 }
 
