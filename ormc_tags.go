@@ -8,7 +8,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"strings"
 
 	"github.com/tinywasm/fmt"
 )
@@ -40,11 +39,11 @@ func (o *Ormc) RewriteModelTags(path string) error {
 		}
 
 		tagValue := field.Tag.Value
-		if !strings.HasPrefix(tagValue, "`") || !strings.HasSuffix(tagValue, "`") {
+		if !fmt.HasPrefix(tagValue, "`") || !fmt.HasSuffix(tagValue, "`") {
 			return true
 		}
 
-		rawTag := strings.Trim(tagValue, "`")
+		rawTag := fmt.Convert(tagValue).TrimPrefix("`").TrimSuffix("`").String()
 		newTag := rewriteRawTag(rawTag)
 		if newTag != rawTag {
 			edits = append(edits, edit{
@@ -86,17 +85,17 @@ func rewriteRawTag(raw string) string {
 		if p == "" {
 			continue
 		}
-		if strings.HasPrefix(p, "form:") || strings.HasPrefix(p, "validate:") {
+		if fmt.HasPrefix(p, "form:") || fmt.HasPrefix(p, "validate:") {
 			continue
 		}
-		if strings.HasPrefix(p, "json:\"") {
-			val := strings.TrimSuffix(strings.TrimPrefix(p, "json:\""), "\"")
+		if fmt.HasPrefix(p, "json:\"") {
+			val := fmt.Convert(p).TrimSuffix("\"").TrimPrefix("json:\"").String()
 			if val == "-" {
 				kept = append(kept, p)
 				continue
 			}
 
-			subParts := strings.Split(val, ",")
+			subParts := fmt.Convert(val).Split(",")
 			hasOmit := false
 			for _, sp := range subParts {
 				if sp == "omitempty" {
@@ -114,5 +113,5 @@ func rewriteRawTag(raw string) string {
 		kept = append(kept, p)
 	}
 
-	return strings.Join(kept, " ")
+	return fmt.Convert(kept).Join(" ").String()
 }

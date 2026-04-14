@@ -4,7 +4,6 @@ package orm
 
 import (
 	"os"
-	"strings"
 
 	"github.com/tinywasm/fmt"
 )
@@ -82,7 +81,7 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 				if f.AutoInc {
 					parts = append(parts, "AutoInc: true")
 				}
-				buf.Write(strings.Join(parts, ", "))
+				buf.Write(fmt.Convert(parts).Join(", ").String())
 				buf.Write("}")
 			}
 			if f.NotNull {
