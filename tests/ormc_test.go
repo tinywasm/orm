@@ -130,7 +130,9 @@ func TestOrmc(t *testing.T) {
 			"var User_ = struct {",
 			"ID: \"id\"",
 			"func ReadOneUser(qb *orm.QB, model *User) (*User, error) {",
-			"func ReadAllUser(qb *orm.QB) ([]*User, error) {",
+			"func ReadAllUser(qb *orm.QB) (*UserList, error) {",
+			"type UserList []*User",
+			"func (s *UserList) Append() fmt.Fielder",
 		}
 
 		for _, expected := range expectedStrings {
