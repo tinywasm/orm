@@ -258,6 +258,12 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		}
 
 		colName := fmt.Convert(fieldName).SnakeLow().String()
+		if jsonTag != "" {
+			name := fmt.Convert(jsonTag).Split(",")[0]
+			if name != "" && name != "-" {
+				colName = name
+			}
+		}
 		isID, isPK := fmt.IDorPrimaryKey(modelName, fieldName)
 
 		var pk, unique, notNull, autoInc bool
