@@ -134,3 +134,9 @@ type WithPointers struct {
 	Count *int    // pointer to primitive -> should be skipped with warning
 	Addr  *Address // pointer to struct -> FieldStruct
 }
+
+// ormc:formonly
+type MCPResponse struct {
+	Result string `json:"result,raw"`
+	Error  string `json:"error,omitempty,raw"`
+}

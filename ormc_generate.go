@@ -66,6 +66,8 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 				typeStr = "fmt.FieldBlob"
 			case fmt.FieldStruct:
 				typeStr = "fmt.FieldStruct"
+			case fmt.FieldRaw:
+				typeStr = "fmt.FieldRaw"
 			}
 
 			buf.Write(fmt.Sprintf("\t\t{Name: \"%s\", Type: %s", f.ColumnName, typeStr))

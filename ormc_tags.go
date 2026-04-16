@@ -127,22 +127,37 @@ func rewriteRawTag(raw string, formOnly bool) string {
 			subParts := fmt.Convert(val).Split(",")
 			name := subParts[0]
 			hasOmit := false
+			hasRaw := false
 			for _, sp := range subParts {
 				if sp == "omitempty" {
 					hasOmit = true
-					break
+				}
+				if sp == "raw" {
+					hasRaw = true
 				}
 			}
 
 			if formOnly && name != "" {
 				// preserve json name for formonly structs
+				tagVal := name
 				if hasOmit {
-					kept = append(kept, fmt.Sprintf("json:\"%s,omitempty\"", name))
-				} else {
-					kept = append(kept, p)
+					tagVal += ",omitempty"
 				}
-			} else if hasOmit {
-				kept = append(kept, "json:\",omitempty\"")
+				if hasRaw {
+					tagVal += ",raw"
+				}
+				kept = append(kept, fmt.Sprintf("json:\"%s\"", tagVal))
+			} else {
+				tagVal := ""
+				if hasOmit {
+					tagVal += ",omitempty"
+				}
+				if hasRaw {
+					tagVal += ",raw"
+				}
+				if tagVal != "" {
+					kept = append(kept, fmt.Sprintf("json:\"%s\"", tagVal))
+				}
 			}
 			// non-formonly without omitempty: drop the json tag entirely
 			continue

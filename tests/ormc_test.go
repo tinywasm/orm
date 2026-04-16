@@ -425,6 +425,32 @@ func TestOrmc(t *testing.T) {
 			t.Errorf("expected FieldStruct in generated output, got:\n%s", content)
 		}
 	})
+
+	t.Run("json raw tag generates FieldRaw", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("MCPResponse", "models.go")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		outFile := "models_orm.go"
+		content, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		s := string(content)
+
+		mustHave := []string{
+			`{Name: "result", Type: fmt.FieldRaw`,
+			`{Name: "error", Type: fmt.FieldRaw, OmitEmpty: true`,
+		}
+		for _, want := range mustHave {
+			if !strings.Contains(s, want) {
+				t.Errorf("missing expected string: %s\nContent:\n%s", want, s)
+			}
+		}
+	})
 }
 
 func TestParseStructRejectsJsonNameOnDBModel(t *testing.T) {
