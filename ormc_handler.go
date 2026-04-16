@@ -4,8 +4,9 @@ package orm
 
 // Ormc is the code generator handler for the ormc tool.
 type Ormc struct {
-	logFn   func(messages ...any)
-	rootDir string
+	logFn      func(messages ...any)
+	rootDir    string
+	withFields bool // generates field descriptor variables (e.g. User_.Name)
 }
 
 // NewOrmc creates a new Ormc handler with rootDir defaulting to ".".
@@ -25,6 +26,11 @@ func (o *Ormc) SetLog(fn func(messages ...any)) {
 // without needing os.Chdir.
 func (o *Ormc) SetRootDir(dir string) {
 	o.rootDir = dir
+}
+
+// SetFields sets the flag to generate field descriptor variables (e.g. User_.Name).
+func (o *Ormc) SetFields(v bool) {
+	o.withFields = v
 }
 
 // log emits a message via the configured log function, if any.
