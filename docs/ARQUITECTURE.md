@@ -9,7 +9,7 @@ The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (
 
 ## Active Plans
 
-- [PLAN.md](PLAN.md) — Replace `form:`/`validate:` tags with unified `input:` tag; source file tag cleanup
+- [PLAN.md](PLAN.md) — json name restriction on DB structs; compact `Pointers()`; `-fields` flag for optional field descriptors
 
 ---
 
@@ -57,7 +57,7 @@ type Fielder interface {
 ```
 
 `fmt.Field` carries:
-- `Name string` — column name (snake_case)
+- `Name string` — column name, always derived from the Go field name as `snake_case`. Custom JSON names via `json:"name"` are **only** honored on `ormc:formonly` structs (JSON/form-only, no DB mapping). Placing `json:"name"` on a DB struct is a compile-time error from `ormc`.
 - `Type fmt.FieldType` — `FieldText`, `FieldInt`, `FieldFloat`, `FieldBool`, `FieldBlob`, `FieldStruct`
 - `PK bool`, `Unique bool`, `NotNull bool`, `AutoInc bool` — schema constraints
 - `OmitEmpty bool` — hint from `json:",omitempty"` struct tag (read by `tinywasm/json`)
@@ -301,7 +301,41 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 
 ---
 
-## 4. Advantages of this Design
+## 4. `ormc` Code Generator
+
+`ormc` reads `model.go` / `models.go` files and generates `*_orm.go` with the `Schema()`, `Pointers()`, `Validate()`, typed read helpers, and optional field descriptors.
+
+### 4.1. Generation rules
+
+| Element | Generated | Condition |
+|---------|-----------|-----------|
+| `Schema()` | always | any struct |
+| `Pointers()` | always | any struct |
+| `Validate()` | when constraints exist | `NotNull`, `Permitted`, or `ormc:form` |
+| `ReadOne<Name>` / `ReadAll<Name>` | always | DB structs only (not `formonly`) |
+| `<Name>_` field descriptors | **opt-in** | DB structs + `-fields` flag |
+
+### 4.2. CLI flags
+
+```
+ormc [-fields] [-root <dir>]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-fields` | `false` | Generate field descriptor variables (e.g. `User_.Name`) for type-safe query building. Omit to keep the binary smaller. |
+
+### 4.3. Struct tag rules
+
+| Tag | DB struct | `ormc:formonly` |
+|-----|-----------|-----------------|
+| `json:",omitempty"` | allowed — sets `OmitEmpty: true` in schema | allowed |
+| `json:"name"` | **compile error** — column name always derived from field name as `snake_case` | allowed — sets `ColumnName` |
+| `db:"pk,unique,..."` | allowed — sets constraints | ignored |
+
+---
+
+## 5. Advantages of this Design
 
 1. **Fully Stdlib & WASM Compatible:** `tinywasm/orm` core does not import `database/sql` nor interact with the OS or Network.
 2. **Separation of Concerns:** The ORM packs/unpacks data (`Model` → `Query`). `Compiler` translates logic (`Query` → `Plan`). `Executor` runs operations on DB Engine.
