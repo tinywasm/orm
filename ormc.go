@@ -261,6 +261,12 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		if jsonTag != "" {
 			name := fmt.Convert(jsonTag).Split(",")[0]
 			if name != "" && name != "-" {
+				if !formOnly {
+					return StructInfo{}, fmt.Err(
+						"field", fieldName,
+						"json name tag has no effect on DB structs: column name is always derived from the field name; remove the json name or declare the struct as ormc:formonly",
+					)
+				}
 				colName = name
 			}
 		}

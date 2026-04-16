@@ -4,6 +4,7 @@ package tests
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -152,7 +153,9 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Generate User", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("User", "models.go")
+		o := orm.NewOrmc()
+		o.SetFields(true)
+		err := o.GenerateForStruct("User", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for User: %v", err)
 		}
@@ -406,7 +409,6 @@ func TestOrmc(t *testing.T) {
 		}
 	})
 
-
 	t.Run("FieldStruct for nested struct stage 1", func(t *testing.T) {
 		err := orm.NewOrmc().GenerateForStruct("UserWithJSON", "models.go")
 		if err != nil {
@@ -423,4 +425,117 @@ func TestOrmc(t *testing.T) {
 			t.Errorf("expected FieldStruct in generated output, got:\n%s", content)
 		}
 	})
+}
+
+func TestParseStructRejectsJsonNameOnDBModel(t *testing.T) {
+	src := `package test
+
+type User struct {
+	FirstName string ` + "`" + `json:"firstName"` + "`" + `
+}
+`
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "model.go")
+	os.WriteFile(path, []byte(src), 0644)
+
+	o := orm.NewOrmc()
+	_, err := o.ParseStruct("User", path)
+	if err == nil {
+		t.Fatal("expected error for json name override on DB struct, got nil")
+	}
+}
+
+func TestParseStructFormOnlyAllowsJsonName(t *testing.T) {
+	src := `package test
+
+// ormc:formonly
+type ContactForm struct {
+	FirstName string ` + "`" + `json:"firstName"` + "`" + `
+}
+`
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "model.go")
+	os.WriteFile(path, []byte(src), 0644)
+
+	o := orm.NewOrmc()
+	info, err := o.ParseStruct("ContactForm", path)
+	if err != nil {
+		t.Fatalf("unexpected error for formonly struct: %v", err)
+	}
+	if info.Fields[0].ColumnName != "firstName" {
+		t.Errorf("expected ColumnName %q, got %q", "firstName", info.Fields[0].ColumnName)
+	}
+}
+
+func TestGenerateWithoutFields(t *testing.T) {
+	src := `package test
+
+type User struct {
+	ID   int    ` + "`" + `db:"pk"` + "`" + `
+	Name string
+}
+`
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
+
+	o := orm.NewOrmc()
+	o.SetRootDir(tmpDir)
+	// withFields = false por defecto
+	if err := o.Run(); err != nil {
+		t.Fatal(err)
+	}
+	output, _ := os.ReadFile(filepath.Join(tmpDir, "model_orm.go"))
+	if strings.Contains(string(output), "var User_ =") {
+		t.Error("field descriptor must not be generated without -fields flag")
+	}
+}
+
+func TestGenerateWithFields(t *testing.T) {
+	src := `package test
+
+type User struct {
+	ID   int    ` + "`" + `db:"pk"` + "`" + `
+	Name string
+}
+`
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
+
+	o := orm.NewOrmc()
+	o.SetRootDir(tmpDir)
+	o.SetFields(true)
+	if err := o.Run(); err != nil {
+		t.Fatal(err)
+	}
+	output, _ := os.ReadFile(filepath.Join(tmpDir, "model_orm.go"))
+	out := string(output)
+	if !strings.Contains(out, "var User_ =") {
+		t.Error("field descriptor must be generated with -fields flag")
+	}
+	if !strings.Contains(out, `Name: "name"`) {
+		t.Error("field descriptor must include field Name")
+	}
+}
+
+func TestGenerateFormOnlyNeverFields(t *testing.T) {
+	src := `package test
+
+// ormc:formonly
+type ContactForm struct {
+	Name string
+}
+`
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
+
+	o := orm.NewOrmc()
+	o.SetRootDir(tmpDir)
+	o.SetFields(true)
+	if err := o.Run(); err != nil {
+		t.Fatal(err)
+	}
+	output, _ := os.ReadFile(filepath.Join(tmpDir, "model_orm.go"))
+	if strings.Contains(string(output), "var ContactForm_ =") {
+		t.Error("field descriptor must never be generated for formonly structs")
+	}
 }
