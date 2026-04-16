@@ -451,6 +451,35 @@ func TestOrmc(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("fields without raw stay FieldText", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("PlainResponse", "models.go")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		outFile := "models_orm.go"
+		content, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		s := string(content)
+
+		mustHave := []string{
+			`{Name: "message", Type: fmt.FieldText`,
+			`{Name: "code", Type: fmt.FieldText, OmitEmpty: true`,
+		}
+		for _, want := range mustHave {
+			if !strings.Contains(s, want) {
+				t.Errorf("missing expected string: %s\nContent:\n%s", want, s)
+			}
+		}
+		if strings.Contains(s, "fmt.FieldRaw") {
+			t.Error("should not contain FieldRaw")
+		}
+	})
 }
 
 func TestParseStructRejectsJsonNameOnDBModel(t *testing.T) {

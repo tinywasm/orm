@@ -51,12 +51,12 @@ type User struct {
 	if strings.Contains(outStr, `json:"name"`) || strings.Contains(outStr, `validate:"required"`) {
 		t.Errorf("Expected json:\"name\" and validate:\"required\" to be removed, got: %s", outStr)
 	}
-	// Verify Email: form, validate removed, json rewritten to ,omitempty
+	// Verify Email: form, validate removed, json rewritten to ,omitempty (discarded for DB model)
 	if strings.Contains(outStr, `form:"email"`) || strings.Contains(outStr, `validate:"email"`) {
 		t.Errorf("Expected form and validate to be removed, got: %s", outStr)
 	}
-	if !strings.Contains(outStr, `json:",omitempty"`) {
-		t.Errorf("Expected json:\",omitempty\" to be present, got: %s", outStr)
+	if strings.Contains(outStr, `json:",`) {
+		t.Errorf("json tag with leading comma should not exist, got: %s", outStr)
 	}
 	// Verify Age: json:"-" preserved
 	if !strings.Contains(outStr, `json:"-"`) {

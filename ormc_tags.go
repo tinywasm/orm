@@ -128,7 +128,17 @@ func rewriteRawTag(raw string, formOnly bool) string {
 			name := subParts[0]
 			hasOmit := false
 			hasRaw := false
-			for _, sp := range subParts {
+			if name == "omitempty" {
+				hasOmit = true
+				name = ""
+			} else if name == "raw" {
+				hasRaw = true
+				name = ""
+			}
+			for i, sp := range subParts {
+				if i == 0 && (hasOmit || hasRaw) {
+					continue
+				}
 				if sp == "omitempty" {
 					hasOmit = true
 				}
@@ -137,27 +147,28 @@ func rewriteRawTag(raw string, formOnly bool) string {
 				}
 			}
 
-			if formOnly && name != "" {
+			if formOnly {
 				// preserve json name for formonly structs
-				tagVal := name
+				var parts []string
+				if name != "" {
+					parts = append(parts, name)
+				}
 				if hasOmit {
-					tagVal += ",omitempty"
+					parts = append(parts, "omitempty")
 				}
 				if hasRaw {
-					tagVal += ",raw"
+					parts = append(parts, "raw")
 				}
-				kept = append(kept, fmt.Sprintf("json:\"%s\"", tagVal))
+				if len(parts) > 0 {
+					// Use shorthand json:"raw" if no explicit name (docs/PLAN.md)
+					// This is okay because our ormc generator (Pass 1) already captured
+					// the metadata before this cleanup (Pass 2).
+					kept = append(kept, fmt.Sprintf("json:\"%s\"", fmt.Convert(parts).Join(",").String()))
+				}
 			} else {
-				tagVal := ""
-				if hasOmit {
-					tagVal += ",omitempty"
-				}
-				if hasRaw {
-					tagVal += ",raw"
-				}
-				if tagVal != "" {
-					kept = append(kept, fmt.Sprintf("json:\"%s\"", tagVal))
-				}
+				// DB field without explicit json name: only preserve if there's a name
+				// omitempty/raw without name add nothing — the ORM derives the name from the field
+				// In this context, the json tag is completely discarded
 			}
 			// non-formonly without omitempty: drop the json tag entirely
 			continue

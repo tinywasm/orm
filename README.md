@@ -110,6 +110,15 @@ DB flags are grouped in `Field.DB *FieldDB` (nil for `formonly` structs). Helper
 | `json:",raw"` | Sets `Type: fmt.FieldRaw` in schema |
 | `json:"-"` | Exclude from JSON (field still in schema for DB/Form) |
 
+**Raw option usage:**
+
+| Tag | When to use it |
+|---|---|
+| `json:"raw"` | Only raw, default name (snake_case of the field) |
+| `json:"omitempty,raw"` | Raw + omit if empty, default name |
+| `json:"camelName,raw"` | Name different from snake_case + raw |
+| `json:"camelName,omitempty,raw"` | Different name + omitempty + raw |
+
 ### `input:` — Form layer
 
 | Tag | Effect |

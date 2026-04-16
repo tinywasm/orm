@@ -137,6 +137,12 @@ type WithPointers struct {
 
 // ormc:formonly
 type MCPResponse struct {
-	Result string `json:"result,raw"`
-	Error  string `json:"error,omitempty,raw"`
+	Result string `json:"raw"`
+	Error  string `json:"omitempty,raw"`
+}
+
+// ormc:formonly
+type PlainResponse struct {
+	Message string `json:"message"`
+	Code    string `json:"omitempty"`
 }

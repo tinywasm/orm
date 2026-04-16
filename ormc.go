@@ -259,7 +259,11 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 
 		colName := fmt.Convert(fieldName).SnakeLow().String()
 		if jsonTag != "" {
-			name := fmt.Convert(jsonTag).Split(",")[0]
+			parts := fmt.Convert(jsonTag).Split(",")
+			name := parts[0]
+			if name == "omitempty" || name == "raw" {
+				name = ""
+			}
 			if name != "" && name != "-" {
 				if !formOnly {
 					return StructInfo{}, fmt.Err(
@@ -593,17 +597,7 @@ func (o *Ormc) generateAll(all map[string]StructInfo, structOrder []string, file
 
 // Run is the entry point for the CLI tool.
 func (o *Ormc) Run() error {
-	// Pass 0: cleanup tags
-	_, _, fileOrder, err := o.collectAllStructs()
-	if err == nil {
-		for _, f := range fileOrder {
-			if err := o.RewriteModelTags(f); err != nil {
-				o.log(fmt.Sprintf("Warning: failed to rewrite tags in %s: %v", f, err))
-			}
-		}
-	}
-
-	// Pass 1: collect all structs across all model files (after cleanup)
+	// Pass 1: collect all structs across all model files (BEFORE cleanup)
 	all, structOrder, fileOrder, err := o.collectAllStructs()
 	if err != nil {
 		return fmt.Err(err, "error walking directory")
@@ -612,15 +606,22 @@ func (o *Ormc) Run() error {
 		return fmt.Err("no models found")
 	}
 
-	// Pass 2: resolve cross-struct relations
+	// Pass 2: cleanup tags (Pass 1 metadata is already safe)
+	for _, f := range fileOrder {
+		if err := o.RewriteModelTags(f); err != nil {
+			o.log(fmt.Sprintf("Warning: failed to rewrite tags in %s: %v", f, err))
+		}
+	}
+
+	// Pass 3: resolve cross-struct relations
 	o.ResolveRelations(all)
 
-	// Pass 3: generate (group by source file, call GenerateForFile once per file)
+	// Pass 4: generate (group by source file, call GenerateForFile once per file)
 	if err := o.generateAll(all, structOrder, fileOrder); err != nil {
 		return err
 	}
 
-	// Pass 4: sync dependencies
+	// Pass 5: sync dependencies
 	if _, err := os.Stat(filepath.Join(o.rootDir, "go.mod")); err == nil {
 		o.log("Syncing dependencies...")
 		if err := o.exec("go", "mod", "tidy"); err != nil {
