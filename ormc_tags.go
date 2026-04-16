@@ -14,6 +14,7 @@ import (
 
 // RewriteModelTags performs in-place struct tag cleanup in the given file.
 // It removes 'form' and 'validate' tags, and strips field names from 'json' tags.
+// For ormc:formonly structs, json field names are preserved (needed for camelCase protocols).
 func (o *Ormc) RewriteModelTags(path string) error {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -32,29 +33,54 @@ func (o *Ormc) RewriteModelTags(path string) error {
 	}
 	var edits []edit
 
-	ast.Inspect(node, func(n ast.Node) bool {
-		field, ok := n.(*ast.Field)
-		if !ok || field.Tag == nil {
-			return true
+	for _, decl := range node.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
 		}
 
-		tagValue := field.Tag.Value
-		if !fmt.HasPrefix(tagValue, "`") || !fmt.HasSuffix(tagValue, "`") {
-			return true
+		formOnly := false
+		if genDecl.Doc != nil {
+			for _, c := range genDecl.Doc.List {
+				if fmt.Contains(c.Text, "ormc:formonly") {
+					formOnly = true
+					break
+				}
+			}
 		}
 
-		rawTag := fmt.Convert(tagValue).TrimPrefix("`").TrimSuffix("`").String()
-		newTag := rewriteRawTag(rawTag)
-		if newTag != rawTag {
-			edits = append(edits, edit{
-				start:  int(field.Tag.Pos()),
-				end:    int(field.Tag.End()),
-				newVal: "`" + newTag + "`",
-			})
-		}
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
 
-		return true
-	})
+			for _, field := range structType.Fields.List {
+				if field.Tag == nil {
+					continue
+				}
+				tagValue := field.Tag.Value
+				if !fmt.HasPrefix(tagValue, "`") || !fmt.HasSuffix(tagValue, "`") {
+					continue
+				}
+
+				rawTag := fmt.Convert(tagValue).TrimPrefix("`").TrimSuffix("`").String()
+				newTag := rewriteRawTag(rawTag, formOnly)
+				if newTag == rawTag {
+					continue
+				}
+				edits = append(edits, edit{
+					start:  int(field.Tag.Pos()),
+					end:    int(field.Tag.End()),
+					newVal: "`" + newTag + "`",
+				})
+			}
+		}
+	}
 
 	if len(edits) == 0 {
 		return nil
@@ -77,7 +103,10 @@ func (o *Ormc) RewriteModelTags(path string) error {
 	return os.WriteFile(path, result, 0644)
 }
 
-func rewriteRawTag(raw string) string {
+// rewriteRawTag cleans a raw struct tag string.
+// For non-formonly structs: removes form/validate tags and strips json field names (keeps only omitempty).
+// For formonly structs: removes form/validate tags but preserves json field names (needed for camelCase protocols).
+func rewriteRawTag(raw string, formOnly bool) string {
 	parts := fmt.Convert(raw).Split(" ")
 	var kept []string
 
@@ -96,6 +125,7 @@ func rewriteRawTag(raw string) string {
 			}
 
 			subParts := fmt.Convert(val).Split(",")
+			name := subParts[0]
 			hasOmit := false
 			for _, sp := range subParts {
 				if sp == "omitempty" {
@@ -104,10 +134,17 @@ func rewriteRawTag(raw string) string {
 				}
 			}
 
-			if hasOmit {
+			if formOnly && name != "" {
+				// preserve json name for formonly structs
+				if hasOmit {
+					kept = append(kept, fmt.Sprintf("json:\"%s,omitempty\"", name))
+				} else {
+					kept = append(kept, p)
+				}
+			} else if hasOmit {
 				kept = append(kept, "json:\",omitempty\"")
 			}
-			// if no omitempty and no -, we just drop the json tag
+			// non-formonly without omitempty: drop the json tag entirely
 			continue
 		}
 		kept = append(kept, p)
