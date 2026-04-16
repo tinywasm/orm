@@ -107,6 +107,7 @@ DB flags are grouped in `Field.DB *FieldDB` (nil for `formonly` structs). Helper
 | Tag | Effect |
 |-----|--------|
 | `json:",omitempty"` | Sets `OmitEmpty: true` in schema |
+| `json:",raw"` | Sets `Type: fmt.FieldRaw` in schema |
 | `json:"-"` | Exclude from JSON (field still in schema for DB/Form) |
 
 ### `input:` — Form layer

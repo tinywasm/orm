@@ -319,6 +319,9 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 				if p == "omitempty" {
 					omitEmpty = true
 				}
+				if p == "raw" {
+					fieldType = fmt.FieldRaw
+				}
 			}
 		}
 
