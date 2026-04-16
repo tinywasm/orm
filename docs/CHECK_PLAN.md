@@ -3,11 +3,11 @@
 ## Estado
 
 - [x] Fix base: `json:"name"` se usa como `ColumnName` cuando está presente
-- [ ] Stage 1 — Restringir `json:"name"` a structs `FormOnly` en `ParseStruct`
-- [ ] Stage 2 — Tests de restricción en `ormc_test.go`
-- [ ] Stage 3 — Tests de FormOnly permitido en `ormc_test.go`
-- [ ] Stage 4 — Compactar `Pointers()` a una sola línea en `ormc_generate.go`
-- [ ] Stage 5 — Flag `-fields` para descriptores opcionales
+- [x] Stage 1 — Restringir `json:"name"` a structs `FormOnly` en `ParseStruct`
+- [x] Stage 2 — Tests de restricción en `ormc_test.go`
+- [x] Stage 3 — Tests de FormOnly permitido en `ormc_test.go`
+- [x] Stage 4 — Compactar `Pointers()` a una sola línea en `ormc_generate.go`
+- [x] Stage 5 — Flag `-fields` para descriptores opcionales
 - [x] Stage 6 — Documentación actualizada en `ARQUITECTURE.md`
 
 ---
