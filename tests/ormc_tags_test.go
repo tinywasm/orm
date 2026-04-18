@@ -110,3 +110,36 @@ type Params struct {
 		t.Errorf("json:\"-\" must be preserved, got: %s", outStr)
 	}
 }
+
+func TestRewriteModelTagsFormOnlyLeadingComma(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelPath := filepath.Join(tmpDir, "model.go")
+
+	input := `package test
+
+// ormc:formonly
+type Repro struct {
+	Result string ` + "`" + `json:",omitempty,raw"` + "`" + `
+	Error  string ` + "`" + `json:",omitempty,raw"` + "`" + `
+}
+`
+	err := os.WriteFile(modelPath, []byte(input), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	o := orm.NewOrmc()
+	if err := o.RewriteModelTags(modelPath); err != nil {
+		t.Fatalf("RewriteModelTags failed: %v", err)
+	}
+
+	output, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outStr := string(output)
+
+	if !strings.Contains(outStr, `json:",omitempty,raw"`) {
+		t.Errorf("Expected leading comma to be preserved in json:\",omitempty,raw\", got: %s", outStr)
+	}
+}

@@ -94,9 +94,9 @@ type MockChild struct {
 type UserForm struct {
 	ID       string `db:"pk"`
 	Name     string `input:"name,min=2,max=100"`
-	Email    string `db:"not_null" input:"email,required" json:",omitempty"`
+	Email    string `db:"not_null" input:"email,required"`
 	Password string `input:"password,required,min=8"`
-	Bio      string `input:"textarea,tilde,spaces" json:",omitempty"`
+	Bio      string `input:"textarea,tilde,spaces"`
 	Age      int64
 }
 
@@ -125,7 +125,7 @@ type UserWithJSON struct {
 	ID       string  `db:"pk"`
 	Name     string  ``
 	Email    string  `input:"email"`
-	Bio      string  `input:"textarea" json:",omitempty"`
+	Bio      string  `input:"textarea"`
 	HomeAddr Address ``
 }
 

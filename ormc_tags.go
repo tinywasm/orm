@@ -150,19 +150,17 @@ func rewriteRawTag(raw string, formOnly bool) string {
 			if formOnly {
 				// preserve json name for formonly structs
 				var parts []string
-				if name != "" {
-					parts = append(parts, name)
-				}
+				parts = append(parts, name)
 				if hasOmit {
 					parts = append(parts, "omitempty")
 				}
 				if hasRaw {
 					parts = append(parts, "raw")
 				}
-				if len(parts) > 0 {
-					// Use shorthand json:"raw" if no explicit name (docs/PLAN.md)
-					// This is okay because our ormc generator (Pass 1) already captured
-					// the metadata before this cleanup (Pass 2).
+
+				if len(parts) > 1 || (len(parts) == 1 && parts[0] != "") {
+					// Reconstruct the tag. If name was empty but we have options,
+					// it will correctly start with a comma (e.g., ",omitempty").
 					kept = append(kept, fmt.Sprintf("json:\"%s\"", fmt.Convert(parts).Join(",").String()))
 				}
 			} else {
