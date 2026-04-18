@@ -136,9 +136,9 @@ func TestOrmc(t *testing.T) {
 			"func (m *UserForm) ModelName() string {",
 			"return \"user_form\"",
 			"{Name: \"name\", Type: fmt.FieldText, Widget: input.Text(), Permitted: fmt.Permitted{Letters: true, Tilde: true, Spaces: true, Minimum: 2, Maximum: 100}}",
-			"{Name: \"email\", Type: fmt.FieldText, NotNull: true, OmitEmpty: true, Widget: input.Email()}",
+			"{Name: \"email\", Type: fmt.FieldText, NotNull: true, Widget: input.Email()}",
 			"{Name: \"password\", Type: fmt.FieldText, NotNull: true, Widget: input.Password(), Permitted: fmt.Permitted{Minimum: 8}}",
-			"{Name: \"bio\", Type: fmt.FieldText, OmitEmpty: true, Widget: input.Textarea(), Permitted: fmt.Permitted{Tilde: true, Spaces: true}}",
+			"{Name: \"bio\", Type: fmt.FieldText, Widget: input.Textarea(), Permitted: fmt.Permitted{Tilde: true, Spaces: true}}",
 			"{Name: \"id\", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}, Widget: input.Text()}",
 			"func (m *UserForm) Validate(action byte) error {",
 			"return fmt.ValidateFields(action, m)",
@@ -368,7 +368,7 @@ func TestOrmc(t *testing.T) {
 			`{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}, Widget: input.Text()}`,
 			`{Name: "name", Type: fmt.FieldText, Widget: input.Text()}`,
 			`{Name: "email", Type: fmt.FieldText, Widget: input.Email()}`,
-			`{Name: "bio", Type: fmt.FieldText, OmitEmpty: true, Widget: input.Textarea()}`,
+			`{Name: "bio", Type: fmt.FieldText, Widget: input.Textarea()}`,
 			`{Name: "home_addr", Type: fmt.FieldStruct}`,
 		}
 
