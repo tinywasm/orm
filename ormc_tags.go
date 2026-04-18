@@ -127,23 +127,18 @@ func rewriteRawTag(raw string, formOnly bool) string {
 			subParts := fmt.Convert(val).Split(",")
 			name := subParts[0]
 			hasOmit := false
-			hasRaw := false
 			if name == "omitempty" {
 				hasOmit = true
 				name = ""
 			} else if name == "raw" {
-				hasRaw = true
 				name = ""
 			}
 			for i, sp := range subParts {
-				if i == 0 && (hasOmit || hasRaw) {
+				if i == 0 && (hasOmit || sp == "raw") {
 					continue
 				}
 				if sp == "omitempty" {
 					hasOmit = true
-				}
-				if sp == "raw" {
-					hasRaw = true
 				}
 			}
 
@@ -154,9 +149,6 @@ func rewriteRawTag(raw string, formOnly bool) string {
 				if hasOmit {
 					parts = append(parts, "omitempty")
 				}
-				if hasRaw {
-					parts = append(parts, "raw")
-				}
 
 				if len(parts) > 1 || (len(parts) == 1 && parts[0] != "") {
 					// Reconstruct the tag. If name was empty but we have options,
@@ -165,7 +157,7 @@ func rewriteRawTag(raw string, formOnly bool) string {
 				}
 			} else {
 				// DB field without explicit json name: only preserve if there's a name
-				// omitempty/raw without name add nothing — the ORM derives the name from the field
+				// omitempty without name adds nothing — the ORM derives the name from the field
 				// In this context, the json tag is completely discarded
 			}
 			// non-formonly without omitempty: drop the json tag entirely

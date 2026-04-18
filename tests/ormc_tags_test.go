@@ -111,7 +111,7 @@ type Params struct {
 	}
 }
 
-func TestRewriteModelTagsFormOnlyLeadingComma(t *testing.T) {
+func TestRewriteModelTagsFormOnlyStripsRaw(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelPath := filepath.Join(tmpDir, "model.go")
 
@@ -139,7 +139,12 @@ type Repro struct {
 	}
 	outStr := string(output)
 
-	if !strings.Contains(outStr, `json:",omitempty,raw"`) {
-		t.Errorf("Expected leading comma to be preserved in json:\",omitempty,raw\", got: %s", outStr)
+	// raw must be stripped from json tags (fields should use fmt.RawJSON type instead)
+	if strings.Contains(outStr, `json:",omitempty,raw"`) || strings.Contains(outStr, `json:",raw"`) {
+		t.Errorf("Expected raw to be stripped from json tags, got: %s", outStr)
+	}
+	// omitempty should be preserved
+	if !strings.Contains(outStr, `json:",omitempty"`) {
+		t.Errorf("Expected omitempty to be preserved, got: %s", outStr)
 	}
 }

@@ -242,6 +242,8 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 			fieldType = fmt.FieldBool
 		case "[]byte":
 			fieldType = fmt.FieldBlob
+		case "RawJSON", "fmt.RawJSON":
+			fieldType = fmt.FieldRaw
 		default:
 			// If it's a struct (but not time.Time, not slice, not chan), map to FieldStruct
 			if typeStr != "" && !fmt.Contains(typeStr, "[") && !fmt.Contains(typeStr, "chan ") {

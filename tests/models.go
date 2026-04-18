@@ -2,6 +2,8 @@ package tests
 
 import (
 	"time"
+
+	"github.com/tinywasm/fmt"
 )
 
 //go:generate ormc
@@ -137,8 +139,8 @@ type WithPointers struct {
 
 // ormc:formonly
 type MCPResponse struct {
-	Result string `json:"raw"`
-	Error  string `json:"omitempty,raw"`
+	Result fmt.RawJSON
+	Error  fmt.RawJSON `json:",omitempty"`
 }
 
 // ormc:formonly

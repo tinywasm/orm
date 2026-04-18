@@ -426,7 +426,7 @@ func TestOrmc(t *testing.T) {
 		}
 	})
 
-	t.Run("json raw tag generates FieldRaw", func(t *testing.T) {
+	t.Run("fmt.RawJSON type generates FieldRaw", func(t *testing.T) {
 		err := orm.NewOrmc().GenerateForStruct("MCPResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
