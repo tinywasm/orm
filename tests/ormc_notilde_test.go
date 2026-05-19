@@ -12,7 +12,7 @@ import (
 
 func TestOrmc_Notilde(t *testing.T) {
 	// 1. notilde is recognised as modifier (doesn't fail or warn as unknown widget)
-	// 2. notilde emits .SetTilde(false)
+	// 2. notilde emits input.SetTilde(<widget>, false)
 	// 3. can be combined with other modifiers
 
 	t.Run("notilde emits setter", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestOrmc_Notilde(t *testing.T) {
 		s := string(content)
 
 		// MUST emit .SetTilde(false)
-		if !strings.Contains(s, "Widget: input.Text().SetTilde(false)") {
+		if !strings.Contains(s, "Widget: input.SetTilde(input.Text(), false)") {
 			t.Errorf("expected .SetTilde(false) in Widget, got:\n%s", s)
 		}
 	})
@@ -52,7 +52,7 @@ func TestOrmc_Notilde(t *testing.T) {
 		s := string(content)
 
 		// MUST emit .SetTilde(false) AND Permitted{Minimum: 2}
-		if !strings.Contains(s, "Widget: input.Text().SetTilde(false)") {
+		if !strings.Contains(s, "Widget: input.SetTilde(input.Text(), false)") {
 			t.Errorf("expected .SetTilde(false) in Widget, got:\n%s", s)
 		}
 		if !strings.Contains(s, "Permitted: fmt.Permitted{Minimum: 2}") {

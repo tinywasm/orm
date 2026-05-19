@@ -416,10 +416,12 @@ var inputWidgets = map[string]string{
 	"gender":   "input.Gender()",
 }
 
-// tagSetters maps a struct-tag modifier to the widget method call that ormc emits
-// when generating the Widget field of a Field literal.
+// tagSetters maps a struct-tag modifier to a wrapper function call.
+// %s is replaced with the current widget expression.
+// Add an entry here when a new sustractive tag is supported.
+// Corresponding helper must exist in tinywasm/form/input (e.g. input.SetTilde).
 var tagSetters = map[string]string{
-	"notilde": ".SetTilde(false)",
+	"notilde": "input.SetTilde(%s, false)",
 }
 
 func isModifier(s string) bool {

@@ -93,12 +93,13 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 				buf.Write(", OmitEmpty: true")
 			}
 			if f.WidgetConstructor != "" {
-				buf.Write(fmt.Sprintf(", Widget: %s", f.WidgetConstructor))
+				widgetExpr := f.WidgetConstructor
 				for _, tag := range f.Tags {
-					if setter, ok := tagSetters[tag]; ok {
-						buf.Write(setter)
+					if wrapper, ok := tagSetters[tag]; ok {
+						widgetExpr = fmt.Sprintf(wrapper, widgetExpr)
 					}
 				}
+				buf.Write(fmt.Sprintf(", Widget: %s", widgetExpr))
 			}
 			writePermittedFields(buf, f)
 			buf.Write("},\n")
