@@ -34,7 +34,8 @@ type FieldInfo struct {
 	Extra             []rune
 	Minimum           int
 	Maximum           int
-	WidgetConstructor string // e.g. "input.Text()"
+	WidgetConstructor string   // e.g. "input.Text()"
+	Tags              []string // input modifiers e.g. "notilde", "min=2"
 }
 
 // SliceFieldInfo records a slice-of-struct field found in a parent struct.
@@ -415,8 +416,16 @@ var inputWidgets = map[string]string{
 	"gender":   "input.Gender()",
 }
 
+// tagSetters maps a struct-tag modifier to a wrapper function call.
+// %s is replaced with the current widget expression.
+// Add an entry here when a new sustractive tag is supported.
+// Corresponding helper must exist in tinywasm/form/input (e.g. input.SetTilde).
+var tagSetters = map[string]string{
+	"notilde": "input.SetTilde(%s, false)",
+}
+
 func isModifier(s string) bool {
-	return s == "required" || s == "letters" || s == "numbers" || s == "tilde" ||
+	return s == "required" || s == "letters" || s == "numbers" || s == "tilde" || s == "notilde" ||
 		s == "spaces" || s == "name" || fmt.HasPrefix(s, "min=") || fmt.HasPrefix(s, "max=")
 }
 
@@ -426,6 +435,7 @@ func parseInputModifiers(tag string, fi *FieldInfo) {
 		if i == 0 && !isModifier(v) {
 			continue // skip type override
 		}
+		fi.Tags = append(fi.Tags, v)
 		switch {
 		case v == "required":
 			fi.NotNull = true
