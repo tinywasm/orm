@@ -148,3 +148,15 @@ type PlainResponse struct {
 	Message string `json:"message"`
 	Code    string `json:"omitempty"`
 }
+
+// ormc:form
+type UserWithNoTilde struct {
+	ID     string `db:"pk"`
+	Nombre string `input:"required,notilde"`
+}
+
+// ormc:form
+type UserWithNoTildeAndMin struct {
+	ID     string `db:"pk"`
+	Nombre string `input:"required,min=2,notilde"`
+}

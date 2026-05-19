@@ -94,6 +94,11 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 			}
 			if f.WidgetConstructor != "" {
 				buf.Write(fmt.Sprintf(", Widget: %s", f.WidgetConstructor))
+				for _, tag := range f.Tags {
+					if setter, ok := tagSetters[tag]; ok {
+						buf.Write(setter)
+					}
+				}
 			}
 			writePermittedFields(buf, f)
 			buf.Write("},\n")
