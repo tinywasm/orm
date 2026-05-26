@@ -480,6 +480,26 @@ func TestOrmc(t *testing.T) {
 			t.Error("should not contain FieldRaw")
 		}
 	})
+
+	t.Run("ShortAutoInc with db autoinc tag", func(t *testing.T) {
+		err := orm.NewOrmc().GenerateForStruct("ShortAutoInc", "models.go")
+		if err != nil {
+			t.Fatalf("Failed to generate code for ShortAutoInc: %v", err)
+		}
+
+		outFile := "models_orm.go"
+		contentBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("Failed to read generated file: %v", err)
+		}
+		defer os.Remove(outFile)
+
+		content := string(contentBytes)
+		expected := `{Name: "id", Type: fmt.FieldInt, DB: &fmt.FieldDB{PK: true, AutoInc: true}`
+		if !strings.Contains(content, expected) {
+			t.Errorf("Expected string: %q not found in output:\n%s", expected, content)
+		}
+	})
 }
 
 func TestParseStructRejectsJsonNameOnDBModel(t *testing.T) {

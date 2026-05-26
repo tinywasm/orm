@@ -303,7 +303,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 					unique = true
 				case p == "not_null":
 					notNull = true
-				case p == "autoincrement":
+				case p == "autoinc" || p == "autoincrement":
 					if fieldType == fmt.FieldText {
 						return StructInfo{}, fmt.Err("autoincrement not allowed on FieldText")
 					}

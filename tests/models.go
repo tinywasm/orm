@@ -160,3 +160,9 @@ type UserWithNoTildeAndMin struct {
 	ID     string `db:"pk"`
 	Nombre string `input:"required,min=2,notilde"`
 }
+
+// ormc:form
+type ShortAutoInc struct {
+	ID    int `db:"pk,autoinc"`
+	Value int64
+}

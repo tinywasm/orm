@@ -93,7 +93,7 @@ func GetActiveUsers(db *orm.DB) (*user.UserList, error) {
 | `db:"pk"` | Marks field as primary key (auto-detected for `ID` fields) |
 | `db:"unique"` | Unique constraint |
 | `db:"not_null"` | NOT NULL constraint |
-| `db:"autoincrement"` | Auto-increment (numeric fields only) |
+| `db:"autoinc"` | Auto-increment (numeric fields only). Alias: `autoincrement` |
 | `db:"ref=table"` | Foreign key to table (default column: `id`) |
 | `db:"ref=table:col"` | Foreign key to specific column |
 | `db:"-"` | Exclude field from schema entirely |
