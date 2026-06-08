@@ -9,7 +9,7 @@ Working notes for AI agents operating in this library. For end-user docs see [RE
 1. **A runtime ORM** (`db.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`, `tx.go`) — `*orm.DB`, query builder, CRUD. Works in Go and WASM.
 2. **`ormc`, a build-time code generator** (`ormc*.go`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
    - `Schema() []fmt.Field` — runtime schema with `Widget`, `Permitted`, `DB`, etc.
-   - `ModelName()`, `T_` table tokens, `FieldDB` constants
+   - `ModelName()`, `<Name>_` table tokens, `FieldDB` constants
    - `ReadOne*`, `ReadAll*` typed query helpers
    - `Validate(action byte)` for CRUD validation
 
@@ -22,6 +22,7 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 - **One source of truth per concern.** Widget defaults live in the widget. Tag → setter mapping lives in `ormc`. Validation rules live in `fmt.Permitted`. Do not duplicate.
 - **Build tag discipline.** `ormc*.go` files are `//go:build !wasm` — they import `go/ast`, `go/parser`, etc. Never call them from WASM.
 - **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc. — it doesn't scale.
+- **Directives are orthogonal and composable.** Avoid monolithic directives like `formonly`. Use atomic ones: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 
 ## Code layout
 
@@ -35,7 +36,7 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 | `ormc.go` | `Ormc` type, file walker, top-level codegen orchestrator |
 | `ormc_generate.go` | Emits `model_orm.go` content (Schema, helpers, validation) |
 | `ormc_tags.go` | Parses `db:`, `json:`, `input:` tags into `FieldInfo` |
-| `ormc_handler.go` | Project-wide handler (`HandlerName_T`, registration) |
+| `ormc_handler.go` | Project-wide handler registration |
 | `ormc_relations.go` | Foreign-key resolution between structs |
 | `cmd/ormc/` | CLI entrypoint |
 | `tests/` | Test fixtures + `_test.go` files |

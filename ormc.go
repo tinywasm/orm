@@ -52,7 +52,8 @@ type StructInfo struct {
 	Fields            []FieldInfo
 	ModelNameDeclared bool
 	IsForm            bool
-	FormOnly          bool
+	NoDB              bool
+	WantTypedFields   bool
 	SourceFile        string
 	SliceFields       []SliceFieldInfo // populated by ParseStruct; used by ResolveRelations
 	Relations         []RelationInfo   // populated by ResolveRelations; used by GenerateForFile
@@ -110,8 +111,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 
 	var targetStruct *ast.StructType
 	var structFound bool
-	var isForm bool
-	var formOnly bool
+	var isForm, noDB, wantTypedFields bool
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		if genDecl, ok := n.(*ast.GenDecl); ok {
@@ -123,13 +123,14 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 							structFound = true
 							if genDecl.Doc != nil {
 								for _, comment := range genDecl.Doc.List {
-									if fmt.Contains(comment.Text, "ormc:formonly") {
+									if fmt.Contains(comment.Text, "orm:typed_fields") {
+										wantTypedFields = true
+									}
+									if fmt.Contains(comment.Text, "orm:no_db") {
+										noDB = true
+									}
+									if fmt.Contains(comment.Text, "orm:form_widgets") {
 										isForm = true
-										formOnly = true
-										break
-									} else if fmt.Contains(comment.Text, "ormc:form") {
-										isForm = true
-										break
 									}
 								}
 							}
@@ -158,7 +159,13 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		PackageName:       node.Name.Name,
 		ModelNameDeclared: declared,
 		IsForm:            isForm,
-		FormOnly:          formOnly,
+		NoDB:              noDB,
+		WantTypedFields:   wantTypedFields,
+	}
+
+	if info.NoDB && info.WantTypedFields {
+		o.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
+		info.WantTypedFields = false
 	}
 
 	pkFound := false
@@ -268,10 +275,10 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 				name = ""
 			}
 			if name != "" && name != "-" {
-				if !formOnly {
+				if !noDB {
 					return StructInfo{}, fmt.Err(
 						"field", fieldName,
-						"json name tag has no effect on DB structs: column name is always derived from the field name; remove the json name or declare the struct as ormc:formonly",
+						"json name tag has no effect on DB structs: column name is always derived from the field name; remove the json name or declare the struct as orm:no_db",
 					)
 				}
 				colName = name

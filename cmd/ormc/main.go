@@ -12,11 +12,9 @@ import (
 )
 
 func main() {
-	fields := flag.Bool("fields", false, "generate field descriptor variables (e.g. User_.Name)")
 	flag.Parse()
 
 	o := orm.NewOrmc()
-	o.SetFields(*fields)
 	o.SetLog(func(messages ...any) {
 		fmt.Fprintln(os.Stderr, messages...)
 	})

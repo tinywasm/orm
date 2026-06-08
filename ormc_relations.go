@@ -10,11 +10,12 @@ import (
 
 // RelationInfo describes a one-to-many relation loader to generate.
 type RelationInfo struct {
-	ChildStruct string // e.g. "Role"
-	FKField     string // e.g. "UserID"  (Go field name)
-	FKColumn    string // e.g. "user_id" (column name)
-	LoaderName  string // e.g. "ReadAllRoleByUserID"
-	FKFieldType string // e.g. "string", "int64"
+	ChildStruct        string // e.g. "Role"
+	FKField            string // e.g. "UserID"  (Go field name)
+	FKColumn           string // e.g. "user_id" (column name)
+	LoaderName         string // e.g. "ReadAllRoleByUserID"
+	FKFieldType        string // e.g. "string", "int64"
+	UseFieldDescriptor bool   // child has // orm:typed_fields: use ChildStruct_.FKField
 }
 
 // ResolveRelations (exported for testing) scans all parent SliceFields,
@@ -45,11 +46,12 @@ func (o *Ormc) ResolveRelations(all map[string]StructInfo) {
 			}
 
 			rel := RelationInfo{
-				ChildStruct: childStructName,
-				FKField:     fkField.Name,
-				FKColumn:    fkField.ColumnName,
-				LoaderName:  fmt.Sprintf("ReadAll%sBy%s", childStructName, fkField.Name),
-				FKFieldType: fkField.GoType,
+				ChildStruct:        childStructName,
+				FKField:            fkField.Name,
+				FKColumn:           fkField.ColumnName,
+				LoaderName:         fmt.Sprintf("ReadAll%sBy%s", childStructName, fkField.Name),
+				FKFieldType:        fkField.GoType,
+				UseFieldDescriptor: childInfo.WantTypedFields,
 			}
 			childInfo.Relations = append(childInfo.Relations, rel)
 			all[childStructName] = childInfo

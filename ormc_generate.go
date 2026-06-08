@@ -22,7 +22,7 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 	hasModel := false
 	hasWidget := false
 	for _, info := range infos {
-		if !info.FormOnly {
+		if !info.NoDB {
 			hasModel = true
 		}
 		for _, f := range info.Fields {
@@ -43,13 +43,11 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 	buf.Write(")\n\n")
 
 	for _, info := range infos {
-		if !info.FormOnly {
-			// Model Interface Methods
-			if !info.ModelNameDeclared {
-				buf.Write(fmt.Sprintf("func (m *%s) ModelName() string {\n", info.Name))
-				buf.Write(fmt.Sprintf("\treturn \"%s\"\n", info.ModelName))
-				buf.Write("}\n\n")
-			}
+		// Model Interface Methods
+		if !info.ModelNameDeclared {
+			buf.Write(fmt.Sprintf("func (m *%s) ModelName() string {\n", info.Name))
+			buf.Write(fmt.Sprintf("\treturn \"%s\"\n", info.ModelName))
+			buf.Write("}\n\n")
 		}
 
 		buf.Write(fmt.Sprintf("var _schema%s = []fmt.Field{\n", info.Name))
@@ -71,7 +69,7 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 			}
 
 			buf.Write(fmt.Sprintf("\t\t{Name: \"%s\", Type: %s", f.ColumnName, typeStr))
-			if !info.FormOnly && (f.PK || f.Unique || f.AutoInc) {
+			if !info.NoDB && (f.PK || f.Unique || f.AutoInc) {
 				buf.Write(", DB: &fmt.FieldDB{")
 				var parts []string
 				if f.PK {
@@ -141,9 +139,9 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 			buf.Write("}\n\n")
 		}
 
-		if !info.FormOnly {
+		if !info.NoDB {
 			// Metadata Descriptors
-			if o.withFields {
+			if info.WantTypedFields {
 				buf.Write(fmt.Sprintf("var %s_ = struct {\n", info.Name))
 				for _, f := range info.Fields {
 					buf.Write(fmt.Sprintf("\t%s string\n", f.Name))
@@ -175,7 +173,7 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 
 			for _, rel := range info.Relations {
 				where := fmt.Sprintf("\"%s\"", rel.FKColumn)
-				if o.withFields {
+				if rel.UseFieldDescriptor {
 					where = fmt.Sprintf("%s_.%s", rel.ChildStruct, rel.FKField)
 				}
 				buf.Write(fmt.Sprintf(

@@ -8,6 +8,7 @@ import (
 
 //go:generate ormc
 
+// orm:typed_fields
 type User struct {
 	ID        int     `db:"pk"`
 	FirstName string  `db:"not_null"`
@@ -92,7 +93,7 @@ type MockChild struct {
 	Value        string
 }
 
-// ormc:form
+// orm:form_widgets
 type UserForm struct {
 	ID       string `db:"pk"`
 	Name     string `input:"name,min=2,max=100"`
@@ -102,7 +103,8 @@ type UserForm struct {
 	Age      int64
 }
 
-// ormc:formonly
+// orm:form_widgets
+// orm:no_db
 type LoginForm struct {
 	Email    string `input:"email,required"`
 	Password string `input:"password,required"`
@@ -111,7 +113,7 @@ type LoginForm struct {
 // TimeSlotResponse is a pure transport struct: formonly, no db: tags, no input: tags.
 // Represents the pattern used by MCP tools that return computed results (e.g. availability slots).
 // It must generate a {Name}List for json.Encode slice support even though it has no DB layer.
-// ormc:formonly
+// orm:no_db
 type TimeSlotResponse struct {
 	StartUTC int64
 	EndUTC   int64
@@ -122,7 +124,7 @@ type Address struct {
 	City   string
 }
 
-// ormc:form
+// orm:form_widgets
 type UserWithJSON struct {
 	ID       string  `db:"pk"`
 	Name     string  ``
@@ -137,31 +139,31 @@ type WithPointers struct {
 	Addr  *Address // pointer to struct -> FieldStruct
 }
 
-// ormc:formonly
+// orm:no_db
 type MCPResponse struct {
 	Result fmt.RawJSON
 	Error  fmt.RawJSON `json:",omitempty"`
 }
 
-// ormc:formonly
+// orm:no_db
 type PlainResponse struct {
 	Message string `json:"message"`
 	Code    string `json:"omitempty"`
 }
 
-// ormc:form
+// orm:form_widgets
 type UserWithNoTilde struct {
 	ID     string `db:"pk"`
 	Nombre string `input:"required,notilde"`
 }
 
-// ormc:form
+// orm:form_widgets
 type UserWithNoTildeAndMin struct {
 	ID     string `db:"pk"`
 	Nombre string `input:"required,min=2,notilde"`
 }
 
-// ormc:form
+// orm:form_widgets
 type ShortAutoInc struct {
 	ID    int `db:"pk,autoinc"`
 	Value int64
