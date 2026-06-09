@@ -7,11 +7,6 @@ The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (
 - [Why use this ORM?](WHY.md)
 - [Why package-level schema variables?](WHY_PACKAGE_LEVEL_SCHEMA.md)
 
-## Active Plans
-
-- [PLAN.md](PLAN.md) — orthogonal `orm:` directive scheme; per-struct `// orm:typed_fields`; remove global `-fields` flag
-
----
 
 ## 1. Primary Architectural Pattern: Dependency Injection and Explicit Models
 
