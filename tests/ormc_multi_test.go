@@ -10,11 +10,12 @@ import (
 
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func TestOrmc_MultiStruct(t *testing.T) {
 	t.Run("Both structs appear in a single output file", func(t *testing.T) {
-		o := orm.NewOrmc()
+		o := ormc.New()
 		infoA, err := o.ParseStruct("MultiA", "models.go")
 		if err != nil {
 			t.Fatal(err)
@@ -25,7 +26,7 @@ func TestOrmc_MultiStruct(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = o.GenerateForFile([]orm.StructInfo{infoA, infoB}, "models.go")
+		err = o.GenerateForFile([]ormc.StructInfo{infoA, infoB}, "models.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +77,7 @@ func TestOrmc_Run(t *testing.T) {
 		}
 
 		var logged []string
-		o := orm.NewOrmc()
+		o := ormc.New()
 		o.SetRootDir(tmp)
 		o.SetLog(func(messages ...any) {
 			// Collect log output — verifies SetLog + logFn branch
@@ -110,7 +111,7 @@ func TestOrmc_Run(t *testing.T) {
 
 	t.Run("Run() returns error when no models found", func(t *testing.T) {
 		tmp := t.TempDir()
-		o := orm.NewOrmc()
+		o := ormc.New()
 		o.SetRootDir(tmp)
 		if err := o.Run(); err == nil {
 			t.Error("Expected error for empty directory, got nil")
@@ -126,7 +127,7 @@ func TestOrmc_DetectPointerReceiver(t *testing.T) {
 		os.WriteFile("models_tmp.go", []byte(newSrc), 0644)
 		defer os.Remove("models_tmp.go")
 
-		err := orm.NewOrmc().GenerateForStruct("PointerReceiver", "models_tmp.go")
+		err := ormc.New().GenerateForStruct("PointerReceiver", "models_tmp.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -203,7 +204,7 @@ func TestOrmc_ModelNameDetection(t *testing.T) {
 		os.WriteFile("models_tmp.go", []byte(newSrc), 0644)
 		defer os.Remove("models_tmp.go")
 
-		err := orm.NewOrmc().GenerateForStruct("MultiA", "models_tmp.go")
+		err := ormc.New().GenerateForStruct("MultiA", "models_tmp.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -221,7 +222,7 @@ func TestOrmc_ModelNameDetection(t *testing.T) {
 	})
 
 	t.Run("ModelName() IS generated when not declared (D5)", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("MultiB", "models.go")
+		err := ormc.New().GenerateForStruct("MultiB", "models.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -241,7 +242,7 @@ func TestOrmc_ModelNameDetection(t *testing.T) {
 
 func TestOrmc_DbIgnoreTag(t *testing.T) {
 	t.Run("db:\"-\" fields excluded from Schema, Values, Pointers (D3+D4)", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("ModelWithIgnored", "models.go")
+		err := ormc.New().GenerateForStruct("ModelWithIgnored", "models.go")
 		if err != nil {
 			t.Fatal(err)
 		}

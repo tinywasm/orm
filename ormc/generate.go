@@ -1,6 +1,5 @@
-//go:build !wasm
 
-package orm
+package ormc
 
 import (
 	"os"
@@ -9,7 +8,7 @@ import (
 )
 
 // GenerateForFile writes ORM implementations for all infos into one file.
-func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
+func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error {
 	if len(infos) == 0 {
 		return nil
 	}
@@ -114,6 +113,25 @@ func (o *Ormc) GenerateForFile(infos []StructInfo, sourceFile string) error {
 			buf.Write(fmt.Sprintf("&m.%s", f.Name))
 		}
 		buf.Write("} }\n\n")
+
+		// RenameProvider
+		hasOldNames := false
+		for _, f := range info.Fields {
+			if f.OldName != "" {
+				hasOldNames = true
+				break
+			}
+		}
+		if hasOldNames {
+			buf.Write(fmt.Sprintf("func (m *%s) OldNames() map[string]string {\n", info.Name))
+			buf.Write("\treturn map[string]string{\n")
+			for _, f := range info.Fields {
+				if f.OldName != "" {
+					buf.Write(fmt.Sprintf("\t\t\"%s\": \"%s\",\n", f.ColumnName, f.OldName))
+				}
+			}
+			buf.Write("\t}\n}\n\n")
+		}
 
 		buf.Write(fmt.Sprintf("type %sList []*%s\n\n", info.Name, info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) Schema() []fmt.Field { return nil }\n", info.Name))

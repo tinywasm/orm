@@ -111,7 +111,7 @@ func (m *MockModel) Validate(action byte) error {
 
 func (m MockModel) ModelName() string   { return m.Table }
 func (m MockModel) Schema() []fmt.Field { return m.Sch }
-func (m MockModel) Pointers() []any     {
+func (m MockModel) Pointers() []any {
 	ptrs := make([]any, len(m.Vals))
 	for i := range m.Vals {
 		ptrs[i] = &m.Vals[i]

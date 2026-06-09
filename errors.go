@@ -13,3 +13,6 @@ var ErrEmptyTable = fmt.Err("name", "table", "empty")
 
 // ErrNoTxSupport is returned by DB.Tx() when the executor does not implement TxExecutor.
 var ErrNoTxSupport = fmt.Err("transaction", "not", "supported")
+
+// ErrSyncFailed is returned by db.Sync() on fatal schema reconciliation errors.
+var ErrSyncFailed = fmt.Err("sync", "failed")

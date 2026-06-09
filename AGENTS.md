@@ -6,8 +6,8 @@ Working notes for AI agents operating in this library. For end-user docs see [RE
 
 `tinywasm/orm` provides:
 
-1. **A runtime ORM** (`db.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`, `tx.go`) — `*orm.DB`, query builder, CRUD. Works in Go and WASM.
-2. **`ormc`, a build-time code generator** (`ormc*.go`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
+1. **A runtime ORM** (`db.go`, `tx.go`, `sync.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`) — `*orm.DB`, query builder, CRUD, and dev-time schema sync (`db.Sync`). Works in Go and WASM (sync is backend-only).
+2. **`ormc`, a build-time code generator** (located in `ormc/`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
    - `Schema() []fmt.Field` — runtime schema with `Widget`, `Permitted`, `DB`, etc.
    - `ModelName()`, `<Name>_` table tokens, `FieldDB` constants
    - `ReadOne*`, `ReadAll*` typed query helpers
@@ -28,16 +28,18 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 
 | File / Dir | Role |
 |------------|------|
-| `db.go`, `tx.go` | `*orm.DB`, `*orm.Tx` — runtime entry points |
+| `db.go`, `tx.go`, `sync.go` | `*orm.DB`, `*orm.Tx`, `db.Sync` — runtime entry points |
 | `query.go`, `qb.go`, `conditions.go` | Query builder (`Where`, `Like`, `Limit`, ...) |
 | `executor.go`, `execution_plan.go` | Query execution |
 | `validate.go` | Runtime validation glue (delegates to `fmt.ValidateFields`) |
 | `field_ext.go` | Field utilities used by generated code |
-| `ormc.go` | `Ormc` type, file walker, top-level codegen orchestrator |
-| `ormc_generate.go` | Emits `model_orm.go` content (Schema, helpers, validation) |
-| `ormc_tags.go` | Parses `db:`, `json:`, `input:` tags into `FieldInfo` |
-| `ormc_handler.go` | Project-wide handler registration |
-| `ormc_relations.go` | Foreign-key resolution between structs |
+| `ormc/` | Codegen subpackage |
+| `ormc/generator.go` | `Generator` type, file walker, top-level codegen orchestrator |
+| `ormc/generate.go` | Emits `model_orm.go` content (Schema, helpers, validation) |
+| `ormc/tags.go` | Parses `db:`, `json:`, `input:` tags into `FieldInfo` |
+| `ormc/handler.go` | Project-wide handler registration |
+| `ormc/relations.go` | Foreign-key resolution between structs |
+| `ormc/watch.go` | File-event watcher handler |
 | `cmd/ormc/` | CLI entrypoint |
 | `tests/` | Test fixtures + `_test.go` files |
 | `docs/` | Architecture, design rationale, tag reference (see `STRUCT_TAGS.md` mirror in `fmt/docs`) |

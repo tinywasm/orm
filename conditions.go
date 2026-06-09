@@ -99,3 +99,12 @@ func Or(c Condition) Condition {
 	c.logic = "OR"
 	return c
 }
+
+// IsNotNull creates a condition for checking if a value is not null.
+func IsNotNull(field string) Condition {
+	return Condition{
+		field:    field,
+		operator: "IS NOT NULL",
+		logic:    "AND",
+	}
+}

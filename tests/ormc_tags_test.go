@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func TestRewriteModelTags(t *testing.T) {
@@ -30,7 +30,7 @@ type User struct {
 		t.Fatal(err)
 	}
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	err = o.RewriteModelTags(modelPath)
 	if err != nil {
 		t.Fatalf("RewriteModelTags failed: %v", err)
@@ -82,7 +82,7 @@ type Params struct {
 		t.Fatal(err)
 	}
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	if err := o.RewriteModelTags(modelPath); err != nil {
 		t.Fatalf("RewriteModelTags failed: %v", err)
 	}
@@ -128,7 +128,7 @@ type Repro struct {
 		t.Fatal(err)
 	}
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	if err := o.RewriteModelTags(modelPath); err != nil {
 		t.Fatalf("RewriteModelTags failed: %v", err)
 	}

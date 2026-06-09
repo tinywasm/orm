@@ -18,6 +18,8 @@ Unlike traditional ORMs (GORM, ObjectDB) that use `reflect` to infer tables and 
 
 The ORM acts as an agnostic orchestrator. It is unaware of whether the destination is Postgres, SQLite, or IndexedDB. It delegates the query translation to a **Compiler** and execution to an **Executor** injected from `cmd/main.go`.
 
+Root `orm` is purely isomorphic and contains the runtime DB API. Codegen tools live in the `orm/ormc` subpackage to keep the runtime clean of build-time dependencies.
+
 ---
 
 ## 2. Flowchart (The Lifecycle of a Query)
@@ -78,6 +80,9 @@ const (
     ActionCreateTable
     ActionDropTable
     ActionCreateDatabase
+    ActionAddColumn
+    ActionRenameColumn
+    ActionDropColumn
 )
 ```
 
@@ -125,6 +130,8 @@ type Query struct {
     Table      string
     Database   string
     Columns    []string
+    Column     *fmt.Field // set for ActionAddColumn and ActionRenameColumn
+    OldName    string     // set for ActionRenameColumn
     Values     []any
     Conditions []Condition
     OrderBy    []Order
@@ -231,6 +238,10 @@ func (db *DB) Tx(fn func(tx *DB) error) error
 func (db *DB) CreateTable(m Model) error
 func (db *DB) DropTable(m Model) error
 func (db *DB) CreateDatabase(name string) error
+
+// Sync reconciles the database to match the given models.
+// Emits CreateTable, AddColumn, RenameColumn, and DropColumn Actions.
+func (db *DB) Sync(models ...fmt.Model) error
 ```
 
 #### Read Operations (Builder/Chain)
@@ -298,7 +309,7 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 
 ## 4. `ormc` Code Generator
 
-`ormc` reads `model.go` / `models.go` files and generates `*_orm.go` with the `Schema()`, `Pointers()`, `Validate()`, typed read helpers, and optional field descriptors.
+`ormc` (located in the `github.com/tinywasm/orm/ormc` package) reads `model.go` / `models.go` files and generates `*_orm.go` with the `Schema()`, `Pointers()`, `Validate()`, typed read helpers, and optional field descriptors.
 
 ### 4.1. Generation rules
 
