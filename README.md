@@ -23,17 +23,29 @@ go install github.com/tinywasm/orm/cmd/ormc@latest
 
 | Layer | Concern | Controlled by | Generated |
 |-------|---------|---------------|-----------|
-| **DB** | Persistence (tables, queries, CRUD) | `db:` tags | `ModelName()`, `ReadOne*`, `ReadAll*`, `T_`, `FieldDB` |
+| **DB** | Persistence (tables, queries, CRUD) | `db:` tags | `ModelName()`, `ReadOne*`, `ReadAll*`, `FieldDB` |
 | **JSON** | Transport (serialization) | `json:` tags | `OmitEmpty` in schema |
 | **Form** | UI (input widgets, validation) | `input:` tags + directive | `Widget` in schema, `Validate()` |
 
 ### Directives
 
-| Directive | DB layer | Form layer | Use case |
-|-----------|----------|------------|----------|
-| *(none)* | Yes | No | DB-only struct (config, logs, metrics) |
-| `// ormc:form` | Yes | Yes | Business entity with UI (user, product) |
-| `// ormc:formonly` | No | Yes | Transport/UI struct without DB (login request, RPC params) |
+Directives are atomic and composable:
+
+| Directive | Effect |
+|-----------|--------|
+| `// orm:form_widgets` | **add** form layer (widgets + `Validate`) |
+| `// orm:no_db` | **remove** DB helpers (`ReadOne`/`ReadAll`) |
+| `// orm:typed_fields` | **add** typed field accessors `User_.Name` |
+
+**Common compositions:**
+
+| Directives | DB layer | Form layer | Typed Accessors | Use case |
+|---|---|---|---|---|
+| *(none)* | Yes | No | No | DB-only (config, logs) |
+| `// orm:form_widgets` | Yes | Yes | No | Business entity with UI |
+| `// orm:form_widgets` + `// orm:no_db` | No | Yes | No | Transport/UI without DB |
+| `// orm:typed_fields` | Yes | No | **Yes** | DB-only with safe queries |
+| `// orm:form_widgets` + `// orm:typed_fields` | Yes | Yes | **Yes** | Business entity + safe queries |
 
 ## Quick Start
 
@@ -42,7 +54,8 @@ go install github.com/tinywasm/orm/cmd/ormc@latest
 ```go
 package user
 
-// ormc:form — DB + Form: full CRUD with UI rendering
+// orm:form_widgets
+// orm:typed_fields
 type User struct {
     ID      string
     Name    string
@@ -51,7 +64,7 @@ type User struct {
     Address Address
 }
 
-// ormc:formonly — Form only: validation + UI, no DB
+// orm:no_db — transport/UI only
 type Address struct {
     Street string
     City   string
@@ -98,7 +111,7 @@ func GetActiveUsers(db *orm.DB) (*user.UserList, error) {
 | `db:"ref=table:col"` | Foreign key to specific column |
 | `db:"-"` | Exclude field from schema entirely |
 
-DB flags are grouped in `Field.DB *FieldDB` (nil for `formonly` structs). Helpers: `field.IsPK()`, `field.IsUnique()`, `field.IsAutoInc()`.
+DB flags are grouped in `Field.DB *FieldDB` (nil for `no_db` structs). Helpers: `field.IsPK()`, `field.IsUnique()`, `field.IsAutoInc()`.
 
 > **String PKs:** must be set by caller via `github.com/tinywasm/unixid` before `db.Create()`. The ORM does not generate IDs.
 
@@ -214,8 +227,8 @@ project/
 |------|------|
 | `Schema() []Field`, `Pointers() []any` | Always |
 | `Validate(action byte) error` | When struct has validation rules or is a form |
-| `ModelName() string` | DB structs only (not `formonly`) |
-| `T_` metadata struct | DB structs only |
+| `ModelName() string` | Always |
+| `T_` metadata struct | DB structs with `// orm:typed_fields` |
 | `ReadOneT()`, `ReadAllT()`, `TList` type | DB structs only |
 
 **Programmatic API:**

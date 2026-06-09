@@ -70,7 +70,7 @@ func TestRewriteModelTagsFormOnly(t *testing.T) {
 
 	input := `package test
 
-// ormc:formonly
+// orm:no_db
 type Params struct {
 	ProtocolVersion string ` + "`" + `json:"protocolVersion"` + "`" + `
 	ClientInfo      string ` + "`" + `json:"clientInfo,omitempty" validate:"required"` + "`" + `
@@ -117,7 +117,7 @@ func TestRewriteModelTagsFormOnlyStripsRaw(t *testing.T) {
 
 	input := `package test
 
-// ormc:formonly
+// orm:no_db
 type Repro struct {
 	Result string ` + "`" + `json:",omitempty,raw"` + "`" + `
 	Error  string ` + "`" + `json:",omitempty,raw"` + "`" + `

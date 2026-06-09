@@ -12,15 +12,15 @@ import (
 )
 
 func TestOrmc(t *testing.T) {
-	// Regression: formonly structs with only primitive fields (no db: / input: tags)
+	// Regression: no_db structs with only primitive fields (no db: / input: tags)
 	// must still generate {Name}List for fmt.FielderSlice support.
 	//
-	// This was broken: {Name}List was guarded by !info.FormOnly, so transport-only
+	// This was broken: {Name}List was guarded by !info.NoDB, so transport-only
 	// structs (e.g. TimeSlot returned by MCP list tools) never received a List type
 	// and could not be encoded with json.Encode as a root array.
 	//
 	// Fix: {Name}List generation is unconditional — it is a transport concern, not a DB concern.
-	t.Run("formonly pure transport struct generates List", func(t *testing.T) {
+	t.Run("no_db pure transport struct generates List", func(t *testing.T) {
 		err := orm.NewOrmc().GenerateForStruct("TimeSlotResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -37,6 +37,7 @@ func TestOrmc(t *testing.T) {
 
 		// MUST generate Schema/Pointers (Fielder contract)
 		mustHave := []string{
+			"func (m *TimeSlotResponse) ModelName() string {",
 			"func (m *TimeSlotResponse) Schema() []fmt.Field {",
 			"func (m *TimeSlotResponse) Pointers() []any {",
 			// MUST generate List with all five FielderSlice methods
@@ -53,9 +54,8 @@ func TestOrmc(t *testing.T) {
 			}
 		}
 
-		// MUST NOT generate DB helpers — no DB layer for formonly
+		// MUST NOT generate DB helpers — no DB layer for no_db
 		mustNotHave := []string{
-			"func (m *TimeSlotResponse) ModelName()",
 			"func ReadOneTimeSlotResponse",
 			"func ReadAllTimeSlotResponse",
 			"var TimeSlotResponse_ =",
@@ -68,7 +68,7 @@ func TestOrmc(t *testing.T) {
 		}
 	})
 
-	t.Run("formonly directive", func(t *testing.T) {
+	t.Run("form_widgets + no_db directive", func(t *testing.T) {
 		err := orm.NewOrmc().GenerateForStruct("LoginForm", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for LoginForm: %v", err)
@@ -85,6 +85,7 @@ func TestOrmc(t *testing.T) {
 
 		// MUST generate Fielder methods
 		expectedStrings := []string{
+			"func (m *LoginForm) ModelName() string {",
 			"func (m *LoginForm) Schema() []fmt.Field {",
 			"func (m *LoginForm) Pointers() []any {",
 			"Widget: input.Email()",
@@ -97,18 +98,17 @@ func TestOrmc(t *testing.T) {
 			}
 		}
 
-		// MUST NOT generate ModelName or ORM helpers
+		// MUST NOT generate ORM helpers
 		forbiddenStrings := []string{
-			"func (m *LoginForm) ModelName() string",
 			"func (m *LoginForm) FormName() string",
 			"func ReadOneLoginForm",
 			"func ReadAllLoginForm",
 			"var LoginForm_ =",
 			"\"github.com/tinywasm/orm\"", // Import should be missing
 		}
-		// MUST generate List type for json.Encode support (formonly structs are also list-encodable)
+		// MUST generate List type for json.Encode support (no_db structs are also list-encodable)
 		if !strings.Contains(content, "type LoginFormList []*LoginForm") {
-			t.Error("formonly struct must generate LoginFormList for FielderSlice support")
+			t.Error("no_db struct must generate LoginFormList for FielderSlice support")
 		}
 		for _, forbidden := range forbiddenStrings {
 			if strings.Contains(content, forbidden) {
@@ -154,7 +154,6 @@ func TestOrmc(t *testing.T) {
 
 	t.Run("Generate User", func(t *testing.T) {
 		o := orm.NewOrmc()
-		o.SetFields(true)
 		err := o.GenerateForStruct("User", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for User: %v", err)
@@ -523,7 +522,7 @@ type User struct {
 func TestParseStructFormOnlyAllowsJsonName(t *testing.T) {
 	src := `package test
 
-// ormc:formonly
+// orm:no_db
 type ContactForm struct {
 	FirstName string ` + "`" + `json:"firstName"` + "`" + `
 }
@@ -555,7 +554,6 @@ type User struct {
 
 	o := orm.NewOrmc()
 	o.SetRootDir(tmpDir)
-	// withFields = false por defecto
 	if err := o.Run(); err != nil {
 		t.Fatal(err)
 	}
@@ -568,6 +566,7 @@ type User struct {
 func TestGenerateWithFields(t *testing.T) {
 	src := `package test
 
+// orm:typed_fields
 type User struct {
 	ID   int    ` + "`" + `db:"pk"` + "`" + `
 	Name string
@@ -578,14 +577,13 @@ type User struct {
 
 	o := orm.NewOrmc()
 	o.SetRootDir(tmpDir)
-	o.SetFields(true)
 	if err := o.Run(); err != nil {
 		t.Fatal(err)
 	}
 	output, _ := os.ReadFile(filepath.Join(tmpDir, "model_orm.go"))
 	out := string(output)
 	if !strings.Contains(out, "var User_ =") {
-		t.Error("field descriptor must be generated with -fields flag")
+		t.Error("field descriptor must be generated with orm:typed_fields directive")
 	}
 	if !strings.Contains(out, `Name: "name"`) {
 		t.Error("field descriptor must include field Name")
@@ -595,7 +593,8 @@ type User struct {
 func TestGenerateFormOnlyNeverFields(t *testing.T) {
 	src := `package test
 
-// ormc:formonly
+// orm:no_db
+// orm:typed_fields
 type ContactForm struct {
 	Name string
 }
@@ -605,12 +604,11 @@ type ContactForm struct {
 
 	o := orm.NewOrmc()
 	o.SetRootDir(tmpDir)
-	o.SetFields(true)
 	if err := o.Run(); err != nil {
 		t.Fatal(err)
 	}
 	output, _ := os.ReadFile(filepath.Join(tmpDir, "model_orm.go"))
 	if strings.Contains(string(output), "var ContactForm_ =") {
-		t.Error("field descriptor must never be generated for formonly structs")
+		t.Error("field descriptor must never be generated for no_db structs")
 	}
 }

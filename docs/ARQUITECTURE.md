@@ -9,7 +9,7 @@ The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (
 
 ## Active Plans
 
-- [PLAN.md](PLAN.md) — json name restriction on DB structs; compact `Pointers()`; `-fields` flag for optional field descriptors
+- [PLAN.md](PLAN.md) — orthogonal `orm:` directive scheme; per-struct `// orm:typed_fields`; remove global `-fields` flag
 
 ---
 
@@ -57,7 +57,7 @@ type Fielder interface {
 ```
 
 `fmt.Field` carries:
-- `Name string` — column name, always derived from the Go field name as `snake_case`. Custom JSON names via `json:"name"` are **only** honored on `ormc:formonly` structs (JSON/form-only, no DB mapping). Placing `json:"name"` on a DB struct is a compile-time error from `ormc`.
+- `Name string` — column name, always derived from the Go field name as `snake_case`. Custom JSON names via `json:"name"` are **only** honored on `orm:no_db` structs (JSON/form-only, no DB mapping). Placing `json:"name"` on a DB struct is a compile-time error from `ormc`.
 - `Type fmt.FieldType` — `FieldText`, `FieldInt`, `FieldFloat`, `FieldBool`, `FieldBlob`, `FieldStruct`
 - `PK bool`, `Unique bool`, `NotNull bool`, `AutoInc bool` — schema constraints
 - `OmitEmpty bool` — hint from `json:",omitempty"` struct tag (read by `tinywasm/json`)
@@ -311,23 +311,44 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 |---------|-----------|-----------|
 | `Schema()` | always | any struct |
 | `Pointers()` | always | any struct |
-| `Validate()` | when constraints exist | `NotNull`, `Permitted`, or `ormc:form` |
-| `ReadOne<Name>` / `ReadAll<Name>` | always | DB structs only (not `formonly`) |
-| `<Name>_` field descriptors | **opt-in** | DB structs + `-fields` flag |
+| `ModelName()` | always | any struct |
+| `Validate()` | when constraints exist | `NotNull`, `Permitted`, or `// orm:form_widgets` |
+| `ReadOne<Name>` / `ReadAll<Name>` | always | DB structs only (not `// orm:no_db`) |
+| `<Name>_` field descriptors | **opt-in** | DB structs + `// orm:typed_fields` |
 
-### 4.2. CLI flags
+### 4.2. Directives (Doc Comments)
+
+Directives are atomic and composable under the `orm:` prefix:
+
+| Directive | Effect |
+|-----------|--------|
+| `// orm:form_widgets` | **add** form layer (widgets + `Validate`) |
+| `// orm:no_db` | **remove** DB helpers (`ReadOne`/`ReadAll`) |
+| `// orm:typed_fields` | **add** typed field accessors `User_.Name` |
+
+**Composition examples:**
+
+| Directives | Generated Layers |
+|---|---|
+| *(none)* | DB only |
+| `// orm:form_widgets` | DB + form |
+| `// orm:form_widgets` + `// orm:no_db` | form layer only |
+| `// orm:no_db` | json/transport only (`Schema` + `Pointers` + `List`) |
+| `// orm:typed_fields` | DB + typed field accessors |
+
+### 4.3. CLI flags
 
 ```
-ormc [-fields] [-root <dir>]
+ormc [-root <dir>]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-fields` | `false` | Generate field descriptor variables (e.g. `User_.Name`) for type-safe query building. Omit to keep the binary smaller. |
+| `-root` | `.` | Directory to scan for `model.go` / `models.go` files |
 
-### 4.3. Struct tag rules
+### 4.4. Struct tag rules
 
-| Tag | DB struct | `ormc:formonly` |
+| Tag | DB struct | `orm:no_db` struct |
 |-----|-----------|-----------------|
 | `json:",omitempty"` | allowed — sets `OmitEmpty: true` in schema | allowed |
 | `json:"name"` | **compile error** — column name always derived from field name as `snake_case` | allowed — sets `ColumnName` |

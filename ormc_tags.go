@@ -39,11 +39,11 @@ func (o *Ormc) RewriteModelTags(path string) error {
 			continue
 		}
 
-		formOnly := false
+		noDB := false
 		if genDecl.Doc != nil {
 			for _, c := range genDecl.Doc.List {
-				if fmt.Contains(c.Text, "ormc:formonly") {
-					formOnly = true
+				if fmt.Contains(c.Text, "orm:no_db") {
+					noDB = true
 					break
 				}
 			}
@@ -69,7 +69,7 @@ func (o *Ormc) RewriteModelTags(path string) error {
 				}
 
 				rawTag := fmt.Convert(tagValue).TrimPrefix("`").TrimSuffix("`").String()
-				newTag := rewriteRawTag(rawTag, formOnly)
+				newTag := rewriteRawTag(rawTag, noDB)
 				if newTag == rawTag {
 					continue
 				}
@@ -104,9 +104,9 @@ func (o *Ormc) RewriteModelTags(path string) error {
 }
 
 // rewriteRawTag cleans a raw struct tag string.
-// For non-formonly structs: removes form/validate tags and strips json field names (keeps only omitempty).
-// For formonly structs: removes form/validate tags but preserves json field names (needed for camelCase protocols).
-func rewriteRawTag(raw string, formOnly bool) string {
+// For non-no_db structs: removes form/validate tags and strips json field names (keeps only omitempty).
+// For no_db structs: removes form/validate tags but preserves json field names (needed for camelCase protocols).
+func rewriteRawTag(raw string, noDB bool) string {
 	parts := fmt.Convert(raw).Split(" ")
 	var kept []string
 
@@ -142,8 +142,8 @@ func rewriteRawTag(raw string, formOnly bool) string {
 				}
 			}
 
-			if formOnly {
-				// preserve json name for formonly structs
+			if noDB {
+				// preserve json name for no_db structs
 				var parts []string
 				parts = append(parts, name)
 				if hasOmit {
