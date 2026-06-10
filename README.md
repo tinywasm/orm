@@ -17,18 +17,6 @@ go get github.com/tinywasm/orm
 go install github.com/tinywasm/orm/cmd/ormc@latest
 ```
 
-## Dev-Time Schema Sync
-
-During development, you can keep your database in sync with your models without writing migration files:
-
-```go
-db := orm.New(executor, compiler)
-// In DevMode: reconcile database to match current models
-db.Sync(&user.User{}, &product.Product{})
-```
-
-`db.Sync` automatically adds missing columns, renames columns (if `db:"old_name=X"` hint is present), and safely drops columns that are empty. Git is your history; the model is your schema.
-
 ## Three Layers, One Struct
 
 `ormc` generates code for three layers depending on the directive and tags present:
@@ -247,10 +235,9 @@ project/
 
 | Method | Description |
 |--------|-------------|
-| `New() *Generator` | Create handler; `rootDir` defaults to `"."` |
+| `NewOrmc() *Ormc` | Create handler; `rootDir` defaults to `"."` |
 | `SetLog(func(...any))` | Set warning/info log function |
 | `SetRootDir(dir string)` | Set scan root |
-| `SetSkipTidy(bool)` | Skip the `go mod tidy` pass |
 | `Run() error` | Scan and generate |
 | `GenerateForStruct(name, file string) error` | Generate for a single struct |
 | `ParseStruct(name, file string) (StructInfo, error)` | Parse struct metadata only |
@@ -260,3 +247,4 @@ project/
 
 - [Architecture](docs/ARQUITECTURE.md)
 - [Improvement Roadmap](docs/IMPROVE.md)
+- [Schema Sync — Design Rationale & Honest Trade-offs](docs/SYNC_DESIGN.md)

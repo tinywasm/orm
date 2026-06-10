@@ -17,12 +17,22 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 
 ## Architectural rules (do not violate)
 
+### Root package (`orm`) — isomorphic, zero dialect
+
+- **No `database/sql` import in the root package.** The root `orm` package compiles for both Go and WASM. Never import `database/sql`, `database/sql/driver`, or any DB driver. Use only `github.com/tinywasm/fmt` and the stdlib.
+- **Agnostic API only.** `query.go`, `qb.go`, `db.go`, `executor.go`, `sync.go` must never contain dialect-specific SQL, driver types, or engine-specific error values (e.g. `sql.ErrNoRows`).
+- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrNoRows`, `ErrSyncFailed`, etc. `qb.go` compares against these. **Executor adapters** (`tinywasm/postgres`, `tinywasm/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `orm.ErrNoRows` inside their `Scanner` implementation.
+- **Executor contract.** Adapters implementing `orm.Executor` must: (1) wrap `sql.ErrNoRows` → `orm.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
 - **Struct tags are processed at build-time, not runtime.** `fmt.Field` has no `Tag` field. If you ever feel you need to inspect a tag in WASM code, you are wrong — push the work into `ormc`.
 - **`ormc` is the single producer of `fmt.Field` literals.** Hand-writing `Schema()` is allowed only in tests.
+
+### `ormc` subpackage — backend-only codegen
+
+- **`orm/ormc` is a separate Go subpackage** (package `ormc`). It is backend-only by nature: its stdlib deps (`go/ast`, `go/parser`, `os/exec`) make it impossible to import from WASM — no `//go:build` tags needed or allowed in the subpackage.
+- **`orm/ormc` does not import the root `orm` package.** It emits runtime type names as string literals inside generated code (`"orm.QB"`, `"orm.DB"`). This keeps the dependency graph cycle-free.
+- **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc.
+- **Directives are orthogonal and composable.** Use atomic directives: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 - **One source of truth per concern.** Widget defaults live in the widget. Tag → setter mapping lives in `ormc`. Validation rules live in `fmt.Permitted`. Do not duplicate.
-- **Build tag discipline.** `ormc*.go` files are `//go:build !wasm` — they import `go/ast`, `go/parser`, etc. Never call them from WASM.
-- **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc. — it doesn't scale.
-- **Directives are orthogonal and composable.** Avoid monolithic directives like `formonly`. Use atomic ones: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 
 ## Code layout
 

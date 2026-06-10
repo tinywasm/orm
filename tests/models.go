@@ -149,7 +149,7 @@ type MCPResponse struct {
 // orm:no_db
 type PlainResponse struct {
 	Message string `json:"message"`
-	Code    string `json:"omitempty"`
+	Code    string `json:",omitempty"`
 }
 
 // orm:form_widgets

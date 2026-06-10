@@ -8,4 +8,5 @@ import (
 
 func TestCoreLogic_Wasm(t *testing.T) {
 	RunCoreTests(t)
+	RunSyncTests(t)
 }

@@ -45,7 +45,7 @@ func (db *DB) syncModel(m fmt.Model) error {
 
 	// 1. Emit ActionCreateTable (idempotent)
 	if err := db.CreateTable(m); err != nil {
-		return fmt.Err(err, ErrSyncFailed)
+		return wrapSyncErr(err)
 	}
 
 	// 2. Cast Executor to TableIntrospector
@@ -68,7 +68,7 @@ func (db *DB) syncModel(m fmt.Model) error {
 	// 3. Retrieve existing columns
 	existingCols, err := introspector.TableColumns(tableName)
 	if err != nil {
-		return fmt.Err(err, ErrSyncFailed)
+		return wrapSyncErr(err)
 	}
 
 	existingMap := make(map[string]bool)
