@@ -231,6 +231,10 @@ func (db *DB) Tx(fn func(tx *DB) error) error
 func (db *DB) CreateTable(m Model) error
 func (db *DB) DropTable(m Model) error
 func (db *DB) CreateDatabase(name string) error
+
+// SyncSchema reconciles one table to the given fields, with no model instance.
+// Used by the dev tool (tinywasm/app) during hot-reload.
+func (db *DB) SyncSchema(table string, fields []fmt.Field) error
 ```
 
 #### Read Operations (Builder/Chain)
@@ -281,7 +285,19 @@ func Or(c Condition) Condition             // wraps c with Logic = "OR"
 
 ---
 
-### 3.7. Sentinel Errors
+### 3.7. Agnostic engine registry
+
+The ORM provides an agnostic entry point for the dev tool to open connections based on DSNs.
+
+```go
+type Factory func(dsn string) (*DB, error)
+func Register(scheme string, f Factory)
+func Open(dsn string) (*DB, error)
+```
+
+Adapters (postgres, sqlite) register their constructors in `init()`. The tool imports them via side-effect.
+
+### 3.8. Sentinel Errors
 
 ```go
 var (

@@ -7,6 +7,7 @@ import "github.com/tinywasm/fmt"
 type DB struct {
 	exec     Executor
 	compiler Compiler
+	log      func(messages ...any)
 }
 
 // New creates a new DB instance.
@@ -14,6 +15,18 @@ func New(exec Executor, compiler Compiler) *DB {
 	return &DB{
 		exec:     exec,
 		compiler: compiler,
+	}
+}
+
+// SetLog sets the log function for warnings and informational messages.
+// If not set, messages are silently discarded.
+func (db *DB) SetLog(fn func(messages ...any)) {
+	db.log = fn
+}
+
+func (db *DB) logw(messages ...any) {
+	if db.log != nil {
+		db.log(messages...)
 	}
 }
 

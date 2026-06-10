@@ -28,6 +28,7 @@ func (db *DB) Tx(fn func(tx *DB) error) error {
 	txDB := &DB{
 		exec:     bound,
 		compiler: db.compiler,
+		log:      db.log,
 	}
 
 	if err := fn(txDB); err != nil {

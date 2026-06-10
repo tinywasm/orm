@@ -12,6 +12,22 @@ type TableIntrospector interface {
 	TableColumns(table string) ([]string, error)
 }
 
+// SyncSchema reconciles one table to the given fields, with no model instance.
+// Wraps (table, fields) in a synthetic model and delegates to the existing
+// Sync algorithm (CreateTable + AddColumn + introspective rename/safe-drop).
+func (db *DB) SyncSchema(table string, fields []fmt.Field) error {
+	return db.Sync(schemaModel{name: table, fields: fields})
+}
+
+type schemaModel struct {
+	name   string
+	fields []fmt.Field
+}
+
+func (s schemaModel) ModelName() string   { return s.name }
+func (s schemaModel) Schema() []fmt.Field { return s.fields }
+func (s schemaModel) Pointers() []any     { return nil }
+
 // Sync reconciles the database to match the given models.
 // Emits CreateTable, AddColumn, RenameColumn, and DropColumn Actions;
 // the engine adapter compiles and executes the dialect SQL.
@@ -60,7 +76,9 @@ func (db *DB) syncModel(m fmt.Model) error {
 				Column: &field,
 			}
 			// Catch duplicates via log-and-continue (logged by the engine adapter)
-			_ = db.execQuery(qAdd, m)
+			if err := db.execQuery(qAdd, m); err != nil {
+				db.logw("sync:", tableName, "add column", field.Name, "skipped:", err)
+			}
 		}
 		return nil
 	}
@@ -96,14 +114,18 @@ func (db *DB) syncModel(m fmt.Model) error {
 				Column:  &field,
 				OldName: oldName,
 			}
-			_ = db.execQuery(qRename, m)
+			if err := db.execQuery(qRename, m); err != nil {
+				db.logw("sync:", tableName, "rename column", oldName, "to", field.Name, "failed:", err)
+			}
 		} else {
 			qAdd := Query{
 				Action: ActionAddColumn,
 				Table:  tableName,
 				Column: &field,
 			}
-			_ = db.execQuery(qAdd, m)
+			if err := db.execQuery(qAdd, m); err != nil {
+				db.logw("sync:", tableName, "add column", field.Name, "failed:", err)
+			}
 		}
 	}
 
@@ -147,13 +169,18 @@ func (db *DB) syncModel(m fmt.Model) error {
 		hasData := rows.Next()
 		rows.Close()
 
-		if !hasData {
-			qDrop := Query{
-				Action:  ActionDropColumn,
-				Table:   tableName,
-				Columns: []string{col},
-			}
-			_ = db.execQuery(qDrop, m)
+		if hasData {
+			db.logw("sync:", tableName, "safe drop skip: column", col, "has data")
+			continue
+		}
+
+		qDrop := Query{
+			Action:  ActionDropColumn,
+			Table:   tableName,
+			Columns: []string{col},
+		}
+		if err := db.execQuery(qDrop, m); err != nil {
+			db.logw("sync:", tableName, "drop column", col, "failed:", err)
 		}
 	}
 
