@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func TestOrmc_Notilde(t *testing.T) {
@@ -16,7 +16,7 @@ func TestOrmc_Notilde(t *testing.T) {
 	// 3. can be combined with other modifiers
 
 	t.Run("notilde emits setter", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("UserWithNoTilde", "models.go")
+		err := ormc.New().GenerateForStruct("UserWithNoTilde", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -37,7 +37,7 @@ func TestOrmc_Notilde(t *testing.T) {
 	})
 
 	t.Run("notilde with other modifiers", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("UserWithNoTildeAndMin", "models.go")
+		err := ormc.New().GenerateForStruct("UserWithNoTildeAndMin", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

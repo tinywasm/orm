@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func TestOrmc_RelationLoader(t *testing.T) {
 	t.Run("ResolveRelations detects FK and sets LoaderName", func(t *testing.T) {
-		o := orm.NewOrmc()
+		o := ormc.New()
 
 		parent, err := o.ParseStruct("MockParent", "models.go")
 		if err != nil {
@@ -24,7 +24,7 @@ func TestOrmc_RelationLoader(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		all := map[string]orm.StructInfo{
+		all := map[string]ormc.StructInfo{
 			"MockParent": parent,
 			"MockChild":  child,
 		}
@@ -40,18 +40,18 @@ func TestOrmc_RelationLoader(t *testing.T) {
 	})
 
 	t.Run("GenerateForFile emits relation loader", func(t *testing.T) {
-		o := orm.NewOrmc()
+		o := ormc.New()
 
 		parent, _ := o.ParseStruct("MockParent", "models.go")
 		child, _ := o.ParseStruct("MockChild", "models.go")
 
-		all := map[string]orm.StructInfo{
+		all := map[string]ormc.StructInfo{
 			"MockParent": parent,
 			"MockChild":  child,
 		}
 		o.ResolveRelations(all)
 
-		err := o.GenerateForFile([]orm.StructInfo{all["MockChild"]}, "models.go")
+		err := o.GenerateForFile([]ormc.StructInfo{all["MockChild"]}, "models.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,7 +69,7 @@ func TestOrmc_RelationLoader(t *testing.T) {
 	})
 
 	t.Run("No FK in child → warning log, no relation generated", func(t *testing.T) {
-		o := orm.NewOrmc()
+		o := ormc.New()
 		var logged []string
 		o.SetLog(func(msgs ...any) {
 			for _, m := range msgs {
@@ -81,13 +81,13 @@ func TestOrmc_RelationLoader(t *testing.T) {
 		parent, _ := o.ParseStruct("MockParent", "models.go")
 		noFK, _ := o.ParseStruct("MultiA", "models.go")
 
-		all := map[string]orm.StructInfo{
+		all := map[string]ormc.StructInfo{
 			"MockParent": parent,
 			"MultiA":     noFK,
 		}
 		// Patch MockParent to pretend Kids is []MultiA
 		p := all["MockParent"]
-		p.SliceFields = []orm.SliceFieldInfo{{Name: "Kids", ElemType: "MultiA"}}
+		p.SliceFields = []ormc.SliceFieldInfo{{Name: "Kids", ElemType: "MultiA"}}
 		all["MockParent"] = p
 
 		o.ResolveRelations(all)

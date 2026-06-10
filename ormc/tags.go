@@ -1,6 +1,5 @@
-//go:build !wasm
 
-package orm
+package ormc
 
 import (
 	"bytes"
@@ -15,7 +14,7 @@ import (
 // RewriteModelTags performs in-place struct tag cleanup in the given file.
 // It removes 'form' and 'validate' tags, and strips field names from 'json' tags.
 // For ormc:formonly structs, json field names are preserved (needed for camelCase protocols).
-func (o *Ormc) RewriteModelTags(path string) error {
+func (o *Generator) RewriteModelTags(path string) error {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {

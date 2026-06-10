@@ -10,10 +10,10 @@ import (
 
 // orm:typed_fields
 type User struct {
-	ID        int     `db:"pk"`
-	FirstName string  `db:"not_null"`
+	ID        int    `db:"pk"`
+	FirstName string `db:"not_null"`
 	LastName  string
-	Email     string  `db:"unique"`
+	Email     string `db:"unique"`
 	Score     float64
 	IsActive  bool
 	Avatar    []byte
@@ -21,9 +21,9 @@ type User struct {
 }
 
 type Order struct {
-	ID        string `db:"pk"`
-	UserID    int    `db:"ref=user:id"`
-	Total     float64
+	ID     string `db:"pk"`
+	UserID int    `db:"ref=user:id"`
+	Total  float64
 }
 
 type BadTimeNoTag struct {
@@ -33,7 +33,7 @@ type BadTimeNoTag struct {
 }
 
 type ModelWithIgnored struct {
-	ID      string   `db:"pk"`
+	ID      string `db:"pk"`
 	Name    string
 	Tags    []string `db:"-"` // slice: silently ignored
 	Friends []User   `db:"-"` // struct slice: silently ignored
@@ -44,6 +44,7 @@ type MultiA struct {
 	ID   string `db:"pk"`
 	Name string
 }
+
 func (MultiA) ModelName() string { return "multi_a_records" } // manually declared → D5
 
 type MultiB struct {
@@ -61,7 +62,7 @@ type Unsupp struct {
 
 // NumericTypes covers int32, uint64, float32 mapping and bitmask constraints.
 type NumericTypes struct {
-	IDNumeric int32   `db:"pk,not_null"` // PK + NotNull → bitmask 5
+	IDNumeric int32 `db:"pk,not_null"` // PK + NotNull → bitmask 5
 	CountUint uint64
 	RatioF32  float32
 }
@@ -134,8 +135,8 @@ type UserWithJSON struct {
 }
 
 type WithPointers struct {
-	ID    string  `db:"pk"`
-	Count *int    // pointer to primitive -> should be skipped with warning
+	ID    string   `db:"pk"`
+	Count *int     // pointer to primitive -> should be skipped with warning
 	Addr  *Address // pointer to struct -> FieldStruct
 }
 
@@ -148,7 +149,7 @@ type MCPResponse struct {
 // orm:no_db
 type PlainResponse struct {
 	Message string `json:"message"`
-	Code    string `json:"omitempty"`
+	Code    string `json:",omitempty"`
 }
 
 // orm:form_widgets

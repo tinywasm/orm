@@ -247,3 +247,4 @@ project/
 
 - [Architecture](docs/ARQUITECTURE.md)
 - [Improvement Roadmap](docs/IMPROVE.md)
+- [Schema Sync — Design Rationale & Honest Trade-offs](docs/SYNC_DESIGN.md)

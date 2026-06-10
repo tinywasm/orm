@@ -6,8 +6,8 @@ Working notes for AI agents operating in this library. For end-user docs see [RE
 
 `tinywasm/orm` provides:
 
-1. **A runtime ORM** (`db.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`, `tx.go`) — `*orm.DB`, query builder, CRUD. Works in Go and WASM.
-2. **`ormc`, a build-time code generator** (`ormc*.go`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
+1. **A runtime ORM** (`db.go`, `tx.go`, `sync.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`) — `*orm.DB`, query builder, CRUD, and dev-time schema sync (`db.Sync`). Works in Go and WASM (sync is backend-only).
+2. **`ormc`, a build-time code generator** (located in `ormc/`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
    - `Schema() []fmt.Field` — runtime schema with `Widget`, `Permitted`, `DB`, etc.
    - `ModelName()`, `<Name>_` table tokens, `FieldDB` constants
    - `ReadOne*`, `ReadAll*` typed query helpers
@@ -17,27 +17,39 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 
 ## Architectural rules (do not violate)
 
+### Root package (`orm`) — isomorphic, zero dialect
+
+- **No `database/sql` import in the root package.** The root `orm` package compiles for both Go and WASM. Never import `database/sql`, `database/sql/driver`, or any DB driver. Use only `github.com/tinywasm/fmt` and the stdlib.
+- **Agnostic API only.** `query.go`, `qb.go`, `db.go`, `executor.go`, `sync.go` must never contain dialect-specific SQL, driver types, or engine-specific error values (e.g. `sql.ErrNoRows`).
+- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrNoRows`, `ErrSyncFailed`, etc. `qb.go` compares against these. **Executor adapters** (`tinywasm/postgres`, `tinywasm/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `orm.ErrNoRows` inside their `Scanner` implementation.
+- **Executor contract.** Adapters implementing `orm.Executor` must: (1) wrap `sql.ErrNoRows` → `orm.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
 - **Struct tags are processed at build-time, not runtime.** `fmt.Field` has no `Tag` field. If you ever feel you need to inspect a tag in WASM code, you are wrong — push the work into `ormc`.
 - **`ormc` is the single producer of `fmt.Field` literals.** Hand-writing `Schema()` is allowed only in tests.
+
+### `ormc` subpackage — backend-only codegen
+
+- **`orm/ormc` is a separate Go subpackage** (package `ormc`). It is backend-only by nature: its stdlib deps (`go/ast`, `go/parser`, `os/exec`) make it impossible to import from WASM — no `//go:build` tags needed or allowed in the subpackage.
+- **`orm/ormc` does not import the root `orm` package.** It emits runtime type names as string literals inside generated code (`"orm.QB"`, `"orm.DB"`). This keeps the dependency graph cycle-free.
+- **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc.
+- **Directives are orthogonal and composable.** Use atomic directives: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 - **One source of truth per concern.** Widget defaults live in the widget. Tag → setter mapping lives in `ormc`. Validation rules live in `fmt.Permitted`. Do not duplicate.
-- **Build tag discipline.** `ormc*.go` files are `//go:build !wasm` — they import `go/ast`, `go/parser`, etc. Never call them from WASM.
-- **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc. — it doesn't scale.
-- **Directives are orthogonal and composable.** Avoid monolithic directives like `formonly`. Use atomic ones: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 
 ## Code layout
 
 | File / Dir | Role |
 |------------|------|
-| `db.go`, `tx.go` | `*orm.DB`, `*orm.Tx` — runtime entry points |
+| `db.go`, `tx.go`, `sync.go` | `*orm.DB`, `*orm.Tx`, `db.Sync` — runtime entry points |
 | `query.go`, `qb.go`, `conditions.go` | Query builder (`Where`, `Like`, `Limit`, ...) |
 | `executor.go`, `execution_plan.go` | Query execution |
 | `validate.go` | Runtime validation glue (delegates to `fmt.ValidateFields`) |
 | `field_ext.go` | Field utilities used by generated code |
-| `ormc.go` | `Ormc` type, file walker, top-level codegen orchestrator |
-| `ormc_generate.go` | Emits `model_orm.go` content (Schema, helpers, validation) |
-| `ormc_tags.go` | Parses `db:`, `json:`, `input:` tags into `FieldInfo` |
-| `ormc_handler.go` | Project-wide handler registration |
-| `ormc_relations.go` | Foreign-key resolution between structs |
+| `ormc/` | Codegen subpackage |
+| `ormc/generator.go` | `Generator` type, file walker, top-level codegen orchestrator |
+| `ormc/generate.go` | Emits `model_orm.go` content (Schema, helpers, validation) |
+| `ormc/tags.go` | Parses `db:`, `json:`, `input:` tags into `FieldInfo` |
+| `ormc/handler.go` | Project-wide handler registration |
+| `ormc/relations.go` | Foreign-key resolution between structs |
+| `ormc/watch.go` | File-event watcher handler |
 | `cmd/ormc/` | CLI entrypoint |
 | `tests/` | Test fixtures + `_test.go` files |
 | `docs/` | Architecture, design rationale, tag reference (see `STRUCT_TAGS.md` mirror in `fmt/docs`) |

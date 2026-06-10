@@ -1,5 +1,7 @@
 package orm
 
+import "github.com/tinywasm/fmt"
+
 // Action represents the type of database operation.
 type Action int
 
@@ -12,6 +14,9 @@ const (
 	ActionCreateTable
 	ActionDropTable
 	ActionCreateDatabase
+	ActionAddColumn
+	ActionRenameColumn
+	ActionDropColumn
 )
 
 // Order represents a sort order for a query.
@@ -31,6 +36,8 @@ type Query struct {
 	Table      string
 	Database   string
 	Columns    []string
+	Column     *fmt.Field
+	OldName    string
 	Values     []any
 	Conditions []Condition
 	OrderBy    []Order

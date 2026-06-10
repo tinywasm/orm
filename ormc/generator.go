@@ -1,6 +1,5 @@
-//go:build !wasm
 
-package orm
+package ormc
 
 import (
 	"go/ast"
@@ -24,6 +23,7 @@ type FieldInfo struct {
 	Ref        string
 	RefColumn  string
 	IsPK       bool
+	OldName    string
 	GoType     string
 	OmitEmpty  bool
 	// Permitted config — populated from validate:"..." tag
@@ -94,7 +94,7 @@ func detectModelName(node *ast.File, structName string) string {
 }
 
 // ParseStruct parses a single struct from a Go file and returns its metadata.
-func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error) {
+func (o *Generator) ParseStruct(structName string, goFile string) (StructInfo, error) {
 	if structName == "" {
 		return StructInfo{}, fmt.Err("Please provide a struct name")
 	}
@@ -287,7 +287,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 		isID, isPK := fmt.IDorPrimaryKey(modelName, fieldName)
 
 		var pk, unique, notNull, autoInc bool
-		var ref, refCol string
+		var ref, refCol, oldName string
 
 		fieldIsPK := false
 		if (isID || isPK) && !pkFound {
@@ -322,6 +322,8 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 					if len(refParts) > 1 {
 						refCol = refParts[1]
 					}
+				case fmt.HasPrefix(p, "old_name="):
+					oldName = fmt.Convert(p).TrimPrefix("old_name=").String()
 				}
 			}
 		}
@@ -350,6 +352,7 @@ func (o *Ormc) ParseStruct(structName string, goFile string) (StructInfo, error)
 			Ref:        ref,
 			RefColumn:  refCol,
 			IsPK:       fieldIsPK,
+			OldName:    oldName,
 			GoType:     typeStr,
 			OmitEmpty:  omitEmpty,
 		}
@@ -469,7 +472,7 @@ func parseInputModifiers(tag string, fi *FieldInfo) {
 }
 
 // GenerateForStruct reads the Go File and generates the ORM implementations for a given struct name.
-func (o *Ormc) GenerateForStruct(structName string, goFile string) error {
+func (o *Generator) GenerateForStruct(structName string, goFile string) error {
 	info, err := o.ParseStruct(structName, goFile)
 	if err != nil {
 		return err
@@ -533,7 +536,7 @@ func writePermittedFields(buf *fmt.Conv, f FieldInfo) {
 
 // collectAllStructs walks rootDir and returns a map of all parsed StructInfo
 // keyed by struct name. Used by Run() Pass 1.
-func (o *Ormc) collectAllStructs() (map[string]StructInfo, []string, []string, error) {
+func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []string, error) {
 	all := make(map[string]StructInfo)
 	var structOrder []string
 	var fileOrder []string
@@ -596,7 +599,7 @@ func (o *Ormc) collectAllStructs() (map[string]StructInfo, []string, []string, e
 
 // generateAll groups the enriched all map by source file path and calls
 // GenerateForFile once per file.
-func (o *Ormc) generateAll(all map[string]StructInfo, structOrder []string, fileOrder []string) error {
+func (o *Generator) generateAll(all map[string]StructInfo, structOrder []string, fileOrder []string) error {
 	byFile := make(map[string][]StructInfo)
 	for _, structName := range structOrder {
 		info := all[structName]
@@ -615,7 +618,7 @@ func (o *Ormc) generateAll(all map[string]StructInfo, structOrder []string, file
 }
 
 // Run is the entry point for the CLI tool.
-func (o *Ormc) Run() error {
+func (o *Generator) Run() error {
 	// Pass 1: collect all structs across all model files (BEFORE cleanup)
 	all, structOrder, fileOrder, err := o.collectAllStructs()
 	if err != nil {
@@ -641,17 +644,19 @@ func (o *Ormc) Run() error {
 	}
 
 	// Pass 5: sync dependencies
-	if _, err := os.Stat(filepath.Join(o.rootDir, "go.mod")); err == nil {
-		o.log("Syncing dependencies...")
-		if err := o.exec("go", "mod", "tidy"); err != nil {
-			return fmt.Err(err, "failed to tidy module")
+	if !o.skipTidy {
+		if _, err := os.Stat(filepath.Join(o.rootDir, "go.mod")); err == nil {
+			o.log("Syncing dependencies...")
+			if err := o.exec("go", "mod", "tidy"); err != nil {
+				return fmt.Err(err, "failed to tidy module")
+			}
 		}
 	}
 
 	return nil
 }
 
-func (o *Ormc) exec(name string, args ...string) error {
+func (o *Generator) exec(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = o.rootDir
 	cmd.Stdout = os.Stdout

@@ -1,6 +1,5 @@
-//go:build !wasm
 
-package orm
+package ormc
 
 import (
 	"sort"
@@ -21,7 +20,7 @@ type RelationInfo struct {
 // ResolveRelations (exported for testing) scans all parent SliceFields,
 // finds the matching FK in the child struct, and appends RelationInfo
 // to the child's entry in the map.
-func (o *Ormc) ResolveRelations(all map[string]StructInfo) {
+func (o *Generator) ResolveRelations(all map[string]StructInfo) {
 	// Sort parent names to ensure deterministic relation generation
 	var parentNames []string
 	for parentName := range all {

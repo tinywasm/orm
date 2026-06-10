@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func TestOrmc(t *testing.T) {
@@ -21,7 +21,7 @@ func TestOrmc(t *testing.T) {
 	//
 	// Fix: {Name}List generation is unconditional — it is a transport concern, not a DB concern.
 	t.Run("no_db pure transport struct generates List", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("TimeSlotResponse", "models.go")
+		err := ormc.New().GenerateForStruct("TimeSlotResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -59,7 +59,8 @@ func TestOrmc(t *testing.T) {
 			"func ReadOneTimeSlotResponse",
 			"func ReadAllTimeSlotResponse",
 			"var TimeSlotResponse_ =",
-			`"github.com/tinywasm/orm"`,
+			`"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"`,
 		}
 		for _, bad := range mustNotHave {
 			if strings.Contains(s, bad) {
@@ -69,7 +70,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("form_widgets + no_db directive", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("LoginForm", "models.go")
+		err := ormc.New().GenerateForStruct("LoginForm", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for LoginForm: %v", err)
 		}
@@ -118,7 +119,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Validate tags and Permitted", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("UserForm", "models.go")
+		err := ormc.New().GenerateForStruct("UserForm", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for UserForm: %v", err)
 		}
@@ -153,7 +154,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Generate User", func(t *testing.T) {
-		o := orm.NewOrmc()
+		o := ormc.New()
 		err := o.GenerateForStruct("User", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for User: %v", err)
@@ -213,7 +214,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Generate Order With Refs", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("Order", "models.go")
+		err := ormc.New().GenerateForStruct("Order", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for Order: %v", err)
 		}
@@ -244,7 +245,7 @@ func TestOrmc(t *testing.T) {
 
 	t.Run("Bad Time Type — now a warning, not fatal", func(t *testing.T) {
 		// D8: time.Time without db:"-" → warning + skip, not error
-		err := orm.NewOrmc().GenerateForStruct("BadTimeNoTag", "models.go")
+		err := ormc.New().GenerateForStruct("BadTimeNoTag", "models.go")
 		if err != nil {
 			t.Fatalf("Expected no error for time.Time (warn+skip), got: %v", err)
 		}
@@ -268,14 +269,14 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Bad AutoInc", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("BadAutoInc", "models.go")
+		err := ormc.New().GenerateForStruct("BadAutoInc", "models.go")
 		if err == nil || !strings.Contains(err.Error(), "autoincrement not allowed on FieldText") {
 			t.Errorf("Expected error about autoincrement on FieldText, got %v", err)
 		}
 	})
 
 	t.Run("Unsupported Type", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("Unsupp", "models.go")
+		err := ormc.New().GenerateForStruct("Unsupp", "models.go")
 		if err != nil {
 			t.Fatalf("Did not expect error for unsupported type, got %v", err)
 		}
@@ -297,7 +298,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Numeric Type Mapping and Bitmask", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("NumericTypes", "models.go")
+		err := ormc.New().GenerateForStruct("NumericTypes", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for NumericTypes: %v", err)
 		}
@@ -328,7 +329,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Ref Without Column", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("RefNoColumn", "models.go")
+		err := ormc.New().GenerateForStruct("RefNoColumn", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for RefNoColumn: %v", err)
 		}
@@ -349,7 +350,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("JSON tags and Nested structs", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("UserWithJSON", "models.go")
+		err := ormc.New().GenerateForStruct("UserWithJSON", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for UserWithJSON: %v", err)
 		}
@@ -379,7 +380,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("Pointers to primitives vs structs", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("WithPointers", "models.go")
+		err := ormc.New().GenerateForStruct("WithPointers", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for WithPointers: %v", err)
 		}
@@ -409,7 +410,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("FieldStruct for nested struct stage 1", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("UserWithJSON", "models.go")
+		err := ormc.New().GenerateForStruct("UserWithJSON", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -426,7 +427,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("fmt.RawJSON type generates FieldRaw", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("MCPResponse", "models.go")
+		err := ormc.New().GenerateForStruct("MCPResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -452,7 +453,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("fields without raw stay FieldText", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("PlainResponse", "models.go")
+		err := ormc.New().GenerateForStruct("PlainResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -481,7 +482,7 @@ func TestOrmc(t *testing.T) {
 	})
 
 	t.Run("ShortAutoInc with db autoinc tag", func(t *testing.T) {
-		err := orm.NewOrmc().GenerateForStruct("ShortAutoInc", "models.go")
+		err := ormc.New().GenerateForStruct("ShortAutoInc", "models.go")
 		if err != nil {
 			t.Fatalf("Failed to generate code for ShortAutoInc: %v", err)
 		}
@@ -512,7 +513,7 @@ type User struct {
 	path := filepath.Join(tmpDir, "model.go")
 	os.WriteFile(path, []byte(src), 0644)
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	_, err := o.ParseStruct("User", path)
 	if err == nil {
 		t.Fatal("expected error for json name override on DB struct, got nil")
@@ -531,7 +532,7 @@ type ContactForm struct {
 	path := filepath.Join(tmpDir, "model.go")
 	os.WriteFile(path, []byte(src), 0644)
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	info, err := o.ParseStruct("ContactForm", path)
 	if err != nil {
 		t.Fatalf("unexpected error for formonly struct: %v", err)
@@ -552,7 +553,7 @@ type User struct {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	o.SetRootDir(tmpDir)
 	if err := o.Run(); err != nil {
 		t.Fatal(err)
@@ -575,7 +576,7 @@ type User struct {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	o.SetRootDir(tmpDir)
 	if err := o.Run(); err != nil {
 		t.Fatal(err)
@@ -602,7 +603,7 @@ type ContactForm struct {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "model.go"), []byte(src), 0644)
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	o.SetRootDir(tmpDir)
 	if err := o.Run(); err != nil {
 		t.Fatal(err)

@@ -8,4 +8,5 @@ import (
 
 func TestCoreLogic_Stlib(t *testing.T) {
 	RunCoreTests(t)
+	RunSyncTests(t)
 }

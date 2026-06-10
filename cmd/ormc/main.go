@@ -8,13 +8,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ormc"
 )
 
 func main() {
 	flag.Parse()
 
-	o := orm.NewOrmc()
+	o := ormc.New()
 	o.SetLog(func(messages ...any) {
 		fmt.Fprintln(os.Stderr, messages...)
 	})
