@@ -1,12 +1,15 @@
 
 package ormc
 
+import "github.com/tinywasm/modfind"
+
 // Ormc is the code generator handler for the ormc tool.
 type Generator struct {
 	logFn    func(messages ...any)
 	rootDir  string
 	skipTidy bool
 	syncer   SchemaSyncer
+	finder   *modfind.Finder
 	cache    map[string]StructInfo
 }
 
@@ -25,20 +28,25 @@ func (g *Generator) SetSkipTidy(skip bool) {
 
 // SetLog sets the log function for warnings and informational messages.
 // If not set, messages are silently discarded.
-func (o *Generator) SetLog(fn func(messages ...any)) {
-	o.logFn = fn
+func (g *Generator) SetLog(fn func(messages ...any)) {
+	g.logFn = fn
 }
 
 // SetRootDir sets the root directory that Run() will scan.
 // Defaults to ".". Useful in tests to point to a specific directory
 // without needing os.Chdir.
-func (o *Generator) SetRootDir(dir string) {
-	o.rootDir = dir
+func (g *Generator) SetRootDir(dir string) {
+	g.rootDir = dir
+}
+
+// SetFinder injects the shared modfind.Finder (one go list across ssr/image/ormc).
+func (g *Generator) SetFinder(f *modfind.Finder) {
+	g.finder = f
 }
 
 // log emits a message via the configured log function, if any.
-func (o *Generator) log(messages ...any) {
-	if o.logFn != nil {
-		o.logFn(messages...)
+func (g *Generator) log(messages ...any) {
+	if g.logFn != nil {
+		g.logFn(messages...)
 	}
 }
