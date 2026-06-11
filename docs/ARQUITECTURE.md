@@ -357,7 +357,22 @@ ormc [-root <dir>]
 |------|---------|-------------|
 | `-root` | `.` | Directory to scan for `model.go` / `models.go` files |
 
-### 4.4. Struct tag rules
+### 4.4. Module Scanning & Schema Sync
+
+`ormc` provides a centralized startup pass via `ScanModules(rootDir string)`. This mirrors how `tinywasm/ssr` and `tinywasm/image` discover assets across the entire module graph.
+
+#### Execution modes:
+
+1. **Per-file (Watcher):** Triggered by `NewFileEvent` during local development. Scans only the modified file in the local project tree.
+2. **CLI Walk:** Triggered by `Run()` or `ormc` command. Walks the local project tree and generates files.
+3. **Startup Scan:** Triggered by `ScanModules()` at application startup. Uses `tinywasm/modfind` to discover all local and external dependencies.
+
+#### Scanning Rules:
+
+- **Writable Modules (Main / Replace):** Scanned like local files. `ormc` regenerates `*_orm.go` files in-place and calls `SyncSchema` for every database model found.
+- **Read-only Modules (Module Cache):** `ormc` does **not** write to these. Instead, it parses the **committed `*_orm.go`** files to recover the schema and calls `SyncSchema` for each. This ensures the schema in the database matches exactly what the module author published, regardless of version differences in the ORM generator itself.
+
+### 4.5. Struct tag rules
 
 | Tag | DB struct | `orm:no_db` struct |
 |-----|-----------|-----------------|

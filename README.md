@@ -242,6 +242,7 @@ project/
 | `GenerateForStruct(name, file string) error` | Generate for a single struct |
 | `ParseStruct(name, file string) (StructInfo, error)` | Parse struct metadata only |
 | `GenerateForFile(infos []StructInfo, file string) error` | Write all infos to one `_orm.go` |
+| `ScanModules(rootDir string) error` | Startup multi-module schema sync (see ARQUITECTURE.md) |
 
 ## More Documentation
 

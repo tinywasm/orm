@@ -94,7 +94,7 @@ func detectModelName(node *ast.File, structName string) string {
 }
 
 // ParseStruct parses a single struct from a Go file and returns its metadata.
-func (o *Generator) ParseStruct(structName string, goFile string) (StructInfo, error) {
+func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, error) {
 	if structName == "" {
 		return StructInfo{}, fmt.Err("Please provide a struct name")
 	}
@@ -164,7 +164,7 @@ func (o *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 	}
 
 	if info.NoDB && info.WantTypedFields {
-		o.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
+		g.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
 		info.WantTypedFields = false
 	}
 
@@ -366,7 +366,7 @@ func (o *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 					if ctor, ok := inputWidgets[typeName]; ok {
 						fi.WidgetConstructor = ctor
 					} else {
-						o.log("Warning: unknown input type", typeName, "for field", fi.Name)
+						g.log("Warning: unknown input type", typeName, "for field", fi.Name)
 						if ctor, ok := defaultWidgets[fi.GoType]; ok {
 							fi.WidgetConstructor = ctor
 						}
@@ -472,15 +472,15 @@ func parseInputModifiers(tag string, fi *FieldInfo) {
 }
 
 // GenerateForStruct reads the Go File and generates the ORM implementations for a given struct name.
-func (o *Generator) GenerateForStruct(structName string, goFile string) error {
-	info, err := o.ParseStruct(structName, goFile)
+func (g *Generator) GenerateForStruct(structName string, goFile string) error {
+	info, err := g.ParseStruct(structName, goFile)
 	if err != nil {
 		return err
 	}
 	if len(info.Fields) == 0 {
 		return nil
 	}
-	return o.GenerateForFile([]StructInfo{info}, goFile)
+	return g.GenerateForFile([]StructInfo{info}, goFile)
 }
 
 func writePermittedFields(buf *fmt.Conv, f FieldInfo) {
@@ -535,7 +535,7 @@ func writePermittedFields(buf *fmt.Conv, f FieldInfo) {
 }
 
 // parseStructsInFile parses all structs in a given file.
-func (o *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
+func (g *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
@@ -548,13 +548,13 @@ func (o *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
 			for _, spec := range genDecl.Specs {
 				if typeSpec, ok := spec.(*ast.TypeSpec); ok {
 					if _, ok := typeSpec.Type.(*ast.StructType); ok {
-						info, err := o.ParseStruct(typeSpec.Name.Name, path)
+						info, err := g.ParseStruct(typeSpec.Name.Name, path)
 						if err != nil {
-							o.log(fmt.Sprintf("Skipping %s in %s: %v", typeSpec.Name.Name, path, err))
+							g.log(fmt.Sprintf("Skipping %s in %s: %v", typeSpec.Name.Name, path, err))
 							continue
 						}
 						if len(info.Fields) == 0 {
-							o.log(fmt.Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
+							g.log(fmt.Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
 							continue
 						}
 						info.SourceFile = path
@@ -588,13 +588,13 @@ func (s StructInfo) asFields() []fmt.Field {
 
 // collectAllStructs walks rootDir and returns a map of all parsed StructInfo
 // keyed by struct name. Used by Run() Pass 1.
-func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []string, error) {
+func (g *Generator) collectAllStructs() (map[string]StructInfo, []string, []string, error) {
 	all := make(map[string]StructInfo)
 	var structOrder []string
 	var fileOrder []string
 	fileSeen := make(map[string]bool)
 
-	err := filepath.Walk(o.rootDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(g.rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -609,7 +609,7 @@ func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []stri
 
 		fileName := info.Name()
 		if fileName == "model.go" || fileName == "models.go" {
-			infos, err := o.parseStructsInFile(path)
+			infos, err := g.parseStructsInFile(path)
 			if err != nil {
 				return nil // Skip unparseable files
 			}
@@ -632,7 +632,7 @@ func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []stri
 
 // generateAll groups the enriched all map by source file path and calls
 // GenerateForFile once per file.
-func (o *Generator) generateAll(all map[string]StructInfo, structOrder []string, fileOrder []string) error {
+func (g *Generator) generateAll(all map[string]StructInfo, structOrder []string, fileOrder []string) error {
 	byFile := make(map[string][]StructInfo)
 	for _, structName := range structOrder {
 		info := all[structName]
@@ -642,8 +642,8 @@ func (o *Generator) generateAll(all map[string]StructInfo, structOrder []string,
 	for _, sourceFile := range fileOrder {
 		infos := byFile[sourceFile]
 		if len(infos) > 0 {
-			if err := o.GenerateForFile(infos, sourceFile); err != nil {
-				o.log(fmt.Sprintf("Failed to write output for %s: %v", sourceFile, err))
+			if err := g.GenerateForFile(infos, sourceFile); err != nil {
+				g.log(fmt.Sprintf("Failed to write output for %s: %v", sourceFile, err))
 			}
 		}
 	}
@@ -651,9 +651,9 @@ func (o *Generator) generateAll(all map[string]StructInfo, structOrder []string,
 }
 
 // Run is the entry point for the CLI tool.
-func (o *Generator) Run() error {
+func (g *Generator) Run() error {
 	// Pass 1: collect all structs across all model files (BEFORE cleanup)
-	all, structOrder, fileOrder, err := o.collectAllStructs()
+	all, structOrder, fileOrder, err := g.collectAllStructs()
 	if err != nil {
 		return fmt.Err(err, "error walking directory")
 	}
@@ -663,24 +663,24 @@ func (o *Generator) Run() error {
 
 	// Pass 2: cleanup tags (Pass 1 metadata is already safe)
 	for _, f := range fileOrder {
-		if err := o.RewriteModelTags(f); err != nil {
-			o.log(fmt.Sprintf("Warning: failed to rewrite tags in %s: %v", f, err))
+		if err := g.RewriteModelTags(f); err != nil {
+			g.log(fmt.Sprintf("Warning: failed to rewrite tags in %s: %v", f, err))
 		}
 	}
 
 	// Pass 3: resolve cross-struct relations
-	o.ResolveRelations(all)
+	g.ResolveRelations(all)
 
 	// Pass 4: generate (group by source file, call GenerateForFile once per file)
-	if err := o.generateAll(all, structOrder, fileOrder); err != nil {
+	if err := g.generateAll(all, structOrder, fileOrder); err != nil {
 		return err
 	}
 
 	// Pass 5: sync dependencies
-	if !o.skipTidy {
-		if _, err := os.Stat(filepath.Join(o.rootDir, "go.mod")); err == nil {
-			o.log("Syncing dependencies...")
-			if err := o.exec("go", "mod", "tidy"); err != nil {
+	if !g.skipTidy {
+		if _, err := os.Stat(filepath.Join(g.rootDir, "go.mod")); err == nil {
+			g.log("Syncing dependencies...")
+			if err := g.exec("go", "mod", "tidy"); err != nil {
 				return fmt.Err(err, "failed to tidy module")
 			}
 		}
@@ -689,9 +689,9 @@ func (o *Generator) Run() error {
 	return nil
 }
 
-func (o *Generator) exec(name string, args ...string) error {
+func (g *Generator) exec(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	cmd.Dir = o.rootDir
+	cmd.Dir = g.rootDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
