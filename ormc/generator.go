@@ -235,7 +235,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		}
 
 		if typeStr == "time.Time" {
-			o.log(fmt.Sprintf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName))
+			g.log(fmt.Sprintf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName))
 			continue
 		}
 
@@ -257,13 +257,13 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			if typeStr != "" && !fmt.Contains(typeStr, "[") && !fmt.Contains(typeStr, "chan ") {
 				fieldType = fmt.FieldStruct
 			} else {
-				o.log(fmt.Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
+				g.log(fmt.Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
 				continue
 			}
 		}
 
 		if isPointer && fieldType != fmt.FieldStruct {
-			o.log(fmt.Sprintf("Warning: pointers to primitive types not supported for field %s.%s; skipping. Add db:\"-\" to suppress.", structName, fieldName))
+			g.log(fmt.Sprintf("Warning: pointers to primitive types not supported for field %s.%s; skipping. Add db:\"-\" to suppress.", structName, fieldName))
 			continue
 		}
 
