@@ -158,11 +158,13 @@ func (db *DB) syncModel(m fmt.Model) error {
 
 		plan, err := db.compiler.Compile(qCheck, m)
 		if err != nil {
+			db.logw("sync:", tableName, "safe drop check compile failed for column", col, ":", err)
 			continue
 		}
 
 		rows, err := db.exec.Query(plan.Query, plan.Args...)
 		if err != nil {
+			db.logw("sync:", tableName, "safe drop check query failed for column", col, ":", err)
 			continue
 		}
 
