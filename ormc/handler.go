@@ -6,11 +6,16 @@ type Generator struct {
 	logFn    func(messages ...any)
 	rootDir  string
 	skipTidy bool
+	syncer   SchemaSyncer
+	cache    map[string]StructInfo
 }
 
 // NewOrmc creates a new Ormc handler with rootDir defaulting to ".".
 func New() *Generator {
-	return &Generator{rootDir: "."}
+	return &Generator{
+		rootDir: ".",
+		cache:   make(map[string]StructInfo),
+	}
 }
 
 // SetSkipTidy enables or disables the go mod tidy pass.

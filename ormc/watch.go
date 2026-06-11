@@ -2,9 +2,39 @@ package ormc
 
 // NewFileEvent implements the file-event contract for watchers (e.g. tinywasm/app's devwatch).
 func (g *Generator) NewFileEvent(fileName, extension, filePath, event string) error {
-	if fileName == "model.go" || fileName == "models.go" {
-		return g.Run()
+	if fileName != "model.go" && fileName != "models.go" {
+		return nil
 	}
+
+	// 1. Parse only that file
+	infos, err := g.parseStructsInFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// 2. Merge into cache and resolve relations
+	for _, info := range infos {
+		g.cache[info.Name] = info
+	}
+	g.ResolveRelations(g.cache)
+
+	// 3. Regenerate just <file>_orm.go
+	if err := g.GenerateForFile(infos, filePath); err != nil {
+		return err
+	}
+
+	// 4. Sync each DB struct
+	if g.syncer != nil {
+		for _, info := range infos {
+			if info.NoDB {
+				continue
+			}
+			if err := g.syncer.SyncSchema(info.ModelName, info.asFields()); err != nil {
+				g.log("sync error for", info.ModelName, ":", err)
+			}
+		}
+	}
+
 	return nil
 }
 

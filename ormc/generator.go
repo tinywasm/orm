@@ -534,6 +534,58 @@ func writePermittedFields(buf *fmt.Conv, f FieldInfo) {
 	buf.Write("}")
 }
 
+// parseStructsInFile parses all structs in a given file.
+func (o *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	var infos []StructInfo
+	for _, decl := range node.Decls {
+		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
+			for _, spec := range genDecl.Specs {
+				if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+					if _, ok := typeSpec.Type.(*ast.StructType); ok {
+						info, err := o.ParseStruct(typeSpec.Name.Name, path)
+						if err != nil {
+							o.log(fmt.Sprintf("Skipping %s in %s: %v", typeSpec.Name.Name, path, err))
+							continue
+						}
+						if len(info.Fields) == 0 {
+							o.log(fmt.Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
+							continue
+						}
+						info.SourceFile = path
+						infos = append(infos, info)
+					}
+				}
+			}
+		}
+	}
+	return infos, nil
+}
+
+// asFields maps FieldInfo to fmt.Field for sync.
+func (s StructInfo) asFields() []fmt.Field {
+	fields := make([]fmt.Field, len(s.Fields))
+	for i, f := range s.Fields {
+		fields[i] = fmt.Field{
+			Name:      f.ColumnName,
+			Type:      f.Type,
+			NotNull:   f.NotNull,
+			OmitEmpty: f.OmitEmpty,
+			DB: &fmt.FieldDB{
+				PK:      f.PK,
+				Unique:  f.Unique,
+				AutoInc: f.AutoInc,
+			},
+		}
+	}
+	return fields
+}
+
 // collectAllStructs walks rootDir and returns a map of all parsed StructInfo
 // keyed by struct name. Used by Run() Pass 1.
 func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []string, error) {
@@ -557,36 +609,17 @@ func (o *Generator) collectAllStructs() (map[string]StructInfo, []string, []stri
 
 		fileName := info.Name()
 		if fileName == "model.go" || fileName == "models.go" {
-			fset := token.NewFileSet()
-			node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			infos, err := o.parseStructsInFile(path)
 			if err != nil {
 				return nil // Skip unparseable files
 			}
 
-			for _, decl := range node.Decls {
-				if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.TYPE {
-					for _, spec := range genDecl.Specs {
-						if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-							if _, ok := typeSpec.Type.(*ast.StructType); ok {
-								info, err := o.ParseStruct(typeSpec.Name.Name, path)
-								if err != nil {
-									o.log(fmt.Sprintf("Skipping %s in %s: %v", typeSpec.Name.Name, path, err))
-									continue
-								}
-								if len(info.Fields) == 0 {
-									o.log(fmt.Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
-									continue
-								}
-								info.SourceFile = path
-								all[info.Name] = info
-								structOrder = append(structOrder, info.Name)
-								if !fileSeen[path] {
-									fileSeen[path] = true
-									fileOrder = append(fileOrder, path)
-								}
-							}
-						}
-					}
+			for _, info := range infos {
+				all[info.Name] = info
+				structOrder = append(structOrder, info.Name)
+				if !fileSeen[path] {
+					fileSeen[path] = true
+					fileOrder = append(fileOrder, path)
 				}
 			}
 		}
