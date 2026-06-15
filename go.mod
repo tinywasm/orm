@@ -5,3 +5,14 @@ go 1.25.2
 require github.com/tinywasm/fmt v0.24.0
 
 require github.com/tinywasm/modfind v0.0.4
+
+require (
+	github.com/tinywasm/context v0.0.18 // indirect
+	github.com/tinywasm/dom v0.7.1 // indirect
+	github.com/tinywasm/fetch v0.1.23 // indirect
+	github.com/tinywasm/form v0.2.1 // indirect
+	github.com/tinywasm/json v0.5.2 // indirect
+	github.com/tinywasm/mcp v0.1.9 // indirect
+	github.com/tinywasm/time v0.5.0 // indirect
+	github.com/tinywasm/unixid v0.2.23 // indirect
+)
