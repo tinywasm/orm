@@ -70,11 +70,13 @@ func (m *MockScanner) Scan(dest ...any) error {
 }
 
 type MockRows struct {
-	Count    int
-	Current  int
-	ScanErr  error
-	CloseErr error
-	ErrVal   error
+	Count      int
+	Current    int
+	ScanErr    error
+	ColumnsVal []string
+	ColumnsErr error
+	CloseErr   error
+	ErrVal     error
 }
 
 func (m *MockRows) Next() bool {
@@ -87,6 +89,10 @@ func (m *MockRows) Next() bool {
 
 func (m *MockRows) Scan(dest ...any) error {
 	return m.ScanErr
+}
+
+func (m *MockRows) Columns() ([]string, error) {
+	return m.ColumnsVal, m.ColumnsErr
 }
 
 func (m *MockRows) Close() error {

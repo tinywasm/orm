@@ -18,6 +18,7 @@ type Scanner interface {
 type Rows interface {
 	Next() bool
 	Scan(dest ...any) error
+	Columns() ([]string, error)
 	Close() error
 	Err() error
 }

@@ -29,6 +29,27 @@ func parseGenerated(path string) (map[string][]fmt.Field, error) {
 		return nil, err
 	}
 
+	// dbStructs collects structs that have ReadOne*/ReadAll* helpers — the
+	// marker that ormc emitted DB helpers (i.e. the struct is NOT orm:no_db).
+	// Structs without these helpers must not be synced even if they have ModelName().
+	// Note: old generated files (pre orm:no_db) may lack ReadOne/ReadAll but still
+	// be valid DB structs — we fall back to allowing all structs if none are found,
+	// preserving backward compatibility with cached module generated files.
+	dbStructs := make(map[string]bool) // structName -> is DB struct
+	for _, decl := range node.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Recv != nil {
+			continue // only package-level funcs
+		}
+		name := fn.Name.Name
+		if strings.HasPrefix(name, "ReadOne") || strings.HasPrefix(name, "ReadAll") {
+			structName := strings.TrimPrefix(strings.TrimPrefix(name, "ReadOne"), "ReadAll")
+			dbStructs[structName] = true
+		}
+	}
+	// If no ReadOne/ReadAll found, file predates orm:no_db — treat all structs as DB.
+	allAreDB := len(dbStructs) == 0
+
 	modelNames := make(map[string]string) // structName -> tableName
 	for _, decl := range node.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -71,6 +92,12 @@ func parseGenerated(path string) (map[string][]fmt.Field, error) {
 			structName := strings.TrimPrefix(vspec.Names[0].Name, "_schema")
 			tableName, ok := modelNames[structName]
 			if !ok {
+				continue
+			}
+			// Skip structs without DB helpers — they were generated with orm:no_db.
+			// ModelName() is always emitted (used by form/API layers), but only
+			// structs with ReadOne*/ReadAll* have an actual DB table to sync.
+			if !allAreDB && !dbStructs[structName] {
 				continue
 			}
 

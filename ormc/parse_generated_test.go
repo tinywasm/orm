@@ -89,6 +89,49 @@ var _schemaUser = []fmt.Field{
 	}
 }
 
+func TestParseGenerated_NoDB(t *testing.T) {
+	// orm:no_db structs: ModelName() is always emitted (used by form/API layers)
+	// but ReadOne*/ReadAll* are absent. parseGenerated must not include them in
+	// the sync map — otherwise ScanModules would create spurious tables.
+	content := `package test
+import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/orm"
+
+func (m *User) ModelName() string { return "users" }
+var _schemaUser = []fmt.Field{
+	{Name: "id", Type: fmt.FieldInt, DB: &fmt.FieldDB{PK: true, AutoInc: true}},
+	{Name: "name", Type: fmt.FieldText, NotNull: true},
+}
+func (m *User) Schema() []fmt.Field { return _schemaUser }
+func (m *User) Pointers() []any     { return nil }
+func ReadOneUser(qb *orm.QB, model *User) (*User, error) { return nil, nil }
+
+func (m *FormArgs) ModelName() string { return "form_args" }
+var _schemaFormArgs = []fmt.Field{
+	{Name: "sql", Type: fmt.FieldText, NotNull: true},
+}
+func (m *FormArgs) Schema() []fmt.Field { return _schemaFormArgs }
+func (m *FormArgs) Pointers() []any     { return nil }
+`
+	tmpDir, _ := os.MkdirTemp("", "ormc_test")
+	defer os.RemoveAll(tmpDir)
+
+	path := filepath.Join(tmpDir, "models_orm.go")
+	os.WriteFile(path, []byte(content), 0644)
+
+	schemas, err := parseGenerated(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := schemas["users"]; !ok {
+		t.Error("users table should be present (has ReadOne)")
+	}
+	if _, ok := schemas["form_args"]; ok {
+		t.Error("form_args table must NOT be present (orm:no_db — no ReadOne/ReadAll)")
+	}
+}
+
 func TestParseGenerated_MS7(t *testing.T) {
 	// MS7: unknown fmt.FieldXxx in literal
 	content := `package test
