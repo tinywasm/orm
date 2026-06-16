@@ -44,6 +44,9 @@ func (g *Generator) SetFinder(f *modfind.Finder) {
 	g.finder = f
 }
 
+// Name returns the TUI handler label shown in the development console.
+func (g *Generator) Name() string { return "ORMC" }
+
 // log emits a message via the configured log function, if any.
 func (g *Generator) log(messages ...any) {
 	if g.logFn != nil {
