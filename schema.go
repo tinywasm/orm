@@ -1,5 +1,3 @@
-//go:build !wasm
-
 package orm
 
 // SchemaInspector is optionally implemented by Executor adapters to expose
