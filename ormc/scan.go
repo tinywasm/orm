@@ -15,8 +15,10 @@ import (
 // No-op if no syncer is injected (CLI codegen-only path).
 func (g *Generator) ScanModules(rootDir string) error {
 	if g.syncer == nil {
+		g.log("ready (no db syncer)")
 		return nil
 	}
+	g.log("scanning modules...")
 	if g.finder == nil {
 		g.finder = modfind.New()
 	}
