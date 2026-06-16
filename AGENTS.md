@@ -8,6 +8,7 @@ Working notes for AI agents operating in this library. For end-user docs see [RE
 
 1. **A runtime ORM** (`db.go`, `tx.go`, `sync.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`) — `*orm.DB`, query builder, CRUD, and dev-time schema sync (`db.Sync`). Works in Go and WASM (sync is backend-only).
 2. **`ormc`, a build-time code generator** (located in `ormc/`, `cmd/ormc/`) — parses Go source files, reads struct tags (`db:`, `json:`, `input:`), emits `model_orm.go` files next to each source with:
+3. **`ormcp`, an MCP tool provider** (located in `ormcp/`) — backend-only subpackage that exposes `db_schema`, `db_query`, and `db_exec` MCP tools for LLM interaction with a live `*orm.DB` during development. Register via `ormcp.NewProvider(db)`. `db_schema` is only available if the executor implements `orm.SchemaInspector`.
    - `Schema() []fmt.Field` — runtime schema with `Widget`, `Permitted`, `DB`, etc.
    - `ModelName()`, `<Name>_` table tokens, `FieldDB` constants
    - `ReadOne*`, `ReadAll*` typed query helpers
@@ -41,7 +42,8 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 |------------|------|
 | `db.go`, `tx.go`, `sync.go` | `*orm.DB`, `*orm.Tx`, `db.Sync` — runtime entry points |
 | `query.go`, `qb.go`, `conditions.go` | Query builder (`Where`, `Like`, `Limit`, ...) |
-| `executor.go`, `execution_plan.go` | Query execution |
+| `executor.go`, `execution_plan.go` | Query execution; `Rows` interface includes `Columns() ([]string, error)` |
+| `schema.go` (`//go:build !wasm`) | `SchemaInspector` interface + `ColumnInfo` struct — implemented by DB adapters (sqlite, postgres) |
 | `validate.go` | Runtime validation glue (delegates to `fmt.ValidateFields`) |
 | `field_ext.go` | Field utilities used by generated code |
 | `ormc/` | Codegen subpackage |
@@ -51,9 +53,21 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 | `ormc/handler.go` | Project-wide handler registration |
 | `ormc/relations.go` | Foreign-key resolution between structs |
 | `ormc/watch.go` | File-event watcher handler |
+| `ormcp/` | MCP tool provider subpackage (backend-only) |
+| `ormcp/provider.go` | `Provider`, `NewProvider(*orm.DB)`, `Tools()`, `encodeSchema`, `scanRowsToText` |
+| `ormcp/models.go` | `QueryArgs`, `ExecArgs` — manual `Schema()`/`Validate()` (no ormc, avoids spurious table sync) |
+| `ormcp/tool_schema.go` | `db_schema` tool — lists tables + columns (requires `SchemaInspector`) |
+| `ormcp/tool_query.go` | `db_query` tool — SELECT/WITH only |
+| `ormcp/tool_exec.go` | `db_exec` tool — INSERT/UPDATE/DELETE/DDL |
 | `cmd/ormc/` | CLI entrypoint |
-| `tests/` | Test fixtures + `_test.go` files |
+| `tests/` | Test fixtures + `_test.go` files (separate module with `replace ../`) |
 | `docs/` | Architecture, design rationale, tag reference (see `STRUCT_TAGS.md` mirror in `fmt/docs`) |
+
+## ormcp — reglas
+
+- **No usar `ormc` en `ormcp/models.go`.** El generador emite `ModelName()` aunque se use `// orm:no_db`, lo que haría que `ScanModules` intentara crear tablas `query_args`/`exec_args` espurias en la DB del usuario. `Schema()` y `Validate()` se implementan a mano — los structs son triviales (1 campo).
+- **Sin `encoding/json` ni `strings`.** Usar `fmt.Convert()`, `fmt.HasPrefix()`, `fmt.Convert(slice).Join()` del ecosistema.
+- **Sin parámetros SQL (`Args`).** El LLM escribe SQL completo con valores embebidos. Los parámetros existen para proteger input de usuarios externos — no aplica en contexto de desarrollo.
 
 ## How `ormc` adds support for a new `input:` tag
 
