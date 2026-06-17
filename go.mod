@@ -12,9 +12,8 @@ require (
 )
 
 require (
-	github.com/tinywasm/dom v0.7.1 // indirect
 	github.com/tinywasm/fetch v0.1.23 // indirect
-	github.com/tinywasm/form v0.2.1 // indirect
+	github.com/tinywasm/form v0.2.7 // indirect
 	github.com/tinywasm/time v0.5.0 // indirect
 	github.com/tinywasm/unixid v0.2.23 // indirect
 )
