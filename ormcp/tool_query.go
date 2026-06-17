@@ -15,20 +15,27 @@ func queryTool(db *orm.DB) mcp.Tool {
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
-			var args QueryArgs
-			if err := req.Bind(&args); err != nil {
-				return nil, err
-			}
-			upper := fmt.Convert(args.SQL).TrimSpace().ToUpper().String()
-			if !fmt.HasPrefix(upper, "SELECT") && !fmt.HasPrefix(upper, "WITH") {
-				return nil, fmt.Err("db_query only accepts SELECT or WITH statements; use db_exec for mutations")
-			}
-			rows, err := db.RawExecutor().Query(args.SQL)
-			if err != nil {
-				return nil, err
-			}
-			defer rows.Close()
-			return mcp.Text(scanRowsToText(rows)), nil
+			return executeQuery(db, req)
 		},
 	}
+}
+
+func executeQuery(db *orm.DB, req mcp.Request) (*mcp.Result, error) {
+	if db == nil {
+		return nil, fmt.Err("no database configured: call start_development first")
+	}
+	var args QueryArgs
+	if err := req.Bind(&args); err != nil {
+		return nil, err
+	}
+	upper := fmt.Convert(args.SQL).TrimSpace().ToUpper().String()
+	if !fmt.HasPrefix(upper, "SELECT") && !fmt.HasPrefix(upper, "WITH") {
+		return nil, fmt.Err("db_query only accepts SELECT or WITH statements; use db_exec for mutations")
+	}
+	rows, err := db.RawExecutor().Query(args.SQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return mcp.Text(scanRowsToText(rows)), nil
 }
