@@ -35,6 +35,12 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 - **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc.
 - **Directives are orthogonal and composable.** Use atomic directives: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
 - **One source of truth per concern.** Widget defaults live in the widget. Tag → setter mapping lives in `ormc`. Validation rules live in `fmt.Permitted`. Do not duplicate.
+- **Typed serialization codec.** `ormc` also emits `EncodeFields(w fmt.FieldWriter)` /
+  `DecodeFields(r fmt.FieldReader)` (the typed visitor codec from `tinywasm/fmt`). These MUST be
+  **0-alloc, map-free, `any`-free, reflect-free** — typed calls only, using `Field.Name` as key.
+  This is the single serialization contract (consumed by `tinywasm/json` and `tinywasm/jsvalue`).
+  `Schema()`/`Pointers()` stay for their distinct roles (SQL scan, schema, validation) — see
+  `../fmt/docs/CODEC_AND_FIELDER.md`. See `docs/PLAN.md`.
 
 ## Code layout
 
