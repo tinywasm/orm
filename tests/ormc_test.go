@@ -200,6 +200,9 @@ func TestOrmc(t *testing.T) {
 			"func (s *UserList) Len() int             { return len(*s) }",
 			"func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }",
 			"func (s *UserList) Append() fmt.Fielder",
+			"func (m *User) EncodeFields(w fmt.FieldWriter) {",
+			"func (m *User) DecodeFields(r fmt.FieldReader) error {",
+			"func (m *User) IsNil() bool {",
 		}
 
 		for _, expected := range expectedStrings {

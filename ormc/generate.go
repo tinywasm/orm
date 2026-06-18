@@ -65,6 +65,10 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				typeStr = "fmt.FieldStruct"
 			case fmt.FieldRaw:
 				typeStr = "fmt.FieldRaw"
+			case fmt.FieldIntSlice:
+				typeStr = "fmt.FieldIntSlice"
+			case fmt.FieldStructSlice:
+				typeStr = "fmt.FieldStructSlice"
 			}
 
 			buf.Write(fmt.Sprintf("\t\t{Name: \"%s\", Type: %s", f.ColumnName, typeStr))
@@ -113,6 +117,76 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 			buf.Write(fmt.Sprintf("&m.%s", f.Name))
 		}
 		buf.Write("} }\n\n")
+
+		buf.Write(fmt.Sprintf("func (m *%s) IsNil() bool { return m == nil }\n\n", info.Name))
+
+		buf.Write(fmt.Sprintf("func (m *%s) EncodeFields(w fmt.FieldWriter) {\n", info.Name))
+		for _, f := range info.Fields {
+			switch f.Type {
+			case fmt.FieldText, fmt.FieldRaw:
+				buf.Write(fmt.Sprintf("\tw.String(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+			case fmt.FieldInt:
+				buf.Write(fmt.Sprintf("\tw.Int(\"%s\", int64(m.%s))\n", f.ColumnName, f.Name))
+			case fmt.FieldFloat:
+				buf.Write(fmt.Sprintf("\tw.Float(\"%s\", float64(m.%s))\n", f.ColumnName, f.Name))
+			case fmt.FieldBool:
+				buf.Write(fmt.Sprintf("\tw.Bool(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+			case fmt.FieldBlob:
+				buf.Write(fmt.Sprintf("\tw.Bytes(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+			case fmt.FieldStruct:
+				buf.Write(fmt.Sprintf("\tif m.%s != nil { w.Object(\"%s\", m.%s) } else { w.Null(\"%s\") }\n", f.Name, f.ColumnName, f.Name, f.ColumnName))
+			case fmt.FieldIntSlice:
+				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n\t\t\tarr.Int(int64(x))\n\t\t}\n\t}\n", f.ColumnName, f.Name, f.Name))
+			case fmt.FieldStructSlice:
+				isPtr := fmt.HasPrefix(f.GoType, "[]*")
+				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n", f.ColumnName, f.Name, f.Name))
+				if isPtr {
+					buf.Write("\t\t\tif x != nil { arr.Object(x) }\n")
+				} else {
+					buf.Write("\t\t\tarr.Object(&x)\n")
+				}
+				buf.Write("\t\t}\n\t}\n")
+			}
+		}
+		buf.Write("}\n\n")
+
+		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r fmt.FieldReader) error {\n", info.Name))
+		for _, f := range info.Fields {
+			switch f.Type {
+			case fmt.FieldText, fmt.FieldRaw:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.String(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
+			case fmt.FieldInt:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.Int(\"%s\"); ok { m.%s = %s(v) }\n", f.ColumnName, f.Name, f.GoType))
+			case fmt.FieldFloat:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.Float(\"%s\"); ok { m.%s = %s(v) }\n", f.ColumnName, f.Name, f.GoType))
+			case fmt.FieldBool:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.Bool(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
+			case fmt.FieldBlob:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.Bytes(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
+			case fmt.FieldStruct:
+				elemType := f.GoType
+				buf.Write(fmt.Sprintf("\tif m.%s == nil { m.%s = new(%s) }\n", f.Name, f.Name, elemType))
+				buf.Write(fmt.Sprintf("\tif !r.Object(\"%s\", m.%s) { m.%s = nil }\n", f.ColumnName, f.Name, f.Name))
+			case fmt.FieldIntSlice:
+				elemType := fmt.Convert(f.GoType).TrimPrefix("[]").String()
+				buf.Write(fmt.Sprintf("\tif arr, ok := r.Array(\"%s\"); ok {\n", f.ColumnName))
+				buf.Write(fmt.Sprintf("\t\tn := arr.Len()\n\t\tm.%s = make(%s, n)\n\t\tfor i := 0; i < n; i++ {\n\t\t\tm.%s[i] = %s(arr.Int(i))\n\t\t}\n\t}\n", f.Name, f.GoType, f.Name, elemType))
+			case fmt.FieldStructSlice:
+				isPtr := fmt.HasPrefix(f.GoType, "[]*")
+				elemType := fmt.Convert(f.GoType).TrimPrefix("[]").TrimPrefix("*").String()
+				buf.Write(fmt.Sprintf("\tif arr, ok := r.Array(\"%s\"); ok {\n", f.ColumnName))
+				buf.Write(fmt.Sprintf("\t\tn := arr.Len()\n\t\tm.%s = make(%s, n)\n\t\tfor i := 0; i < n; i++ {\n", f.Name, f.GoType))
+				if isPtr {
+					buf.Write(fmt.Sprintf("\t\t\tm.%s[i] = new(%s)\n", f.Name, elemType))
+					buf.Write(fmt.Sprintf("\t\t\tarr.Object(i, m.%s[i])\n", f.Name))
+				} else {
+					buf.Write(fmt.Sprintf("\t\t\tarr.Object(i, &m.%s[i])\n", f.Name))
+				}
+				buf.Write("\t\t}\n\t}\n")
+			}
+		}
+		buf.Write("\treturn nil\n")
+		buf.Write("}\n\n")
 
 		// RenameProvider
 		hasOldNames := false

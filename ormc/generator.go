@@ -200,17 +200,6 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			continue
 		}
 
-		// Detect []Struct fields for relation resolution (R8)
-		if arr, ok := field.Type.(*ast.ArrayType); ok {
-			if eltIdent, ok := arr.Elt.(*ast.Ident); ok && eltIdent.Name != "byte" {
-				info.SliceFields = append(info.SliceFields, SliceFieldInfo{
-					Name:     fieldName,
-					ElemType: eltIdent.Name,
-				})
-				continue // never add to Fields — not DB-mappable
-			}
-		}
-
 		// Field Type mapping
 		var fieldType fmt.FieldType
 		var typeStr string
@@ -229,8 +218,23 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 				typeStr = pkgIdent.Name + "." + sel.Sel.Name
 			}
 		} else if arr, ok := fType.(*ast.ArrayType); ok {
-			if eltIdent, ok := arr.Elt.(*ast.Ident); ok && eltIdent.Name == "byte" {
-				typeStr = "[]byte"
+			elt := arr.Elt
+			isEltPointer := false
+			if star, ok := elt.(*ast.StarExpr); ok {
+				isEltPointer = true
+				elt = star.X
+			}
+
+			if eltIdent, ok := elt.(*ast.Ident); ok {
+				if eltIdent.Name == "byte" && !isEltPointer {
+					typeStr = "[]byte"
+				} else {
+					prefix := "[]"
+					if isEltPointer {
+						prefix = "[]*"
+					}
+					typeStr = prefix + eltIdent.Name
+				}
 			}
 		}
 
@@ -252,9 +256,19 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			fieldType = fmt.FieldBlob
 		case "RawJSON", "fmt.RawJSON":
 			fieldType = fmt.FieldRaw
+		case "[]int", "[]int32", "[]int64", "[]uint", "[]uint32", "[]uint64":
+			fieldType = fmt.FieldIntSlice
 		default:
-			// If it's a struct (but not time.Time, not slice, not chan), map to FieldStruct
-			if typeStr != "" && !fmt.Contains(typeStr, "[") && !fmt.Contains(typeStr, "chan ") {
+			if fmt.HasPrefix(typeStr, "[]") {
+				// Slice of struct (likely)
+				fieldType = fmt.FieldStructSlice
+				elemType := fmt.Convert(typeStr).TrimPrefix("[]").TrimPrefix("*").String()
+				info.SliceFields = append(info.SliceFields, SliceFieldInfo{
+					Name:     fieldName,
+					ElemType: elemType,
+				})
+			} else if typeStr != "" && !fmt.Contains(typeStr, "chan ") {
+				// If it's a struct (but not time.Time, not slice, not chan), map to FieldStruct
 				fieldType = fmt.FieldStruct
 			} else {
 				g.log(fmt.Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
