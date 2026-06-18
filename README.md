@@ -8,6 +8,7 @@
 - **Zero Reflection**: Interface-driven schema via `github.com/tinywasm/fmt`
 - **Isomorphic**: Same generated code works in Go (backend) and WASM (frontend)
 - **Three Layers**: DB persistence, JSON transport, and Form UI — from one struct definition
+- **0-alloc Codec**: Symmetric, reflection-free serialization/deserialization methods generated for every model
 - **Code Generator**: `ormc` CLI generates boilerplate from struct tags
 
 ## Installation
@@ -159,6 +160,8 @@ Available widget types: `text`, `email`, `password`, `textarea`, `phone`, `numbe
 | `bool` | `fmt.FieldBool` |
 | `[]byte` | `fmt.FieldBlob` |
 | struct (nested) | `fmt.FieldStruct` |
+| `[]int`, `[]int32`, `[]int64`, etc | `fmt.FieldIntSlice` |
+| `[]Struct`, `[]*Struct` | `fmt.FieldStructSlice` |
 | `time.Time` | not allowed — use `int64` + `tinywasm/time` |
 
 ## API Reference
@@ -226,6 +229,8 @@ project/
 | What | When |
 |------|------|
 | `Schema() []Field`, `Pointers() []any` | Always |
+| `EncodeFields(FieldWriter)`, `DecodeFields(FieldReader)` | Always (symmetric 0-alloc codec) |
+| `IsNil() bool` | Always |
 | `Validate(action byte) error` | When struct has validation rules or is a form |
 | `ModelName() string` | Always |
 | `T_` metadata struct | DB structs with `// orm:typed_fields` |

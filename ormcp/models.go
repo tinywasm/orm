@@ -1,29 +1,11 @@
 package ormcp
 
-import "github.com/tinywasm/fmt"
-
+// orm:no_db
 type QueryArgs struct {
-	SQL string
+	SQL string `json:"SQL" db:"not_null"`
 }
 
-func (m *QueryArgs) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText, NotNull: true},
-	}
-}
-
-func (m *QueryArgs) Validate(action byte) error { return fmt.ValidateFields(action, m) }
-func (m *QueryArgs) Pointers() []any            { return []any{&m.SQL} }
-
+// orm:no_db
 type ExecArgs struct {
-	SQL string
+	SQL string `json:"SQL" db:"not_null"`
 }
-
-func (m *ExecArgs) Schema() []fmt.Field {
-	return []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText, NotNull: true},
-	}
-}
-
-func (m *ExecArgs) Validate(action byte) error { return fmt.ValidateFields(action, m) }
-func (m *ExecArgs) Pointers() []any            { return []any{&m.SQL} }
