@@ -3,6 +3,7 @@ package ormc
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tinywasm/fmt"
@@ -107,4 +108,84 @@ type Model struct {
 		}
 	}
 	t.Fatal("field ID not found")
+}
+
+func TestGenerate_E2E(t *testing.T) {
+	src := `package p
+type MyID = string
+type MyInt = int
+
+// ormc:formonly
+type Parent struct {
+	ID    MyID
+	Count MyInt
+	Child Child
+}
+
+// ormc:formonly
+type Child struct {
+	X string
+}
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseStructsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	// Bug 1 Verification: struct by value should use &m.Field and NO nil check
+	if !strings.Contains(s, "w.Object(\"child\", &m.Child)") {
+		t.Errorf("missing expected w.Object for value struct field in EncodeFields")
+	}
+	if strings.Contains(s, "if m.Child != nil") {
+		t.Errorf("unexpected nil check for value struct field in EncodeFields")
+	}
+	if !strings.Contains(s, "r.Object(\"child\", &m.Child)") {
+		t.Errorf("missing expected r.Object for value struct field in DecodeFields")
+	}
+
+	// Bug 2 Verification: type aliases should map to primitive field types
+	if !strings.Contains(s, "{Name: \"id\", Type: fmt.FieldText") {
+		t.Errorf("MyID (string alias) should map to FieldText")
+	}
+	if !strings.Contains(s, "{Name: \"count\", Type: fmt.FieldInt") {
+		t.Errorf("MyInt (int alias) should map to FieldInt")
+	}
+}
+
+func TestParseStruct_SliceOfTypeAlias(t *testing.T) {
+	src := `package p
+type MyInt = int
+// ormc:formonly
+type Model struct {
+	IDs []MyInt
+}
+`
+	g := New()
+	info, err := g.ParseStruct("Model", writeTemp(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range info.Fields {
+		if f.Name == "IDs" {
+			if f.Type != fmt.FieldIntSlice {
+				t.Fatalf("IDs: expected FieldIntSlice (slice of alias of int), got %v", f.Type)
+			}
+			return
+		}
+	}
+	t.Fatal("field IDs not found")
 }

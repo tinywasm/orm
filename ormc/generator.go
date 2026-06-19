@@ -248,14 +248,15 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 
 			if eltIdent, ok := elt.(*ast.Ident); ok {
-				if eltIdent.Name == "byte" && !isEltPointer {
+				eltName := resolveTypeAlias(node, eltIdent.Name)
+				if eltName == "byte" && !isEltPointer {
 					typeStr = "[]byte"
 				} else {
 					prefix := "[]"
 					if isEltPointer {
 						prefix = "[]*"
 					}
-					typeStr = prefix + eltIdent.Name
+					typeStr = prefix + eltName
 				}
 			}
 		}
