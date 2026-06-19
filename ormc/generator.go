@@ -25,6 +25,7 @@ type FieldInfo struct {
 	IsPK       bool
 	OldName    string
 	GoType     string
+	IsPointer  bool // true if the original field is *T (only meaningful for FieldStruct)
 	OmitEmpty  bool
 	// Permitted config — populated from validate:"..." tag
 	Letters           bool
@@ -57,6 +58,27 @@ type StructInfo struct {
 	SourceFile        string
 	SliceFields       []SliceFieldInfo // populated by ParseStruct; used by ResolveRelations
 	Relations         []RelationInfo   // populated by ResolveRelations; used by GenerateForFile
+}
+
+// resolveTypeAlias checks if name is a type alias (type name = underlying) declared
+// in node and returns the underlying primitive name, or name unchanged if not found.
+func resolveTypeAlias(node *ast.File, name string) string {
+	for _, decl := range node.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok || !ts.Assign.IsValid() || ts.Name.Name != name {
+				continue
+			}
+			if ident, ok := ts.Type.(*ast.Ident); ok {
+				return ident.Name
+			}
+		}
+	}
+	return name
 }
 
 // detectModelName scans the AST for func (X) ModelName() string on structName.
@@ -238,6 +260,8 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 		}
 
+		typeStr = resolveTypeAlias(node, typeStr)
+
 		if typeStr == "time.Time" {
 			g.log(fmt.Sprintf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName))
 			continue
@@ -368,6 +392,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			IsPK:       fieldIsPK,
 			OldName:    oldName,
 			GoType:     typeStr,
+			IsPointer:  isPointer,
 			OmitEmpty:  omitEmpty,
 		}
 

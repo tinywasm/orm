@@ -134,7 +134,11 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 			case fmt.FieldBlob:
 				buf.Write(fmt.Sprintf("\tw.Bytes(\"%s\", m.%s)\n", f.ColumnName, f.Name))
 			case fmt.FieldStruct:
-				buf.Write(fmt.Sprintf("\tif m.%s != nil { w.Object(\"%s\", m.%s) } else { w.Null(\"%s\") }\n", f.Name, f.ColumnName, f.Name, f.ColumnName))
+				if f.IsPointer {
+					buf.Write(fmt.Sprintf("\tif m.%s != nil { w.Object(\"%s\", m.%s) } else { w.Null(\"%s\") }\n", f.Name, f.ColumnName, f.Name, f.ColumnName))
+				} else {
+					buf.Write(fmt.Sprintf("\tw.Object(\"%s\", &m.%s)\n", f.ColumnName, f.Name))
+				}
 			case fmt.FieldIntSlice:
 				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n\t\t\tarr.Int(int64(x))\n\t\t}\n\t}\n", f.ColumnName, f.Name, f.Name))
 			case fmt.FieldStructSlice:
@@ -165,8 +169,12 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Bytes(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
 			case fmt.FieldStruct:
 				elemType := f.GoType
-				buf.Write(fmt.Sprintf("\tif m.%s == nil { m.%s = new(%s) }\n", f.Name, f.Name, elemType))
-				buf.Write(fmt.Sprintf("\tif !r.Object(\"%s\", m.%s) { m.%s = nil }\n", f.ColumnName, f.Name, f.Name))
+				if f.IsPointer {
+					buf.Write(fmt.Sprintf("\tif m.%s == nil { m.%s = new(%s) }\n", f.Name, f.Name, elemType))
+					buf.Write(fmt.Sprintf("\tif !r.Object(\"%s\", m.%s) { m.%s = nil }\n", f.ColumnName, f.Name, f.Name))
+				} else {
+					buf.Write(fmt.Sprintf("\tr.Object(\"%s\", &m.%s)\n", f.ColumnName, f.Name))
+				}
 			case fmt.FieldIntSlice:
 				elemType := fmt.Convert(f.GoType).TrimPrefix("[]").String()
 				buf.Write(fmt.Sprintf("\tif arr, ok := r.Array(\"%s\"); ok {\n", f.ColumnName))

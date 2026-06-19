@@ -6,7 +6,7 @@ require github.com/tinywasm/fmt v0.24.3
 
 require (
 	github.com/tinywasm/context v0.0.18
-	github.com/tinywasm/json v0.5.2
+	github.com/tinywasm/json v0.5.3
 	github.com/tinywasm/mcp v0.1.9
 	github.com/tinywasm/modfind v0.0.4
 )
