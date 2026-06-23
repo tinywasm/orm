@@ -56,6 +56,9 @@ func (s *UserList) Pointers() []any     { return nil }
 func (s *UserList) Len() int             { return len(*s) }
 func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserList) Append() fmt.Fielder  { v := &User{}; *s = append(*s, v); return v }
+func (s *UserList) IsNil() bool          { return s == nil }
+func (s *UserList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *User) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -132,6 +135,9 @@ func (s *OrderList) Pointers() []any     { return nil }
 func (s *OrderList) Len() int             { return len(*s) }
 func (s *OrderList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *OrderList) Append() fmt.Fielder  { v := &Order{}; *s = append(*s, v); return v }
+func (s *OrderList) IsNil() bool          { return s == nil }
+func (s *OrderList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *OrderList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneOrder(qb *orm.QB, model *Order) (*Order, error) {
 	err := qb.ReadOne()
@@ -183,6 +189,9 @@ func (s *BadTimeNoTagList) Pointers() []any     { return nil }
 func (s *BadTimeNoTagList) Len() int             { return len(*s) }
 func (s *BadTimeNoTagList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *BadTimeNoTagList) Append() fmt.Fielder  { v := &BadTimeNoTag{}; *s = append(*s, v); return v }
+func (s *BadTimeNoTagList) IsNil() bool          { return s == nil }
+func (s *BadTimeNoTagList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *BadTimeNoTagList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneBadTimeNoTag(qb *orm.QB, model *BadTimeNoTag) (*BadTimeNoTag, error) {
 	err := qb.ReadOne()
@@ -237,6 +246,9 @@ func (s *ModelWithIgnoredList) Pointers() []any     { return nil }
 func (s *ModelWithIgnoredList) Len() int             { return len(*s) }
 func (s *ModelWithIgnoredList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *ModelWithIgnoredList) Append() fmt.Fielder  { v := &ModelWithIgnored{}; *s = append(*s, v); return v }
+func (s *ModelWithIgnoredList) IsNil() bool          { return s == nil }
+func (s *ModelWithIgnoredList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *ModelWithIgnoredList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneModelWithIgnored(qb *orm.QB, model *ModelWithIgnored) (*ModelWithIgnored, error) {
 	err := qb.ReadOne()
@@ -284,6 +296,9 @@ func (s *MultiAList) Pointers() []any     { return nil }
 func (s *MultiAList) Len() int             { return len(*s) }
 func (s *MultiAList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *MultiAList) Append() fmt.Fielder  { v := &MultiA{}; *s = append(*s, v); return v }
+func (s *MultiAList) IsNil() bool          { return s == nil }
+func (s *MultiAList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *MultiAList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneMultiA(qb *orm.QB, model *MultiA) (*MultiA, error) {
 	err := qb.ReadOne()
@@ -335,6 +350,9 @@ func (s *MultiBList) Pointers() []any     { return nil }
 func (s *MultiBList) Len() int             { return len(*s) }
 func (s *MultiBList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *MultiBList) Append() fmt.Fielder  { v := &MultiB{}; *s = append(*s, v); return v }
+func (s *MultiBList) IsNil() bool          { return s == nil }
+func (s *MultiBList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *MultiBList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneMultiB(qb *orm.QB, model *MultiB) (*MultiB, error) {
 	err := qb.ReadOne()
@@ -389,6 +407,9 @@ func (s *NumericTypesList) Pointers() []any     { return nil }
 func (s *NumericTypesList) Len() int             { return len(*s) }
 func (s *NumericTypesList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *NumericTypesList) Append() fmt.Fielder  { v := &NumericTypes{}; *s = append(*s, v); return v }
+func (s *NumericTypesList) IsNil() bool          { return s == nil }
+func (s *NumericTypesList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *NumericTypesList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *NumericTypes) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -444,6 +465,9 @@ func (s *RefNoColumnList) Pointers() []any     { return nil }
 func (s *RefNoColumnList) Len() int             { return len(*s) }
 func (s *RefNoColumnList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *RefNoColumnList) Append() fmt.Fielder  { v := &RefNoColumn{}; *s = append(*s, v); return v }
+func (s *RefNoColumnList) IsNil() bool          { return s == nil }
+func (s *RefNoColumnList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *RefNoColumnList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneRefNoColumn(qb *orm.QB, model *RefNoColumn) (*RefNoColumn, error) {
 	err := qb.ReadOne()
@@ -491,6 +515,9 @@ func (s *PointerReceiverList) Pointers() []any     { return nil }
 func (s *PointerReceiverList) Len() int             { return len(*s) }
 func (s *PointerReceiverList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *PointerReceiverList) Append() fmt.Fielder  { v := &PointerReceiver{}; *s = append(*s, v); return v }
+func (s *PointerReceiverList) IsNil() bool          { return s == nil }
+func (s *PointerReceiverList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *PointerReceiverList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOnePointerReceiver(qb *orm.QB, model *PointerReceiver) (*PointerReceiver, error) {
 	err := qb.ReadOne()
@@ -556,6 +583,9 @@ func (s *MockParentList) Pointers() []any     { return nil }
 func (s *MockParentList) Len() int             { return len(*s) }
 func (s *MockParentList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *MockParentList) Append() fmt.Fielder  { v := &MockParent{}; *s = append(*s, v); return v }
+func (s *MockParentList) IsNil() bool          { return s == nil }
+func (s *MockParentList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *MockParentList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneMockParent(qb *orm.QB, model *MockParent) (*MockParent, error) {
 	err := qb.ReadOne()
@@ -610,6 +640,9 @@ func (s *MockChildList) Pointers() []any     { return nil }
 func (s *MockChildList) Len() int             { return len(*s) }
 func (s *MockChildList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *MockChildList) Append() fmt.Fielder  { v := &MockChild{}; *s = append(*s, v); return v }
+func (s *MockChildList) IsNil() bool          { return s == nil }
+func (s *MockChildList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *MockChildList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneMockChild(qb *orm.QB, model *MockChild) (*MockChild, error) {
 	err := qb.ReadOne()
@@ -679,6 +712,9 @@ func (s *UserFormList) Pointers() []any     { return nil }
 func (s *UserFormList) Len() int             { return len(*s) }
 func (s *UserFormList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserFormList) Append() fmt.Fielder  { v := &UserForm{}; *s = append(*s, v); return v }
+func (s *UserFormList) IsNil() bool          { return s == nil }
+func (s *UserFormList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserFormList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *UserForm) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -734,6 +770,9 @@ func (s *LoginFormList) Pointers() []any     { return nil }
 func (s *LoginFormList) Len() int             { return len(*s) }
 func (s *LoginFormList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *LoginFormList) Append() fmt.Fielder  { v := &LoginForm{}; *s = append(*s, v); return v }
+func (s *LoginFormList) IsNil() bool          { return s == nil }
+func (s *LoginFormList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *LoginFormList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *LoginForm) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -772,6 +811,9 @@ func (s *TimeSlotResponseList) Pointers() []any     { return nil }
 func (s *TimeSlotResponseList) Len() int             { return len(*s) }
 func (s *TimeSlotResponseList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *TimeSlotResponseList) Append() fmt.Fielder  { v := &TimeSlotResponse{}; *s = append(*s, v); return v }
+func (s *TimeSlotResponseList) IsNil() bool          { return s == nil }
+func (s *TimeSlotResponseList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *TimeSlotResponseList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *Address) ModelName() string {
 	return "address"
@@ -806,6 +848,9 @@ func (s *AddressList) Pointers() []any     { return nil }
 func (s *AddressList) Len() int             { return len(*s) }
 func (s *AddressList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *AddressList) Append() fmt.Fielder  { v := &Address{}; *s = append(*s, v); return v }
+func (s *AddressList) IsNil() bool          { return s == nil }
+func (s *AddressList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *AddressList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneAddress(qb *orm.QB, model *Address) (*Address, error) {
 	err := qb.ReadOne()
@@ -847,7 +892,7 @@ func (m *UserWithJSON) EncodeFields(w fmt.FieldWriter) {
 	w.String("name", m.Name)
 	w.String("email", m.Email)
 	w.String("bio", m.Bio)
-	if m.HomeAddr != nil { w.Object("home_addr", m.HomeAddr) } else { w.Null("home_addr") }
+	w.Object("home_addr", &m.HomeAddr)
 }
 
 func (m *UserWithJSON) DecodeFields(r fmt.FieldReader) error {
@@ -855,8 +900,7 @@ func (m *UserWithJSON) DecodeFields(r fmt.FieldReader) error {
 	if v, ok := r.String("name"); ok { m.Name = v }
 	if v, ok := r.String("email"); ok { m.Email = v }
 	if v, ok := r.String("bio"); ok { m.Bio = v }
-	if m.HomeAddr == nil { m.HomeAddr = new(Address) }
-	if !r.Object("home_addr", m.HomeAddr) { m.HomeAddr = nil }
+	r.Object("home_addr", &m.HomeAddr)
 	return nil
 }
 
@@ -867,6 +911,9 @@ func (s *UserWithJSONList) Pointers() []any     { return nil }
 func (s *UserWithJSONList) Len() int             { return len(*s) }
 func (s *UserWithJSONList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserWithJSONList) Append() fmt.Fielder  { v := &UserWithJSON{}; *s = append(*s, v); return v }
+func (s *UserWithJSONList) IsNil() bool          { return s == nil }
+func (s *UserWithJSONList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserWithJSONList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *UserWithJSON) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -923,6 +970,9 @@ func (s *WithPointersList) Pointers() []any     { return nil }
 func (s *WithPointersList) Len() int             { return len(*s) }
 func (s *WithPointersList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *WithPointersList) Append() fmt.Fielder  { v := &WithPointers{}; *s = append(*s, v); return v }
+func (s *WithPointersList) IsNil() bool          { return s == nil }
+func (s *WithPointersList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *WithPointersList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func ReadOneWithPointers(qb *orm.QB, model *WithPointers) (*WithPointers, error) {
 	err := qb.ReadOne()
@@ -974,6 +1024,9 @@ func (s *MCPResponseList) Pointers() []any     { return nil }
 func (s *MCPResponseList) Len() int             { return len(*s) }
 func (s *MCPResponseList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *MCPResponseList) Append() fmt.Fielder  { v := &MCPResponse{}; *s = append(*s, v); return v }
+func (s *MCPResponseList) IsNil() bool          { return s == nil }
+func (s *MCPResponseList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *MCPResponseList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *PlainResponse) ModelName() string {
 	return "plain_response"
@@ -1008,6 +1061,9 @@ func (s *PlainResponseList) Pointers() []any     { return nil }
 func (s *PlainResponseList) Len() int             { return len(*s) }
 func (s *PlainResponseList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *PlainResponseList) Append() fmt.Fielder  { v := &PlainResponse{}; *s = append(*s, v); return v }
+func (s *PlainResponseList) IsNil() bool          { return s == nil }
+func (s *PlainResponseList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *PlainResponseList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *UserWithNoTilde) ModelName() string {
 	return "user_with_no_tilde"
@@ -1042,6 +1098,9 @@ func (s *UserWithNoTildeList) Pointers() []any     { return nil }
 func (s *UserWithNoTildeList) Len() int             { return len(*s) }
 func (s *UserWithNoTildeList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserWithNoTildeList) Append() fmt.Fielder  { v := &UserWithNoTilde{}; *s = append(*s, v); return v }
+func (s *UserWithNoTildeList) IsNil() bool          { return s == nil }
+func (s *UserWithNoTildeList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserWithNoTildeList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *UserWithNoTilde) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -1097,6 +1156,9 @@ func (s *UserWithNoTildeAndMinList) Pointers() []any     { return nil }
 func (s *UserWithNoTildeAndMinList) Len() int             { return len(*s) }
 func (s *UserWithNoTildeAndMinList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *UserWithNoTildeAndMinList) Append() fmt.Fielder  { v := &UserWithNoTildeAndMin{}; *s = append(*s, v); return v }
+func (s *UserWithNoTildeAndMinList) IsNil() bool          { return s == nil }
+func (s *UserWithNoTildeAndMinList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *UserWithNoTildeAndMinList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *UserWithNoTildeAndMin) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -1152,6 +1214,9 @@ func (s *ShortAutoIncList) Pointers() []any     { return nil }
 func (s *ShortAutoIncList) Len() int             { return len(*s) }
 func (s *ShortAutoIncList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *ShortAutoIncList) Append() fmt.Fielder  { v := &ShortAutoInc{}; *s = append(*s, v); return v }
+func (s *ShortAutoIncList) IsNil() bool          { return s == nil }
+func (s *ShortAutoIncList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *ShortAutoIncList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *ShortAutoInc) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -1173,3 +1238,4 @@ func ReadAllShortAutoInc(qb *orm.QB) (*ShortAutoIncList, error) {
 	)
 	return &results, err
 }
+

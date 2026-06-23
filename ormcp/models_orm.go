@@ -36,6 +36,9 @@ func (s *QueryArgsList) Pointers() []any     { return nil }
 func (s *QueryArgsList) Len() int             { return len(*s) }
 func (s *QueryArgsList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *QueryArgsList) Append() fmt.Fielder  { v := &QueryArgs{}; *s = append(*s, v); return v }
+func (s *QueryArgsList) IsNil() bool          { return s == nil }
+func (s *QueryArgsList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *QueryArgsList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *QueryArgs) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
@@ -71,7 +74,11 @@ func (s *ExecArgsList) Pointers() []any     { return nil }
 func (s *ExecArgsList) Len() int             { return len(*s) }
 func (s *ExecArgsList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *ExecArgsList) Append() fmt.Fielder  { v := &ExecArgs{}; *s = append(*s, v); return v }
+func (s *ExecArgsList) IsNil() bool          { return s == nil }
+func (s *ExecArgsList) EncodeFields(_ fmt.FieldWriter) {}
+func (s *ExecArgsList) DecodeFields(_ fmt.FieldReader) error { return nil }
 
 func (m *ExecArgs) Validate(action byte) error {
 	return fmt.ValidateFields(action, m)
 }
+

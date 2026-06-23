@@ -220,7 +220,10 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (s *%sList) Pointers() []any     { return nil }\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) Len() int             { return len(*s) }\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) At(i int) fmt.Fielder { return (*s)[i] }\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n\n", info.Name, info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n", info.Name, info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) IsNil() bool          { return s == nil }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ fmt.FieldWriter) {}\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ fmt.FieldReader) error { return nil }\n\n", info.Name))
 
 		hasValidation := info.IsForm
 		if !hasValidation {
