@@ -189,3 +189,50 @@ type Model struct {
 	}
 	t.Fatal("field IDs not found")
 }
+
+func TestGenerate_RawField(t *testing.T) {
+	src := `package p
+// ormc:formonly
+type Model struct {
+	Config string ` + "`" + `json:"raw"` + "`" + `
+}
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseStructsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	if !strings.Contains(s, "{Name: \"config\", Type: fmt.FieldRaw") {
+		t.Errorf("config field should map to FieldRaw")
+	}
+
+	// Verify EncodeFields uses w.Raw()
+	if !strings.Contains(s, "w.Raw(\"config\", m.Config)") {
+		t.Errorf("missing expected w.Raw for FieldRaw in EncodeFields")
+	}
+	if strings.Contains(s, "w.String(\"config\", m.Config)") {
+		t.Errorf("unexpected w.String for FieldRaw in EncodeFields")
+	}
+
+	// Verify DecodeFields uses r.Raw()
+	if !strings.Contains(s, "if v, ok := r.Raw(\"config\"); ok { m.Config = v }") {
+		t.Errorf("missing expected r.Raw for FieldRaw in DecodeFields")
+	}
+	if strings.Contains(s, "r.String(\"config\")") {
+		t.Errorf("unexpected r.String for FieldRaw in DecodeFields")
+	}
+}

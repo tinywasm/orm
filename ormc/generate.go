@@ -123,8 +123,10 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (m *%s) EncodeFields(w fmt.FieldWriter) {\n", info.Name))
 		for _, f := range info.Fields {
 			switch f.Type {
-			case fmt.FieldText, fmt.FieldRaw:
+			case fmt.FieldText:
 				buf.Write(fmt.Sprintf("\tw.String(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+			case fmt.FieldRaw:
+				buf.Write(fmt.Sprintf("\tw.Raw(\"%s\", m.%s)\n", f.ColumnName, f.Name))
 			case fmt.FieldInt:
 				buf.Write(fmt.Sprintf("\tw.Int(\"%s\", int64(m.%s))\n", f.ColumnName, f.Name))
 			case fmt.FieldFloat:
@@ -140,7 +142,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 					buf.Write(fmt.Sprintf("\tw.Object(\"%s\", &m.%s)\n", f.ColumnName, f.Name))
 				}
 			case fmt.FieldIntSlice:
-				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n\t\t\tarr.Int(int64(x))\n\t\t}\n\t}\n", f.ColumnName, f.Name, f.Name))
+				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n\t\t\tarr.Int(int64(x))\n\t\t}\n\t\tarr.Close()\n\t}\n", f.ColumnName, f.Name, f.Name))
 			case fmt.FieldStructSlice:
 				isPtr := fmt.HasPrefix(f.GoType, "[]*")
 				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n", f.ColumnName, f.Name, f.Name))
@@ -149,7 +151,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				} else {
 					buf.Write("\t\t\tarr.Object(&x)\n")
 				}
-				buf.Write("\t\t}\n\t}\n")
+				buf.Write("\t\t}\n\t\tarr.Close()\n\t}\n")
 			}
 		}
 		buf.Write("}\n\n")
@@ -157,8 +159,10 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r fmt.FieldReader) error {\n", info.Name))
 		for _, f := range info.Fields {
 			switch f.Type {
-			case fmt.FieldText, fmt.FieldRaw:
+			case fmt.FieldText:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.String(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
+			case fmt.FieldRaw:
+				buf.Write(fmt.Sprintf("\tif v, ok := r.Raw(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
 			case fmt.FieldInt:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Int(\"%s\"); ok { m.%s = %s(v) }\n", f.ColumnName, f.Name, f.GoType))
 			case fmt.FieldFloat:
