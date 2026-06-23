@@ -31,7 +31,7 @@ func (p *Provider) Tools() []mcp.Tool {
 }
 
 // encodeSchema encodes a fmt.Fielder as a JSON schema string for InputSchema.
-func encodeSchema(f fmt.Fielder) string {
+func encodeSchema(f fmt.Encodable) string {
 	var s string
 	_ = json.Encode(f, &s)
 	return s

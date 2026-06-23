@@ -6,8 +6,8 @@ require (
 	github.com/tinywasm/context v0.0.18
 	github.com/tinywasm/fmt v0.24.4
 	github.com/tinywasm/json v0.5.4
-	github.com/tinywasm/mcp v0.1.9
-	github.com/tinywasm/orm v0.0.0
+	github.com/tinywasm/mcp v0.1.11
+	github.com/tinywasm/orm v0.9.8
 )
 
 require (
@@ -17,4 +17,3 @@ require (
 	github.com/tinywasm/unixid v0.2.23 // indirect
 )
 
-replace github.com/tinywasm/orm => ../
