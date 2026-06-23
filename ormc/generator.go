@@ -60,23 +60,49 @@ type StructInfo struct {
 	Relations         []RelationInfo   // populated by ResolveRelations; used by GenerateForFile
 }
 
-// resolveTypeAlias checks if name is a type alias (type name = underlying) declared
-// in node and returns the underlying primitive name, or name unchanged if not found.
-func resolveTypeAlias(node *ast.File, name string) string {
-	for _, decl := range node.Decls {
-		genDecl, ok := decl.(*ast.GenDecl)
-		if !ok {
+// buildAliasMap scans all .go files in dir and returns a map of
+// type alias name → underlying type name (only one-level, primitive aliases).
+func buildAliasMap(dir string) map[string]string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	aliases := map[string]string{}
+	fset := token.NewFileSet()
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".go" {
 			continue
 		}
-		for _, spec := range genDecl.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok || !ts.Assign.IsValid() || ts.Name.Name != name {
+		f, err := parser.ParseFile(fset, filepath.Join(dir, e.Name()), nil, 0)
+		if err != nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
 				continue
 			}
-			if ident, ok := ts.Type.(*ast.Ident); ok {
-				return ident.Name
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok || !ts.Assign.IsValid() {
+					continue
+				}
+				if ident, ok := ts.Type.(*ast.Ident); ok {
+					aliases[ts.Name.Name] = ident.Name
+				}
 			}
 		}
+	}
+	return aliases
+}
+
+// resolveAlias resolves a type name through the alias map (one level).
+func resolveAlias(aliases map[string]string, name string) string {
+	if aliases == nil {
+		return name
+	}
+	if u, ok := aliases[name]; ok {
+		return u
 	}
 	return name
 }
@@ -148,7 +174,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 									if fmt.Contains(comment.Text, "orm:typed_fields") {
 										wantTypedFields = true
 									}
-									if fmt.Contains(comment.Text, "orm:no_db") {
+									if fmt.Contains(comment.Text, "orm:no_db") || fmt.Contains(comment.Text, "ormc:formonly") {
 										noDB = true
 									}
 									if fmt.Contains(comment.Text, "orm:form_widgets") {
@@ -168,6 +194,8 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 	if !structFound {
 		return StructInfo{}, fmt.Err("Struct not found in file")
 	}
+
+	aliases := buildAliasMap(filepath.Dir(goFile))
 
 	modelName := detectModelName(node, structName)
 	declared := modelName != ""
@@ -248,7 +276,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 
 			if eltIdent, ok := elt.(*ast.Ident); ok {
-				eltName := resolveTypeAlias(node, eltIdent.Name)
+				eltName := resolveAlias(aliases, eltIdent.Name)
 				if eltName == "byte" && !isEltPointer {
 					typeStr = "[]byte"
 				} else {
@@ -261,7 +289,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 		}
 
-		typeStr = resolveTypeAlias(node, typeStr)
+		typeStr = resolveAlias(aliases, typeStr)
 
 		if typeStr == "time.Time" {
 			g.log(fmt.Sprintf("Warning: time.Time not allowed for field %s.%s; use int64+tinywasm/time. Skipping.", structName, fieldName))
