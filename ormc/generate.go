@@ -122,36 +122,78 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 
 		buf.Write(fmt.Sprintf("func (m *%s) EncodeFields(w fmt.FieldWriter) {\n", info.Name))
 		for _, f := range info.Fields {
+			var line string
 			switch f.Type {
 			case fmt.FieldText:
-				buf.Write(fmt.Sprintf("\tw.String(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.String(\"%s\", m.%s)", f.ColumnName, f.Name)
 			case fmt.FieldRaw:
-				buf.Write(fmt.Sprintf("\tw.Raw(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.Raw(\"%s\", m.%s)", f.ColumnName, f.Name)
 			case fmt.FieldInt:
-				buf.Write(fmt.Sprintf("\tw.Int(\"%s\", int64(m.%s))\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.Int(\"%s\", int64(m.%s))", f.ColumnName, f.Name)
 			case fmt.FieldFloat:
-				buf.Write(fmt.Sprintf("\tw.Float(\"%s\", float64(m.%s))\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.Float(\"%s\", float64(m.%s))", f.ColumnName, f.Name)
 			case fmt.FieldBool:
-				buf.Write(fmt.Sprintf("\tw.Bool(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.Bool(\"%s\", m.%s)", f.ColumnName, f.Name)
 			case fmt.FieldBlob:
-				buf.Write(fmt.Sprintf("\tw.Bytes(\"%s\", m.%s)\n", f.ColumnName, f.Name))
+				line = fmt.Sprintf("w.Bytes(\"%s\", m.%s)", f.ColumnName, f.Name)
 			case fmt.FieldStruct:
 				if f.IsPointer {
-					buf.Write(fmt.Sprintf("\tif m.%s != nil { w.Object(\"%s\", m.%s) } else { w.Null(\"%s\") }\n", f.Name, f.ColumnName, f.Name, f.ColumnName))
+					if f.OmitEmpty {
+						line = fmt.Sprintf("w.Object(\"%s\", m.%s)", f.ColumnName, f.Name)
+					} else {
+						buf.Write(fmt.Sprintf("\tif m.%s != nil { w.Object(\"%s\", m.%s) } else { w.Null(\"%s\") }\n", f.Name, f.ColumnName, f.Name, f.ColumnName))
+					}
 				} else {
-					buf.Write(fmt.Sprintf("\tw.Object(\"%s\", &m.%s)\n", f.ColumnName, f.Name))
+					line = fmt.Sprintf("w.Object(\"%s\", &m.%s)", f.ColumnName, f.Name)
 				}
 			case fmt.FieldIntSlice:
-				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n\t\t\tarr.Int(int64(x))\n\t\t}\n\t\tarr.Close()\n\t}\n", f.ColumnName, f.Name, f.Name))
+				if f.OmitEmpty {
+					buf.Write(fmt.Sprintf("\tif len(m.%s) != 0 {\n", f.Name))
+				}
+				buf.Write(fmt.Sprintf("\t\t{\n\t\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\t\tfor _, x := range m.%s {\n\t\t\t\tarr.Int(int64(x))\n\t\t\t}\n\t\t\tarr.Close()\n\t\t}\n", f.ColumnName, f.Name, f.Name))
+				if f.OmitEmpty {
+					buf.Write("\t}\n")
+				}
 			case fmt.FieldStructSlice:
 				isPtr := fmt.HasPrefix(f.GoType, "[]*")
-				buf.Write(fmt.Sprintf("\t{\n\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\tfor _, x := range m.%s {\n", f.ColumnName, f.Name, f.Name))
-				if isPtr {
-					buf.Write("\t\t\tif x != nil { arr.Object(x) }\n")
-				} else {
-					buf.Write("\t\t\tarr.Object(&x)\n")
+				if f.OmitEmpty {
+					buf.Write(fmt.Sprintf("\tif len(m.%s) != 0 {\n", f.Name))
 				}
-				buf.Write("\t\t}\n\t\tarr.Close()\n\t}\n")
+				buf.Write(fmt.Sprintf("\t\t{\n\t\t\tarr := w.Array(\"%s\", len(m.%s))\n\t\t\tfor _, x := range m.%s {\n", f.ColumnName, f.Name, f.Name))
+				if isPtr {
+					buf.Write("\t\t\t\tif x != nil { arr.Object(x) }\n")
+				} else {
+					buf.Write("\t\t\t\tarr.Object(&x)\n")
+				}
+				buf.Write("\t\t\t}\n\t\t\tarr.Close()\n\t\t}\n")
+				if f.OmitEmpty {
+					buf.Write("\t}\n")
+				}
+			}
+
+			if f.OmitEmpty && line != "" {
+				guard := ""
+				switch f.Type {
+				case fmt.FieldText:
+					guard = fmt.Sprintf("m.%s != \"\"", f.Name)
+				case fmt.FieldRaw, fmt.FieldBlob:
+					guard = fmt.Sprintf("len(m.%s) != 0", f.Name)
+				case fmt.FieldInt, fmt.FieldFloat:
+					guard = fmt.Sprintf("m.%s != 0", f.Name)
+				case fmt.FieldBool:
+					guard = fmt.Sprintf("m.%s", f.Name)
+				case fmt.FieldStruct:
+					if f.IsPointer {
+						guard = fmt.Sprintf("m.%s != nil", f.Name)
+					}
+				}
+				if guard != "" {
+					buf.Write(fmt.Sprintf("\tif %s { %s }\n", guard, line))
+					continue
+				}
+			}
+			if line != "" {
+				buf.Write("\t" + line + "\n")
 			}
 		}
 		buf.Write("}\n\n")
