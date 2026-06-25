@@ -6,7 +6,7 @@ require (
 	github.com/tinywasm/context v0.0.18
 	github.com/tinywasm/fmt v0.24.4
 	github.com/tinywasm/json v0.5.5
-	github.com/tinywasm/mcp v0.1.11
+	github.com/tinywasm/mcp v0.1.12
 	github.com/tinywasm/orm v0.9.10
 )
 
