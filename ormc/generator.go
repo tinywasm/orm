@@ -232,6 +232,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		dbTag := ""
 		jsonTag := ""
 		inputTag := ""
+		omitEmptyTag := false
 		if field.Tag != nil {
 			tagVal := fmt.Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
 			parts := fmt.Convert(tagVal).Split(" ")
@@ -242,6 +243,9 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 					jsonTag = fmt.Convert(p).TrimPrefix(`json:"`).TrimSuffix(`"`).String()
 				} else if fmt.HasPrefix(p, "input:\"") {
 					inputTag = fmt.Convert(p).TrimPrefix(`input:"`).TrimSuffix(`"`).String()
+				} else if fmt.HasPrefix(p, "omitempty:\"") {
+					v := fmt.Convert(p).TrimPrefix(`omitempty:"`).TrimSuffix(`"`).String()
+					omitEmptyTag = (v == "true")
 				}
 			}
 		}
@@ -395,7 +399,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 		}
 
-		omitEmpty := false
+		omitEmpty := omitEmptyTag
 		if jsonTag != "" {
 			parts := fmt.Convert(jsonTag).Split(",")
 			for _, p := range parts {

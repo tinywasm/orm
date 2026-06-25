@@ -236,3 +236,67 @@ type Model struct {
 		t.Errorf("unexpected r.String for FieldRaw in DecodeFields")
 	}
 }
+
+func TestGenerate_OmitEmpty(t *testing.T) {
+	src := `package p
+// ormc:formonly
+type Model struct {
+	Text  string ` + "`" + `omitempty:"true"` + "`" + `
+	Raw   string ` + "`" + `json:"raw,omitempty"` + "`" + `
+	Int   int    ` + "`" + `json:",omitempty"` + "`" + `
+	Bool  bool   ` + "`" + `omitempty:"true"` + "`" + `
+	Child *Child ` + "`" + `omitempty:"true"` + "`" + `
+	Plain string
+}
+// ormc:formonly
+type Child struct { X string }
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseStructsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	// Verify schema has OmitEmpty: true
+	if !strings.Contains(s, "{Name: \"text\", Type: fmt.FieldText, OmitEmpty: true}") {
+		t.Errorf("text field should have OmitEmpty: true in schema")
+	}
+	if !strings.Contains(s, "{Name: \"raw\", Type: fmt.FieldRaw, OmitEmpty: true}") {
+		t.Errorf("raw field should have OmitEmpty: true in schema")
+	}
+
+	// Verify EncodeFields has guards
+	if !strings.Contains(s, "if m.Text != \"\" { w.String(\"text\", m.Text) }") {
+		t.Errorf("missing guard for Text")
+	}
+	if !strings.Contains(s, "if len(m.Raw) != 0 { w.Raw(\"raw\", m.Raw) }") {
+		t.Errorf("missing guard for Raw")
+	}
+	if !strings.Contains(s, "if m.Int != 0 { w.Int(\"int\", int64(m.Int)) }") {
+		t.Errorf("missing guard for Int")
+	}
+	if !strings.Contains(s, "if m.Bool { w.Bool(\"bool\", m.Bool) }") {
+		t.Errorf("missing guard for Bool")
+	}
+	if !strings.Contains(s, "if m.Child != nil { w.Object(\"child\", m.Child) }") {
+		t.Errorf("missing guard for Child")
+	}
+
+	// Verify Plain field does NOT have a guard
+	if !strings.Contains(s, "\tw.String(\"plain\", m.Plain)") {
+		t.Errorf("Plain field should not have a guard")
+	}
+}
