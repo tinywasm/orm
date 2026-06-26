@@ -6,6 +6,7 @@ The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (
 
 - [Why use this ORM?](WHY.md)
 - [Why package-level schema variables?](WHY_PACKAGE_LEVEL_SCHEMA.md)
+- [Why ormc generates so much code (and why it's free)](WHY_GENERATED_CODE_IS_FREE.md)
 
 
 ## 1. Primary Architectural Pattern: Dependency Injection and Explicit Models

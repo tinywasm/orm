@@ -12,4 +12,3 @@ require (
 
 require github.com/tinywasm/modfind v0.0.4 // indirect
 
-replace github.com/tinywasm/orm => ../
