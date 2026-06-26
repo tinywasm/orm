@@ -161,6 +161,15 @@ Todo en `tinywasm/orm/ormc`. No tocar el runtime del ORM.
   Mantener intactas las guardas de presencia por campo (`if v, ok := r.String(name); ok { ... }`).
 - `go build ./... && go test ./ormc/...` verdes con la nueva firma antes de seguir.
 
+> **Nota crítica — doble rotura:** el breaking change de `fmt` produce DOS generaciones rotas simultáneas:
+> 1. El **generador** (`ormc`): emite `DecodeFields(r FieldReader) error` → no satisface la nueva interfaz
+>    `fmt.Decodable`. **Este PLAN lo corrige.**
+> 2. Los **`model_orm.go` ya generados** en cada consumidor: también emiten la firma vieja `error`. Seguirán
+>    rotos hasta que se regeneren con el `ormc` nuevo. **Downstream — se coordina en el master plan.**
+>
+> El flujo es: publicar `orm` → consumidores hacen `go get orm@latest` + **ejecutan `ormc` de nuevo** →
+> sus `model_orm.go` pasan a la firma sin `error` → todo compila.
+
 ### Stage 1 — Inferencia de rol desde campos
 - En `generator.go`: borrar el seteo de `isForm`/`noDB` desde `genDecl.Doc` (líneas ~177-182). Mantener
   `orm:typed_fields` (es comportamiento de relación, no rol).
@@ -199,9 +208,21 @@ Casos mínimos, con structs de fixture y aserción sobre el `model_orm.go` gener
   las reglas tinywasm: usa `github.com/tinywasm/fmt` y, si hay widgets, `github.com/tinywasm/form/input`.
 
 ## Fuera de alcance (downstream, otros repos)
-Tras publicar `orm`, **regenerar consumidores** y quitar de sus `model.go` los directivos de rol obsoletos
-(`ormc:form`/`ormc:formonly`/`orm:form_widgets`/`orm:no_db`): `goflare-demo/modules/*`, `mcp`, `devtui`,
-`devbrowser`, etc. Eso se coordina en `tinywasm/docs/REGRESSION_FIX_MASTER_PLAN.md`, no en este plan.
+Tras publicar `orm`, los consumidores afectados deben:
+
+**A. Regenerar `model_orm.go`** (tienen structs en `model.go`/`models.go`): ejecutar `ormc` con la versión
+nueva → la firma generada pasa a `DecodeFields(r fmt.FieldReader)` sin `error`. También quitar de sus
+`model.go` los directivos de rol obsoletos (`ormc:form`/`ormc:formonly`/`orm:form_widgets`/`orm:no_db`):
+`goflare-demo/modules/*`, `mcp`, `devtui`, `devbrowser`, `ormcp`.
+
+**B. Implementan `Decodable` a mano** (no usan `ormc`): actualizar la firma de `DecodeFields` y quitar
+el `return nil`: `json`, `jsvalue`.
+
+**C. Call sites que capturan el `error`** de `DecodeFields`: eliminar la captura del error (el error ya no
+existe; si necesitan errores de parse, leer del reader). Todos los paquetes con `model_orm.go` afectados
+por A ya quedan al día al regenerar.
+
+Eso se coordina en `tinywasm/docs/REGRESSION_FIX_MASTER_PLAN.md`, no en este plan.
 
 ## Tabla de etapas
 
