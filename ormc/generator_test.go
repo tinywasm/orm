@@ -24,12 +24,11 @@ func writeTemp(t *testing.T, content string) string {
 // must produce IsPointer=false so generate.go emits &m.Field instead of nil checks.
 func TestParseStruct_ValueStructField(t *testing.T) {
 	src := `package p
-// ormc:formonly
 type Parent struct {
+	ID    int ` + "`" + `db:"pk"` + "`" + `
 	Name  string
 	Child Child
 }
-// ormc:formonly
 type Child struct { X string }
 `
 	g := New()
@@ -57,12 +56,11 @@ type Child struct { X string }
 // TestParseStruct_PointerStructField checks that pointer struct fields keep IsPointer=true.
 func TestParseStruct_PointerStructField(t *testing.T) {
 	src := `package p
-// ormc:formonly
 type Parent struct {
+	ID    int ` + "`" + `db:"pk"` + "`" + `
 	Name  string
 	Child *Child
 }
-// ormc:formonly
 type Child struct { X string }
 `
 	g := New()
@@ -88,9 +86,8 @@ type Child struct { X string }
 func TestParseStruct_TypeAlias(t *testing.T) {
 	src := `package p
 type MyID = string
-// ormc:formonly
 type Model struct {
-	ID   MyID
+	ID   MyID ` + "`" + `db:"pk"` + "`" + `
 	Name string
 }
 `
@@ -115,14 +112,12 @@ func TestGenerate_E2E(t *testing.T) {
 type MyID = string
 type MyInt = int
 
-// ormc:formonly
 type Parent struct {
-	ID    MyID
+	ID    MyID  ` + "`" + `db:"pk"` + "`" + `
 	Count MyInt
 	Child Child
 }
 
-// ormc:formonly
 type Child struct {
 	X string
 }
@@ -169,8 +164,8 @@ type Child struct {
 func TestParseStruct_SliceOfTypeAlias(t *testing.T) {
 	src := `package p
 type MyInt = int
-// ormc:formonly
 type Model struct {
+	ID  int ` + "`" + `db:"pk"` + "`" + `
 	IDs []MyInt
 }
 `
@@ -192,8 +187,8 @@ type Model struct {
 
 func TestGenerate_RawField(t *testing.T) {
 	src := `package p
-// ormc:formonly
 type Model struct {
+	ID     int ` + "`" + `db:"pk"` + "`" + `
 	Config string ` + "`" + `json:"raw"` + "`" + `
 }
 `
@@ -239,8 +234,8 @@ type Model struct {
 
 func TestGenerate_OmitEmpty(t *testing.T) {
 	src := `package p
-// ormc:formonly
 type Model struct {
+	ID    int    ` + "`" + `db:"pk"` + "`" + `
 	Text  string ` + "`" + `omitempty:"true"` + "`" + `
 	Raw   string ` + "`" + `json:"raw,omitempty"` + "`" + `
 	Int   int    ` + "`" + `json:",omitempty"` + "`" + `
@@ -248,7 +243,6 @@ type Model struct {
 	Child *Child ` + "`" + `omitempty:"true"` + "`" + `
 	Plain string
 }
-// ormc:formonly
 type Child struct { X string }
 `
 	tmpFile := writeTemp(t, src)

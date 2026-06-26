@@ -12,6 +12,12 @@ import (
 	"github.com/tinywasm/fmt"
 )
 
+const (
+	tagInput   = "input:\""
+	tagDB      = "db:\""
+	tagExclude = "-"
+)
+
 type FieldInfo struct {
 	Name       string
 	ColumnName string
@@ -159,7 +165,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 
 	var targetStruct *ast.StructType
 	var structFound bool
-	var isForm, noDB, wantTypedFields bool
+	var wantTypedFields bool
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		if genDecl, ok := n.(*ast.GenDecl); ok {
@@ -173,12 +179,6 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 								for _, comment := range genDecl.Doc.List {
 									if fmt.Contains(comment.Text, "orm:typed_fields") {
 										wantTypedFields = true
-									}
-									if fmt.Contains(comment.Text, "orm:no_db") || fmt.Contains(comment.Text, "ormc:formonly") {
-										noDB = true
-									}
-									if fmt.Contains(comment.Text, "orm:form_widgets") {
-										isForm = true
 									}
 								}
 							}
@@ -208,17 +208,18 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		ModelName:         modelName,
 		PackageName:       node.Name.Name,
 		ModelNameDeclared: declared,
-		IsForm:            isForm,
-		NoDB:              noDB,
 		WantTypedFields:   wantTypedFields,
 	}
 
-	if info.NoDB && info.WantTypedFields {
-		g.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
-		info.WantTypedFields = false
-	}
-
 	pkFound := false
+	hasForm := false
+	hasDB := false
+
+	type fieldTags struct {
+		inputTag string
+	}
+	allTags := make([]fieldTags, 0)
+
 	for _, field := range targetStruct.Fields.List {
 		if len(field.Names) == 0 {
 			continue // Anonymous field, skip for now
@@ -237,12 +238,12 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			tagVal := fmt.Convert(field.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
 			parts := fmt.Convert(tagVal).Split(" ")
 			for _, p := range parts {
-				if fmt.HasPrefix(p, "db:\"") {
-					dbTag = fmt.Convert(p).TrimPrefix(`db:"`).TrimSuffix(`"`).String()
+				if fmt.HasPrefix(p, tagDB) {
+					dbTag = fmt.Convert(p).TrimPrefix(tagDB).TrimSuffix(`"`).String()
 				} else if fmt.HasPrefix(p, "json:\"") {
 					jsonTag = fmt.Convert(p).TrimPrefix(`json:"`).TrimSuffix(`"`).String()
-				} else if fmt.HasPrefix(p, "input:\"") {
-					inputTag = fmt.Convert(p).TrimPrefix(`input:"`).TrimSuffix(`"`).String()
+				} else if fmt.HasPrefix(p, tagInput) {
+					inputTag = fmt.Convert(p).TrimPrefix(tagInput).TrimSuffix(`"`).String()
 				} else if fmt.HasPrefix(p, "omitempty:\"") {
 					v := fmt.Convert(p).TrimPrefix(`omitempty:"`).TrimSuffix(`"`).String()
 					omitEmptyTag = (v == "true")
@@ -250,7 +251,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 		}
 
-		if dbTag == "-" {
+		if dbTag == tagExclude {
 			continue
 		}
 
@@ -346,12 +347,6 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 				name = ""
 			}
 			if name != "" && name != "-" {
-				if !noDB {
-					return StructInfo{}, fmt.Err(
-						"field", fieldName,
-						"json name tag has no effect on DB structs: column name is always derived from the field name; remove the json name or declare the struct as orm:no_db",
-					)
-				}
 				colName = name
 			}
 		}
@@ -365,9 +360,11 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			fieldIsPK = true
 			pkFound = true
 			pk = true
+			hasDB = true
 		}
 
 		if dbTag != "" {
+			hasDB = true
 			tagParts := fmt.Convert(dbTag).Split(",")
 			for _, p := range tagParts {
 				switch {
@@ -429,8 +426,34 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			OmitEmpty:  omitEmpty,
 		}
 
-		if isForm {
-			if inputTag == "-" {
+		if inputTag != "" && inputTag != tagExclude {
+			hasForm = true
+		}
+
+		info.Fields = append(info.Fields, fi)
+		allTags = append(allTags, fieldTags{inputTag: inputTag})
+	}
+
+	if len(info.Fields) == 0 {
+		g.log(fmt.Sprintf("Warning: struct %s skipped (no serializable fields)", info.Name))
+		return StructInfo{}, nil
+	}
+
+	info.IsForm = hasForm
+	info.NoDB = !hasDB
+
+	if info.NoDB && info.WantTypedFields {
+		g.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
+		info.WantTypedFields = false
+	}
+
+	// Second pass for widgets/modifiers now that info.IsForm is known
+	for i := range info.Fields {
+		fi := &info.Fields[i]
+		inputTag := allTags[i].inputTag
+
+		if info.IsForm {
+			if inputTag == tagExclude {
 				// No widget
 			} else if inputTag != "" {
 				typeName := fmt.Convert(inputTag).Split(",")[0]
@@ -448,18 +471,16 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 						fi.WidgetConstructor = ctor
 					}
 				}
-				parseInputModifiers(inputTag, &fi)
+				parseInputModifiers(inputTag, fi)
 			} else {
 				if ctor, ok := defaultWidgets[fi.GoType]; ok {
 					fi.WidgetConstructor = ctor
 				}
 			}
-		} else if inputTag != "" && inputTag != "-" {
-			// Struct without form directive, but with input: tag for modifiers
-			parseInputModifiers(inputTag, &fi)
+		} else if inputTag != "" && inputTag != tagExclude {
+			// Struct without form role (no input: tag with widget), but with input: tag for modifiers
+			parseInputModifiers(inputTag, fi)
 		}
-
-		info.Fields = append(info.Fields, fi)
 	}
 
 	return info, nil
@@ -626,7 +647,7 @@ func (g *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
 							continue
 						}
 						if len(info.Fields) == 0 {
-							g.log(fmt.Sprintf("Warning: %s has no mappable fields; skipping", typeSpec.Name.Name))
+							// Already logged in ParseStruct
 							continue
 						}
 						info.SourceFile = path

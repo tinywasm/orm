@@ -198,7 +198,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		}
 		buf.Write("}\n\n")
 
-		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r fmt.FieldReader) error {\n", info.Name))
+		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r fmt.FieldReader) {\n", info.Name))
 		for _, f := range info.Fields {
 			switch f.Type {
 			case fmt.FieldText:
@@ -239,7 +239,6 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				buf.Write("\t\t}\n\t}\n")
 			}
 		}
-		buf.Write("\treturn nil\n")
 		buf.Write("}\n\n")
 
 		// RenameProvider
@@ -269,7 +268,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n", info.Name, info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) IsNil() bool          { return s == nil }\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ fmt.FieldWriter) {}\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ fmt.FieldReader) error { return nil }\n\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ fmt.FieldReader) {}\n\n", info.Name))
 
 		hasValidation := info.IsForm
 		if !hasValidation {
