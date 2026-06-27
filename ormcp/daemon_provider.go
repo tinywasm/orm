@@ -33,6 +33,7 @@ func (p *DaemonProvider) Tools() []mcp.Tool {
 		p.schemaToolD(),
 		p.queryToolD(),
 		p.execToolD(),
+		p.exportToolD(),
 	}
 }
 
@@ -48,6 +49,21 @@ func (p *DaemonProvider) schemaToolD() mcp.Tool {
 			db := p.db
 			p.mu.RUnlock()
 			return executeSchema(db, req)
+		},
+	}
+}
+
+func (p *DaemonProvider) exportToolD() mcp.Tool {
+	return mcp.Tool{
+		Name:        "db_export_schema",
+		Description: "Export the full CREATE TABLE DDL for all synced tables as SQL text.",
+		Resource:    "database",
+		Action:      'r',
+		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
+			p.mu.RLock()
+			db := p.db
+			p.mu.RUnlock()
+			return executeExportSchema(db, req)
 		},
 	}
 }

@@ -59,6 +59,21 @@ type Fielder interface {
 - `OmitEmpty bool` — hint from `json:",omitempty"` struct tag (read by `tinywasm/json`)
 - `Permitted Permitted` — validation rules from `validate:` struct tag (read by `fmt.ValidateFielder`)
 
+### 3.1.2. Extended Metadata (`FieldExt`)
+
+For database-specific features like Foreign Keys and `ON DELETE` actions, the ORM uses `orm.FieldExt`.
+
+```go
+type FieldExt struct {
+    fmt.Field
+    Ref       string // Target table name
+    RefColumn string // Target column name (empty = auto PK)
+    OnDelete  string // Action: cascade, set_null, restrict, no_action
+}
+```
+
+Models with foreign keys implement `SchemaExt() []orm.FieldExt`, which is used by `ddl.TopologicalSort` and DDL exporters.
+
 > `Pointers()` are only called by the Executor logic for the operations that require them.
 
 ### 3.1.1. Typed Serialization Codec (`Encodable`/`Decodable`)
@@ -266,6 +281,9 @@ func (db *DB) Tx(fn func(tx *DB) error) error
 func (db *DB) CreateTable(m Model) error
 func (db *DB) DropTable(m Model) error
 func (db *DB) CreateDatabase(name string) error
+
+func (db *DB) RegisteredModels() []fmt.Model
+func (db *DB) Compiler() Compiler
 
 // SyncSchema reconciles one table to the given fields, with no model instance.
 // Used by the dev tool (tinywasm/app) during hot-reload.
@@ -483,7 +501,28 @@ ormc [-root <dir>]
 
 ---
 
-## 5. Advantages of this Design
+## 5. DDL Export and Tooling
+
+The ORM supports database-agnostic DDL export via the `orm/ddl` package and the `ddlc` tool.
+
+### 5.1. `ddl` Package
+
+- `ddl.Exporter`: Interface implemented by SQL compilers (`sqlt`, `postgres`) to generate DDL from models.
+- `ddl.TopologicalSort`: Orders models based on foreign key dependencies using Kahn's algorithm.
+
+### 5.2. `ddlc` CLI Tool
+
+Generates full SQL schema from models without a live database.
+
+```bash
+ddlc -dialect postgres -root ./models -out schema.sql
+```
+
+### 5.3. MCP Tool: `db_export_schema`
+
+Available via `ormcp`, this tool allows LLMs to retrieve the full database schema as SQL.
+
+## 6. Advantages of this Design
 
 1. **Fully Stdlib & WASM Compatible:** `tinywasm/orm` core does not import `database/sql` nor interact with the OS or Network.
 2. **Separation of Concerns:** The ORM packs/unpacks data (`Model` → `Query`). `Compiler` translates logic (`Query` → `Plan`). `Executor` runs operations on DB Engine.

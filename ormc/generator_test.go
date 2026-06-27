@@ -294,3 +294,51 @@ type Child struct { X string }
 		t.Errorf("Plain field should not have a guard")
 	}
 }
+
+func TestOnDelete_Default(t *testing.T) {
+	src := `package p
+type Session struct {
+	UserID int64 ` + "`" + `db:"ref=users"` + "`" + `
+}
+`
+	g := New()
+	info, err := g.ParseStruct("Session", writeTemp(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Fields[0].OnDelete != "" {
+		t.Errorf("expected empty OnDelete (default), got %q", info.Fields[0].OnDelete)
+	}
+}
+
+func TestOnDelete_Restrict(t *testing.T) {
+	src := `package p
+type AuditLog struct {
+	UserID int64 ` + "`" + `db:"ref=users,on_delete=restrict"` + "`" + `
+}
+`
+	g := New()
+	info, err := g.ParseStruct("AuditLog", writeTemp(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Fields[0].OnDelete != "restrict" {
+		t.Errorf("expected restrict, got %q", info.Fields[0].OnDelete)
+	}
+}
+
+func TestOnDelete_Invalid(t *testing.T) {
+	src := `package p
+type Bad struct {
+	UserID int64 ` + "`" + `db:"ref=users,on_delete=wipe"` + "`" + `
+}
+`
+	g := New()
+	_, err := g.ParseStruct("Bad", writeTemp(t, src))
+	if err == nil {
+		t.Fatal("expected error for invalid on_delete value")
+	}
+	if !strings.Contains(err.Error(), "must be cascade|set_null|restrict|no_action") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}

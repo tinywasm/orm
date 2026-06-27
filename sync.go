@@ -63,6 +63,7 @@ func (db *DB) syncModel(m fmt.Model) error {
 	if err := db.CreateTable(m); err != nil {
 		return wrapSyncErr(err)
 	}
+	db.registerModel(m)
 
 	// 2. Cast Executor to TableIntrospector
 	introspector, ok := db.exec.(TableIntrospector)
