@@ -299,7 +299,35 @@ func (g *Generator) ExportSQL(root string, exporter ddl.Exporter) (string, error
 }
 ```
 
-## S10 — `orm/cmd/ddlc/main.go` (nuevo)
+## S10 — `orm/cmd/ddlc/` — módulo separado
+
+**CRÍTICO: `cmd/ddlc` debe tener su propio `go.mod`.**
+`ormcp` ya sigue este patrón (tiene `ormcp/go.mod` con `replace ../`).
+Si `cmd/ddlc` NO tiene su propio `go.mod`, el módulo raíz `orm/go.mod` heredará
+`sqlt` y `postgres` como dependencias — violando la regla de que `orm` no depende de sus adaptadores.
+
+### `orm/cmd/ddlc/go.mod` (nuevo)
+
+```
+module github.com/tinywasm/orm/cmd/ddlc
+
+go 1.25
+
+require (
+    github.com/tinywasm/fmt v0.x.x
+    github.com/tinywasm/orm v0.x.x
+    github.com/tinywasm/orm/ormc v0.x.x   // si ormc tiene go.mod propio, sino usar replace
+    github.com/tinywasm/postgres v0.x.x
+    github.com/tinywasm/sqlt v0.x.x
+)
+
+replace github.com/tinywasm/orm => ../../
+```
+
+> Si `ormc` no tiene `go.mod` propio (es sub-paquete del módulo `orm`), usar solo
+> `replace github.com/tinywasm/orm => ../../` y acceder `ormc` como `github.com/tinywasm/orm/ormc`.
+
+### `orm/cmd/ddlc/main.go` (nuevo)
 
 ```go
 package main
@@ -347,7 +375,9 @@ func main() {
 }
 ```
 
-`cmd/ddlc` es el ÚNICO lugar que importa `sqlt` y `postgres`. `ormc` no los importa.
+**Verificación obligatoria tras implementar:**
+`cat orm/go.mod` NO debe contener `sqlt` ni `postgres`.
+Solo `orm/cmd/ddlc/go.mod` los referencia.
 
 ## S11 — `orm/ormcp/tool_export_schema.go` (nuevo)
 
@@ -409,6 +439,8 @@ Registrar `toolExportSchema` en `orm/ormcp/provider.go` (slice de `Tools()`).
 
 ## Constraints Parte 2
 
+- RULE: `cmd/ddlc` DEBE tener su propio `go.mod` (igual que `ormcp`). Sin él, `orm/go.mod` heredará `sqlt` y `postgres` — incorrecto.
+- RULE: `orm/go.mod` NO debe contener `sqlt` ni `postgres` al terminar. Verificar con `cat orm/go.mod`.
 - RULE: `ormc` NO importa `sqlt` ni `postgres`. Exporter inyectado por `cmd/ddlc`.
 - RULE: `modelStub.Pointers()` retorna nil — DDL nunca llama Pointers.
 - RULE: `modelStub` implementa `SchemaExt()` con `OnDelete` para que FKs e índices sean correctos.
