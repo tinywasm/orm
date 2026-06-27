@@ -28,6 +28,7 @@ type FieldInfo struct {
 	AutoInc    bool
 	Ref        string
 	RefColumn  string
+	OnDelete   string
 	IsPK       bool
 	OldName    string
 	GoType     string
@@ -358,7 +359,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		isID, isPK := fmt.IDorPrimaryKey(modelName, fieldName)
 
 		var pk, unique, notNull, autoInc bool
-		var ref, refCol, oldName string
+		var ref, refCol, oldName, onDelete string
 
 		fieldIsPK := false
 		if (isID || isPK) && !pkFound {
@@ -374,6 +375,13 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			tagParts := fmt.Convert(dbTag).Split(",")
 			for _, p := range tagParts {
 				switch {
+				case fmt.HasPrefix(p, "on_delete="):
+					onDelete = fmt.Convert(p).TrimPrefix("on_delete=").String()
+					switch onDelete {
+					case "cascade", "set_null", "restrict", "no_action":
+					default:
+						return StructInfo{}, fmt.Errf("on_delete= must be cascade|set_null|restrict|no_action, got %q", onDelete)
+					}
 				case p == "pk":
 					if !fieldIsPK {
 						pk = true
@@ -425,6 +433,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			AutoInc:    autoInc,
 			Ref:        ref,
 			RefColumn:  refCol,
+			OnDelete:   onDelete,
 			IsPK:       fieldIsPK,
 			OldName:    oldName,
 			GoType:     typeStr,

@@ -8,6 +8,7 @@ type DB struct {
 	exec     Executor
 	compiler Compiler
 	log      func(messages ...any)
+	models   []fmt.Model
 }
 
 // New creates a new DB instance.
@@ -183,3 +184,16 @@ func (db *DB) Close() error {
 func (db *DB) RawExecutor() Executor {
 	return db.exec
 }
+
+func (db *DB) registerModel(m fmt.Model) {
+	for _, existing := range db.models {
+		if existing.ModelName() == m.ModelName() {
+			return
+		}
+	}
+	db.models = append(db.models, m)
+}
+
+func (db *DB) RegisteredModels() []fmt.Model { return db.models }
+
+func (db *DB) Compiler() Compiler { return db.compiler }

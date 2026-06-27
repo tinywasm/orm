@@ -23,6 +23,7 @@ func (p *Provider) Tools() []mcp.Tool {
 	tools := []mcp.Tool{
 		queryTool(p.db),
 		execTool(p.db),
+		exportTool(p.db),
 	}
 	if _, ok := p.db.RawExecutor().(orm.SchemaInspector); ok {
 		tools = append([]mcp.Tool{schemaTool(p.db)}, tools...)

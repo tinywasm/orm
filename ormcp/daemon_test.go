@@ -12,8 +12,8 @@ import (
 func TestDaemonProvider_Tools(t *testing.T) {
 	p := NewDaemonProvider()
 	tools := p.Tools()
-	if len(tools) != 3 {
-		t.Errorf("expected 3 tools, got %d", len(tools))
+	if len(tools) != 4 {
+		t.Errorf("expected 4 tools, got %d", len(tools))
 	}
 
 	names := map[string]bool{}
@@ -21,7 +21,7 @@ func TestDaemonProvider_Tools(t *testing.T) {
 		names[tool.Name] = true
 	}
 
-	for _, name := range []string{"db_schema", "db_query", "db_exec"} {
+	for _, name := range []string{"db_schema", "db_query", "db_exec", "db_export_schema"} {
 		if !names[name] {
 			t.Errorf("missing tool %s", name)
 		}

@@ -8,4 +8,5 @@ type FieldExt struct {
 	fmt.Field
 	Ref       string // FK: target table name. Empty = no FK.
 	RefColumn string // FK: target column. Empty = auto-detect PK of Ref table.
+	OnDelete  string // Override ON DELETE action. Empty = CASCADE (default for all FKs).
 }
