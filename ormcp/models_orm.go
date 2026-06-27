@@ -4,6 +4,7 @@ package ormcp
 
 import (
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/form/input"
 )
 
 func (m *QueryArgs) ModelName() string {
@@ -11,7 +12,7 @@ func (m *QueryArgs) ModelName() string {
 }
 
 var _schemaQueryArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText},
+		{Name: "SQL", Type: fmt.FieldText, NotNull: true, Widget: input.Text()},
 	}
 
 func (m *QueryArgs) Schema() []fmt.Field { return _schemaQueryArgs }
@@ -39,12 +40,16 @@ func (s *QueryArgsList) IsNil() bool          { return s == nil }
 func (s *QueryArgsList) EncodeFields(_ fmt.FieldWriter) {}
 func (s *QueryArgsList) DecodeFields(_ fmt.FieldReader) {}
 
+func (m *QueryArgs) Validate(action byte) error {
+	return fmt.ValidateFields(action, m)
+}
+
 func (m *ExecArgs) ModelName() string {
 	return "exec_args"
 }
 
 var _schemaExecArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText},
+		{Name: "SQL", Type: fmt.FieldText, NotNull: true, Widget: input.Text()},
 	}
 
 func (m *ExecArgs) Schema() []fmt.Field { return _schemaExecArgs }
@@ -71,4 +76,8 @@ func (s *ExecArgsList) Append() fmt.Fielder  { v := &ExecArgs{}; *s = append(*s,
 func (s *ExecArgsList) IsNil() bool          { return s == nil }
 func (s *ExecArgsList) EncodeFields(_ fmt.FieldWriter) {}
 func (s *ExecArgsList) DecodeFields(_ fmt.FieldReader) {}
+
+func (m *ExecArgs) Validate(action byte) error {
+	return fmt.ValidateFields(action, m)
+}
 
