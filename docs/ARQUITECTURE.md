@@ -347,7 +347,52 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 
 ---
 
-## 4. `ormc` Code Generator
+## 4. DDL and Schema Export
+
+### 4.1. `orm/ddl` Sub-package
+
+Provides tools for schema extraction and manipulation independent of the database engine.
+
+- **`Exporter` Interface**: Implemented by SQL compilers (`sqlt`, `postgres`) to generate full `CREATE TABLE` scripts.
+- **`TopologicalSort(models)`**: Orders models by foreign key dependencies (Kahn's algorithm) so parent tables are created before child tables.
+
+### 4.2. Foreign Keys and `on_delete`
+
+The `db:"ref=table"` tag marks a field as a foreign key. By default, the ORM assumes `ON DELETE CASCADE`. This can be overridden using the `on_delete=` modifier:
+
+```go
+type Session struct {
+    UserID int64 `db:"ref=users,on_delete=restrict"`
+}
+```
+
+Supported values: `cascade`, `set_null`, `restrict`, `no_action`.
+
+### 4.3. Model Registry
+
+The `DB` instance maintains a registry of all models that have been synchronized via `db.Sync()` or `db.SyncSchema()`. This registry is used by the `db_export_schema` tool and runtime introspection.
+
+```go
+func (db *DB) RegisteredModels() []fmt.Model
+```
+
+### 4.4. Schema Export Tools
+
+#### 4.4.1. `ddlc` CLI
+
+A standalone tool that scans a directory for models and exports the entire schema as a SQL file.
+
+```bash
+ddlc -root ./models -dialect postgres -out schema.sql
+```
+
+#### 4.4.2. `db_export_schema` (MCP Tool)
+
+Exposes the DDL export functionality to LLMs and development agents through the Model Context Protocol (MCP). It uses the current database connection's compiler to generate the dialect-specific SQL.
+
+---
+
+## 5. `ormc` Code Generator
 
 `ormc` reads `model.go` / `models.go` files and generates `*_orm.go` with the `Schema()`, `Pointers()`, `Validate()`, typed read helpers, and optional field descriptors.
 
@@ -483,7 +528,7 @@ ormc [-root <dir>]
 
 ---
 
-## 5. Advantages of this Design
+## 6. Advantages of this Design
 
 1. **Fully Stdlib & WASM Compatible:** `tinywasm/orm` core does not import `database/sql` nor interact with the OS or Network.
 2. **Separation of Concerns:** The ORM packs/unpacks data (`Model` → `Query`). `Compiler` translates logic (`Query` → `Plan`). `Executor` runs operations on DB Engine.

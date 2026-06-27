@@ -16,7 +16,12 @@ type TableIntrospector interface {
 // Wraps (table, fields) in a synthetic model and delegates to the existing
 // Sync algorithm (CreateTable + AddColumn + introspective rename/safe-drop).
 func (db *DB) SyncSchema(table string, fields []fmt.Field) error {
-	return db.Sync(schemaModel{name: table, fields: fields})
+	m := schemaModel{name: table, fields: fields}
+	if err := db.Sync(m); err != nil {
+		return err
+	}
+	db.registerModel(m)
+	return nil
 }
 
 type schemaModel struct {
@@ -63,6 +68,7 @@ func (db *DB) syncModel(m fmt.Model) error {
 	if err := db.CreateTable(m); err != nil {
 		return wrapSyncErr(err)
 	}
+	db.registerModel(m)
 
 	// 2. Cast Executor to TableIntrospector
 	introspector, ok := db.exec.(TableIntrospector)

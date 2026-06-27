@@ -5,7 +5,87 @@ import (
 	"os"
 
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/ddl"
 )
+
+type modelStub struct {
+	name   string
+	schema []fmt.Field
+	exts   []orm.FieldExt
+}
+
+func (m *modelStub) ModelName() string              { return m.name }
+func (m *modelStub) Schema() []fmt.Field            { return m.schema }
+func (m *modelStub) Pointers() []any                { return nil }
+func (m *modelStub) IsNil() bool                    { return m == nil }
+func (m *modelStub) EncodeFields(_ fmt.FieldWriter) {}
+func (m *modelStub) DecodeFields(_ fmt.FieldReader) {}
+func (m *modelStub) SchemaExt() []orm.FieldExt      { return m.exts }
+
+func newModelStub(info StructInfo) *modelStub {
+	stub := &modelStub{name: info.ModelName}
+	for _, f := range info.Fields {
+		field := fmt.Field{
+			Name:    f.ColumnName,
+			Type:    goTypeToFieldType(f.GoType),
+			NotNull: f.NotNull,
+		}
+		if f.PK || f.Unique || f.AutoInc {
+			field.DB = &fmt.FieldDB{PK: f.PK, Unique: f.Unique, AutoInc: f.AutoInc}
+		}
+		if f.Maximum > 0 {
+			if field.DB == nil {
+				field.DB = &fmt.FieldDB{}
+			}
+			field.Permitted.Maximum = f.Maximum
+		}
+		stub.schema = append(stub.schema, field)
+		if f.Ref != "" {
+			stub.exts = append(stub.exts, orm.FieldExt{
+				Field:     field,
+				Ref:       f.Ref,
+				RefColumn: f.RefColumn,
+				OnDelete:  f.OnDelete,
+			})
+		}
+	}
+	return stub
+}
+
+func goTypeToFieldType(goType string) fmt.FieldType {
+	switch goType {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64":
+		return fmt.FieldInt
+	case "float32", "float64":
+		return fmt.FieldFloat
+	case "bool":
+		return fmt.FieldBool
+	case "[]byte":
+		return fmt.FieldBlob
+	default:
+		return fmt.FieldText
+	}
+}
+
+func (o *Generator) ExportSQL(root string, exporter ddl.Exporter) (string, error) {
+	infos, err := o.parseDir(root)
+	if err != nil {
+		return "", err
+	}
+	var models []fmt.Model
+	for _, info := range infos {
+		if info.NoDB {
+			continue
+		}
+		models = append(models, newModelStub(info))
+	}
+	if len(models) == 0 {
+		return "", nil
+	}
+	return exporter.ExportDDL(models)
+}
 
 // GenerateForFile writes ORM implementations for all infos into one file.
 func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error {
@@ -299,6 +379,34 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 					buf.Write(fmt.Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
 				}
 				buf.Write("}\n\n")
+			}
+
+			// SchemaExt
+			hasFK := false
+			for _, f := range info.Fields {
+				if f.Ref != "" {
+					hasFK = true
+					break
+				}
+			}
+			if hasFK {
+				buf.Write(fmt.Sprintf("func (m *%s) SchemaExt() []orm.FieldExt {\n", info.Name))
+				buf.Write("\treturn []orm.FieldExt{\n")
+				schema := fmt.Sprintf("_schema%s", info.Name)
+				for i, f := range info.Fields {
+					if f.Ref == "" {
+						continue
+					}
+					buf.Write(fmt.Sprintf("\t\t{Field: %s[%d], Ref: \"%s\"", schema, i, f.Ref))
+					if f.RefColumn != "" {
+						buf.Write(fmt.Sprintf(", RefColumn: \"%s\"", f.RefColumn))
+					}
+					if f.OnDelete != "" {
+						buf.Write(fmt.Sprintf(", OnDelete: \"%s\"", f.OnDelete))
+					}
+					buf.Write("},\n")
+				}
+				buf.Write("\t}\n}\n\n")
 			}
 
 			// Typed Read Operations

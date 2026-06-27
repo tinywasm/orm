@@ -28,6 +28,7 @@ type FieldInfo struct {
 	AutoInc    bool
 	Ref        string
 	RefColumn  string
+	OnDelete   string
 	IsPK       bool
 	OldName    string
 	GoType     string
@@ -358,7 +359,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		isID, isPK := fmt.IDorPrimaryKey(modelName, fieldName)
 
 		var pk, unique, notNull, autoInc bool
-		var ref, refCol, oldName string
+		var ref, refCol, onDelete, oldName string
 
 		fieldIsPK := false
 		if (isID || isPK) && !pkFound {
@@ -396,6 +397,13 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 					if len(refParts) > 1 {
 						refCol = refParts[1]
 					}
+				case fmt.HasPrefix(p, "on_delete="):
+					onDelete = fmt.Convert(p).TrimPrefix("on_delete=").String()
+					switch onDelete {
+					case "cascade", "set_null", "restrict", "no_action":
+					default:
+						return StructInfo{}, fmt.Errf("on_delete= must be cascade|set_null|restrict|no_action, got %q", onDelete)
+					}
 				case fmt.HasPrefix(p, "old_name="):
 					oldName = fmt.Convert(p).TrimPrefix("old_name=").String()
 				}
@@ -425,6 +433,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			AutoInc:    autoInc,
 			Ref:        ref,
 			RefColumn:  refCol,
+			OnDelete:   onDelete,
 			IsPK:       fieldIsPK,
 			OldName:    oldName,
 			GoType:     typeStr,
@@ -801,6 +810,31 @@ func (g *Generator) Run() error {
 	}
 
 	return nil
+}
+
+func (g *Generator) parseDir(dir string) ([]StructInfo, error) {
+	var all []StructInfo
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" || info.Name() == "testdata" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		fileName := info.Name()
+		if fileName == "model.go" || fileName == "models.go" {
+			infos, err := g.parseStructsInFile(path)
+			if err != nil {
+				return nil // skip
+			}
+			all = append(all, infos...)
+		}
+		return nil
+	})
+	return all, err
 }
 
 func (g *Generator) exec(name string, args ...string) error {

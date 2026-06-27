@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/orm"
 )
 
 // writeTemp writes content to a temp file and returns its path.
@@ -292,5 +293,176 @@ type Child struct { X string }
 	// Verify Plain field does NOT have a guard
 	if !strings.Contains(s, "\tw.String(\"plain\", m.Plain)") {
 		t.Errorf("Plain field should not have a guard")
+	}
+}
+
+func TestOnDelete_Default(t *testing.T) {
+	src := `package p
+type Session struct {
+    UserID int64 ` + "`" + `db:"ref=users"` + "`" + `
+}
+`
+	g := New()
+	info, err := g.ParseStruct("Session", writeTemp(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Fields[0].OnDelete != "" {
+		t.Errorf("expected empty OnDelete (defaults to CASCADE), got %q", info.Fields[0].OnDelete)
+	}
+}
+
+func TestOnDelete_Restrict(t *testing.T) {
+	src := `package p
+type Session struct {
+    UserID int64 ` + "`" + `db:"ref=users,on_delete=restrict"` + "`" + `
+}
+`
+	g := New()
+	info, err := g.ParseStruct("Session", writeTemp(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Fields[0].OnDelete != "restrict" {
+		t.Errorf("expected OnDelete restrict, got %q", info.Fields[0].OnDelete)
+	}
+}
+
+func TestOnDelete_Invalid(t *testing.T) {
+	src := `package p
+type Session struct {
+    UserID int64 ` + "`" + `db:"ref=users,on_delete=wipe"` + "`" + `
+}
+`
+	g := New()
+	_, err := g.ParseStruct("Session", writeTemp(t, src))
+	if err == nil {
+		t.Fatal("expected error for invalid on_delete value")
+	}
+	if !fmt.Contains(err.Error(), "must be cascade|set_null|restrict|no_action") {
+		t.Errorf("expected validation error message, got %v", err)
+	}
+}
+
+func TestGenerate_SchemaExt(t *testing.T) {
+	src := `package p
+type Session struct {
+	ID     int64 ` + "`" + `db:"pk"` + "`" + `
+    UserID int64 ` + "`" + `db:"ref=users,on_delete=restrict"` + "`" + `
+}
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseStructsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	if !strings.Contains(s, "func (m *Session) SchemaExt() []orm.FieldExt {") {
+		t.Error("missing SchemaExt implementation")
+	}
+	if !strings.Contains(s, "{Field: _schemaSession[1], Ref: \"users\", OnDelete: \"restrict\"}") {
+		t.Errorf("missing expected SchemaExt entry, got:\n%s", s)
+	}
+}
+
+type mockExporter struct {
+	models []fmt.Model
+}
+
+func (m *mockExporter) ExportDDL(models []fmt.Model) (string, error) {
+	m.models = models
+	return "CREATE TABLE mock", nil
+}
+
+func TestExportSQL_TwoTablesWithFK(t *testing.T) {
+	src := `package p
+type User struct {
+    ID int ` + "`" + `db:"pk"` + "`" + `
+}
+type Session struct {
+    ID     int ` + "`" + `db:"pk"` + "`" + `
+    UserID int ` + "`" + `db:"ref=users,on_delete=cascade"` + "`" + `
+}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.go")
+	os.WriteFile(path, []byte(src), 0644)
+
+	g := New()
+	exporter := &mockExporter{}
+	sql, err := g.ExportSQL(dir, exporter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql != "CREATE TABLE mock" {
+		t.Errorf("expected mock SQL, got %q", sql)
+	}
+	if len(exporter.models) != 2 {
+		t.Errorf("expected 2 models passed to exporter, got %d", len(exporter.models))
+	}
+
+	// Check if stub has FK
+	var session fmt.Model
+	for _, m := range exporter.models {
+		if m.ModelName() == "session" {
+			session = m
+		}
+	}
+	if session == nil {
+		t.Fatal("session model stub not found")
+	}
+	ext, ok := session.(interface{ SchemaExt() []orm.FieldExt })
+	if !ok {
+		t.Fatal("session stub should implement SchemaExt")
+	}
+	exts := ext.SchemaExt()
+	if len(exts) != 1 || exts[0].Ref != "users" || exts[0].OnDelete != "cascade" {
+		t.Errorf("unexpected SchemaExt: %+v", exts)
+	}
+}
+
+func TestModelStub_FieldTypes(t *testing.T) {
+	info := StructInfo{
+		ModelName: "test",
+		Fields: []FieldInfo{
+			{ColumnName: "f1", GoType: "int", NotNull: true},
+			{ColumnName: "f2", GoType: "float64"},
+			{ColumnName: "f3", GoType: "bool"},
+			{ColumnName: "f4", GoType: "[]byte"},
+			{ColumnName: "f5", GoType: "string", Maximum: 100},
+		},
+	}
+	stub := newModelStub(info)
+	schema := stub.Schema()
+	if len(schema) != 5 {
+		t.Fatalf("expected 5 fields, got %d", len(schema))
+	}
+	if schema[0].Type != fmt.FieldInt || !schema[0].NotNull {
+		t.Error("f1 mismatch")
+	}
+	if schema[1].Type != fmt.FieldFloat {
+		t.Error("f2 mismatch")
+	}
+	if schema[2].Type != fmt.FieldBool {
+		t.Error("f3 mismatch")
+	}
+	if schema[3].Type != fmt.FieldBlob {
+		t.Error("f4 mismatch")
+	}
+	if schema[4].Type != fmt.FieldText || schema[4].Permitted.Maximum != 100 {
+		t.Errorf("f5 mismatch: type=%v, max=%d", schema[4].Type, schema[4].Permitted.Maximum)
 	}
 }
