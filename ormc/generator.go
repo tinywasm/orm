@@ -216,7 +216,8 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 	hasDB := false
 
 	type fieldTags struct {
-		inputTag string
+		inputTag    string
+		jsonColName string // non-empty if json tag provided a custom field name
 	}
 	allTags := make([]fieldTags, 0)
 
@@ -340,6 +341,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		}
 
 		colName := fmt.Convert(fieldName).SnakeLow().String()
+		jsonColName := ""
 		if jsonTag != "" {
 			parts := fmt.Convert(jsonTag).Split(",")
 			name := parts[0]
@@ -348,6 +350,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			}
 			if name != "" && name != "-" {
 				colName = name
+				jsonColName = name
 			}
 		}
 		isID, isPK := fmt.IDorPrimaryKey(modelName, fieldName)
@@ -360,7 +363,8 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			fieldIsPK = true
 			pkFound = true
 			pk = true
-			hasDB = true
+			// NOTE: does NOT set hasDB — ID field name alone does not imply DB role.
+			// A struct is DB only if at least one field carries a db: tag (value ≠ "-").
 		}
 
 		if dbTag != "" {
@@ -431,7 +435,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		}
 
 		info.Fields = append(info.Fields, fi)
-		allTags = append(allTags, fieldTags{inputTag: inputTag})
+		allTags = append(allTags, fieldTags{inputTag: inputTag, jsonColName: jsonColName})
 	}
 
 	if len(info.Fields) == 0 {
@@ -442,8 +446,19 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 	info.IsForm = hasForm
 	info.NoDB = !hasDB
 
+	if !info.NoDB {
+		for i, fi := range info.Fields {
+			if allTags[i].jsonColName != "" {
+				return StructInfo{}, fmt.Err(fmt.Sprintf(
+					"field %s.%s: json:\"%s\" is not allowed on DB structs — column name is always derived as snake_case (%s)",
+					structName, fi.Name, allTags[i].jsonColName, fmt.Convert(fi.Name).SnakeLow().String(),
+				))
+			}
+		}
+	}
+
 	if info.NoDB && info.WantTypedFields {
-		g.log(fmt.Sprintf("Warning: orm:typed_fields ignored on no_db struct %s", info.Name))
+		g.log(fmt.Sprintf("Warning: orm:typed_fields ignored on codec-only struct %s", info.Name))
 		info.WantTypedFields = false
 	}
 

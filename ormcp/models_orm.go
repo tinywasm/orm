@@ -11,7 +11,7 @@ func (m *QueryArgs) ModelName() string {
 }
 
 var _schemaQueryArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText, NotNull: true},
+		{Name: "SQL", Type: fmt.FieldText},
 	}
 
 func (m *QueryArgs) Schema() []fmt.Field { return _schemaQueryArgs }
@@ -24,9 +24,8 @@ func (m *QueryArgs) EncodeFields(w fmt.FieldWriter) {
 	w.String("SQL", m.SQL)
 }
 
-func (m *QueryArgs) DecodeFields(r fmt.FieldReader) error {
+func (m *QueryArgs) DecodeFields(r fmt.FieldReader) {
 	if v, ok := r.String("SQL"); ok { m.SQL = v }
-	return nil
 }
 
 type QueryArgsList []*QueryArgs
@@ -38,18 +37,14 @@ func (s *QueryArgsList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *QueryArgsList) Append() fmt.Fielder  { v := &QueryArgs{}; *s = append(*s, v); return v }
 func (s *QueryArgsList) IsNil() bool          { return s == nil }
 func (s *QueryArgsList) EncodeFields(_ fmt.FieldWriter) {}
-func (s *QueryArgsList) DecodeFields(_ fmt.FieldReader) error { return nil }
-
-func (m *QueryArgs) Validate(action byte) error {
-	return fmt.ValidateFields(action, m)
-}
+func (s *QueryArgsList) DecodeFields(_ fmt.FieldReader) {}
 
 func (m *ExecArgs) ModelName() string {
 	return "exec_args"
 }
 
 var _schemaExecArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText, NotNull: true},
+		{Name: "SQL", Type: fmt.FieldText},
 	}
 
 func (m *ExecArgs) Schema() []fmt.Field { return _schemaExecArgs }
@@ -62,9 +57,8 @@ func (m *ExecArgs) EncodeFields(w fmt.FieldWriter) {
 	w.String("SQL", m.SQL)
 }
 
-func (m *ExecArgs) DecodeFields(r fmt.FieldReader) error {
+func (m *ExecArgs) DecodeFields(r fmt.FieldReader) {
 	if v, ok := r.String("SQL"); ok { m.SQL = v }
-	return nil
 }
 
 type ExecArgsList []*ExecArgs
@@ -76,9 +70,5 @@ func (s *ExecArgsList) At(i int) fmt.Fielder { return (*s)[i] }
 func (s *ExecArgsList) Append() fmt.Fielder  { v := &ExecArgs{}; *s = append(*s, v); return v }
 func (s *ExecArgsList) IsNil() bool          { return s == nil }
 func (s *ExecArgsList) EncodeFields(_ fmt.FieldWriter) {}
-func (s *ExecArgsList) DecodeFields(_ fmt.FieldReader) error { return nil }
-
-func (m *ExecArgs) Validate(action byte) error {
-	return fmt.ValidateFields(action, m)
-}
+func (s *ExecArgsList) DecodeFields(_ fmt.FieldReader) {}
 

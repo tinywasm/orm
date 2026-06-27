@@ -201,7 +201,7 @@ func TestOrmc(t *testing.T) {
 			"func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }",
 			"func (s *UserList) Append() fmt.Fielder",
 			"func (m *User) EncodeFields(w fmt.FieldWriter) {",
-			"func (m *User) DecodeFields(r fmt.FieldReader) error {",
+			"func (m *User) DecodeFields(r fmt.FieldReader) {",
 			"func (m *User) IsNil() bool {",
 		}
 
@@ -506,10 +506,13 @@ func TestOrmc(t *testing.T) {
 }
 
 func TestParseStructRejectsJsonNameOnDBModel(t *testing.T) {
+	// A struct with a db: tag is a DB struct. json:"name" on any field of a DB struct
+	// is a compile error — column names are always derived as snake_case from the Go field name.
 	src := `package test
 
-type User struct {
-	FirstName string ` + "`" + `json:"firstName"` + "`" + `
+type Product struct {
+	ID    string ` + "`" + `db:"pk"` + "`" + `
+	Price int64  ` + "`" + `db:"not_null" json:"unitPrice"` + "`" + `
 }
 `
 	tmpDir := t.TempDir()
@@ -517,16 +520,16 @@ type User struct {
 	os.WriteFile(path, []byte(src), 0644)
 
 	o := ormc.New()
-	_, err := o.ParseStruct("User", path)
+	_, err := o.ParseStruct("Product", path)
 	if err == nil {
 		t.Fatal("expected error for json name override on DB struct, got nil")
 	}
 }
 
 func TestParseStructFormOnlyAllowsJsonName(t *testing.T) {
+	// Codec-only struct (no db: tags, no ID convention) — json name is valid and sets ColumnName.
 	src := `package test
 
-// orm:no_db
 type ContactForm struct {
 	FirstName string ` + "`" + `json:"firstName"` + "`" + `
 }

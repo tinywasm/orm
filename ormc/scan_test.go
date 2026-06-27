@@ -31,7 +31,7 @@ func TestScanModules(t *testing.T) {
 	os.MkdirAll(writableDir, 0755)
 	os.WriteFile(filepath.Join(writableDir, "model.go"), []byte(`package main
 type User struct {
-	ID string
+	ID   string `+"`"+`db:"pk"`+"`"+`
 	Name string
 }
 `), 0644)

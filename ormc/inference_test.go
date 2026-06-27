@@ -35,7 +35,7 @@ type Search struct {
 			wantDB:   false,
 		},
 		{
-			name: "DB Only by ID convention",
+			name: "Codec Only — ID field alone does not imply DB (no db: tag)",
 			src: `package p
 type Log struct {
 	ID      int
@@ -43,7 +43,7 @@ type Log struct {
 }
 `,
 			wantForm: false,
-			wantDB:   true,
+			wantDB:   false,
 		},
 		{
 			name: "DB Only by tag",
@@ -81,7 +81,7 @@ type Payload struct {
 			name: "Exclude from Form (DB Only)",
 			src: `package p
 type Secret struct {
-	ID     int
+	ID     int ` + "`" + `db:"pk"` + "`" + `
 	Secret string ` + "`" + `input:"-"` + "`" + `
 }
 `,

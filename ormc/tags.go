@@ -12,8 +12,8 @@ import (
 )
 
 // RewriteModelTags performs in-place struct tag cleanup in the given file.
-// It removes 'form' and 'validate' tags, and strips field names from 'json' tags.
-// For ormc:formonly structs, json field names are preserved (needed for camelCase protocols).
+// It removes 'form' and 'validate' tags, and strips json field names from DB structs.
+// Codec-only structs (no db: tags, no ID convention) preserve their json field names.
 func (o *Generator) RewriteModelTags(path string) error {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -38,16 +38,6 @@ func (o *Generator) RewriteModelTags(path string) error {
 			continue
 		}
 
-		noDB := false
-		if genDecl.Doc != nil {
-			for _, c := range genDecl.Doc.List {
-				if fmt.Contains(c.Text, "orm:no_db") {
-					noDB = true
-					break
-				}
-			}
-		}
-
 		for _, spec := range genDecl.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
 			if !ok {
@@ -57,6 +47,26 @@ func (o *Generator) RewriteModelTags(path string) error {
 			if !ok {
 				continue
 			}
+
+			// Infer DB role from field tags only — same rule as generator.go ParseStruct.
+			// A struct is DB only if at least one field has a db: tag with value ≠ "-".
+			// The ID field name convention alone does NOT imply DB role.
+			hasDB := false
+			for _, f := range structType.Fields.List {
+				if len(f.Names) == 0 {
+					continue
+				}
+				rawTag := ""
+				if f.Tag != nil {
+					rawTag = fmt.Convert(f.Tag.Value).TrimPrefix("`").TrimSuffix("`").String()
+				}
+				dbVal := extractTag(rawTag, "db")
+				if dbVal != "" && dbVal != "-" {
+					hasDB = true
+					break
+				}
+			}
+			noDB := !hasDB
 
 			for _, field := range structType.Fields.List {
 				if field.Tag == nil {
@@ -100,6 +110,20 @@ func (o *Generator) RewriteModelTags(path string) error {
 	}
 
 	return os.WriteFile(path, result, 0644)
+}
+
+// extractTag returns the value of a specific key from a raw struct tag string.
+// e.g. extractTag(`db:"pk" json:"id"`, "db") → "pk"
+func extractTag(raw, key string) string {
+	prefix := key + ":\""
+	parts := fmt.Convert(raw).Split(" ")
+	for _, p := range parts {
+		if fmt.HasPrefix(p, prefix) {
+			val := fmt.Convert(p).TrimPrefix(prefix).TrimSuffix("\"").String()
+			return val
+		}
+	}
+	return ""
 }
 
 // rewriteRawTag cleans a raw struct tag string.

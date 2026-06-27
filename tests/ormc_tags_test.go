@@ -68,9 +68,10 @@ func TestRewriteModelTagsFormOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelPath := filepath.Join(tmpDir, "model.go")
 
+	// No struct-level directive — codec-only is inferred from field tags:
+	// no db: tags, no ID field convention → json names must be preserved.
 	input := `package test
 
-// orm:no_db
 type Params struct {
 	ProtocolVersion string ` + "`" + `json:"protocolVersion"` + "`" + `
 	ClientInfo      string ` + "`" + `json:"clientInfo,omitempty" validate:"required"` + "`" + `
@@ -115,9 +116,9 @@ func TestRewriteModelTagsFormOnlyStripsRaw(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelPath := filepath.Join(tmpDir, "model.go")
 
+	// No struct-level directive — codec-only inferred from field tags.
 	input := `package test
 
-// orm:no_db
 type Repro struct {
 	Result string ` + "`" + `json:",omitempty,raw"` + "`" + `
 	Error  string ` + "`" + `json:",omitempty,raw"` + "`" + `

@@ -83,7 +83,7 @@ func (*PointerReceiver) ModelName() string { return "ptr_table" }
 
 // MockParent / MockChild: relation auto-detection fixture.
 type MockParent struct {
-	ID   string
+	ID   string `db:"pk"`
 	Name string
 	Kids []MockChild // no tag — relation auto-detected via MockChild.MockParentID
 }
@@ -104,17 +104,11 @@ type UserForm struct {
 	Age      int64
 }
 
-// orm:form_widgets
-// orm:no_db
 type LoginForm struct {
 	Email    string `input:"email,required"`
 	Password string `input:"password,required"`
 }
 
-// TimeSlotResponse is a pure transport struct: formonly, no db: tags, no input: tags.
-// Represents the pattern used by MCP tools that return computed results (e.g. availability slots).
-// It must generate a {Name}List for json.Encode slice support even though it has no DB layer.
-// orm:no_db
 type TimeSlotResponse struct {
 	StartUTC int64
 	EndUTC   int64
@@ -125,7 +119,6 @@ type Address struct {
 	City   string
 }
 
-// orm:form_widgets
 type UserWithJSON struct {
 	ID       string  `db:"pk"`
 	Name     string  ``
@@ -140,19 +133,16 @@ type WithPointers struct {
 	Addr  *Address // pointer to struct -> FieldStruct
 }
 
-// orm:no_db
 type MCPResponse struct {
 	Result fmt.RawJSON
 	Error  fmt.RawJSON `json:",omitempty"`
 }
 
-// orm:no_db
 type PlainResponse struct {
 	Message string `json:"message"`
 	Code    string `json:",omitempty"`
 }
 
-// orm:form_widgets
 type UserWithNoTilde struct {
 	ID     string `db:"pk"`
 	Nombre string `input:"required,notilde"`

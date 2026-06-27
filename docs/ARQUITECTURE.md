@@ -374,7 +374,7 @@ or recognized for role assignment. The role controls which layers are generated:
 | Signal in fields | Role | Extra generated |
 |---|---|---|
 | ≥1 field with `input:"..."` ≠ `"-"` | **form** | `Widget` on each field; imports `form/input` |
-| ≥1 field with `db:"..."` ≠ `"-"` **or** `ID` field (convention) | **DB** | `FieldDB`; synced as table |
+| ≥1 field with `db:"..."` ≠ `"-"` | **DB** | `FieldDB`; synced as table |
 | neither | **codec-only (DTO)** | nothing extra; `NoDB=true` (no table sync) |
 
 **Composition — the roles are independent and additive:**
@@ -389,8 +389,8 @@ or recognized for role assignment. The role controls which layers are generated:
 
 > **Escape hatches (field level only):**
 > - `input:"-"` on a field → excluded from form (doesn't count toward `isForm`).
-> - `db:"-"` on a field → excluded from DB, including on `ID` (overrides the convention).
-> - These are the only overrides; no struct-level directives are needed.
+> - `db:"-"` on a field → excluded from DB mapping (field ignored by ORM).
+> - No struct-level directives are needed or recognized.
 
 ### 4.3. CLI flags
 
@@ -423,7 +423,7 @@ ormc [-root <dir>]
 |-----|-----------|-----------------|
 | `json:",omitempty"` | allowed — sets `OmitEmpty: true` in schema | allowed |
 | `json:"name"` | **compile error** — column name always derived from field name as `snake_case` | allowed — sets `ColumnName` |
-| `db:"pk,unique,..."` | allowed — sets constraints | `db:"-"` to exclude; other values ignored |
+| `db:"pk,unique,..."` | allowed — sets constraints; at least one `db:` field makes the struct DB | `db:"-"` to exclude |
 | `input:"<type|modifiers>"` | marks field as form input (sets `isForm` for the struct) | same |
 | `input:"-"` | excludes field from form; doesn't count toward `isForm` | same |
 
