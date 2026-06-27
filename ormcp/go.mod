@@ -8,7 +8,7 @@ require (
 	github.com/tinywasm/form v0.2.9
 	github.com/tinywasm/json v0.5.6
 	github.com/tinywasm/mcp v0.1.13
-	github.com/tinywasm/orm v0.9.13
+	github.com/tinywasm/orm v0.9.14
 )
 
 require (
