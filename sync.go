@@ -16,7 +16,12 @@ type TableIntrospector interface {
 // Wraps (table, fields) in a synthetic model and delegates to the existing
 // Sync algorithm (CreateTable + AddColumn + introspective rename/safe-drop).
 func (db *DB) SyncSchema(table string, fields []fmt.Field) error {
-	return db.Sync(schemaModel{name: table, fields: fields})
+	m := &schemaModel{name: table, fields: fields}
+	if err := db.Sync(m); err != nil {
+		return err
+	}
+	db.registerModel(m)
+	return nil
 }
 
 type schemaModel struct {
@@ -24,9 +29,12 @@ type schemaModel struct {
 	fields []fmt.Field
 }
 
-func (s schemaModel) ModelName() string   { return s.name }
-func (s schemaModel) Schema() []fmt.Field { return s.fields }
-func (s schemaModel) Pointers() []any     { return nil }
+func (s *schemaModel) ModelName() string             { return s.name }
+func (s *schemaModel) Schema() []fmt.Field           { return s.fields }
+func (s *schemaModel) Pointers() []any               { return nil }
+func (s *schemaModel) IsNil() bool                   { return s == nil }
+func (s *schemaModel) EncodeFields(fmt.FieldWriter) {}
+func (s *schemaModel) DecodeFields(fmt.FieldReader) {}
 
 // Sync reconciles the database to match the given models.
 // Emits CreateTable, AddColumn, RenameColumn, and DropColumn Actions;
