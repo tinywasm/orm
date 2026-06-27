@@ -53,7 +53,7 @@ type Fielder interface {
 ```
 
 `fmt.Field` carries:
-- `Name string` — column name, always derived from the Go field name as `snake_case`. Custom JSON names via `json:"name"` are **only** honored on `orm:no_db` structs (JSON/form-only, no DB mapping). Placing `json:"name"` on a DB struct is a compile-time error from `ormc`.
+- `Name string` — column name, always derived from the Go field name as `snake_case`. Custom JSON names via `json:"name"` are **only** honored on structs with no `db:` tags (JSON/form-only, no DB mapping). Placing `json:"name"` on a DB struct is a compile-time error from `ormc`.
 - `Type fmt.FieldType` — `FieldText`, `FieldInt`, `FieldFloat`, `FieldBool`, `FieldBlob`, `FieldStruct`
 - `PK bool`, `Unique bool`, `NotNull bool`, `AutoInc bool` — schema constraints
 - `OmitEmpty bool` — hint from `json:",omitempty"` struct tag (read by `tinywasm/json`)
@@ -355,32 +355,42 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 
 | Element | Generated | Condition |
 |---------|-----------|-----------|
+| `ModelName()` | always | any struct |
 | `Schema()` | always | any struct |
 | `Pointers()` | always | any struct |
-| `ModelName()` | always | any struct |
-| `Validate()` | when constraints exist | `NotNull`, `Permitted`, or `// orm:form_widgets` |
-| `ReadOne<Name>` / `ReadAll<Name>` | always | DB structs only (not `// orm:no_db`) |
-| `<Name>_` field descriptors | **opt-in** | DB structs + `// orm:typed_fields` |
+| `IsNil()` | always | any struct |
+| `EncodeFields()` / `DecodeFields()` | always | any struct |
+| `*List` type | always | any struct (unused code is removed by DCE) |
+| `Widget:` in Schema fields | only if `isForm` | ≥1 field with `input:` tag ≠ `"-"` |
+| `DB: &fmt.FieldDB{...}` in Schema fields | only if `isDB` | ≥1 field with `db:` tag ≠ `"-"` OR `ID` convention |
+| `ReadOne<Name>` / `ReadAll<Name>` | only if `isDB` | same as DB above |
+| `<Name>_` field descriptors | **opt-in** | `// orm:typed_fields` struct comment |
 
-### 4.2. Directives (Doc Comments)
+### 4.2. Role inference (from field tags — no struct directives)
 
-Directives are atomic and composable under the `orm:` prefix:
+`ormc` infers the **role** of each struct from its field tags. No struct-level comment directives are needed
+or recognized for role assignment. The role controls which layers are generated:
 
-| Directive | Effect |
-|-----------|--------|
-| `// orm:form_widgets` | **add** form layer (widgets + `Validate`) |
-| `// orm:no_db` | **remove** DB helpers (`ReadOne`/`ReadAll`) |
-| `// orm:typed_fields` | **add** typed field accessors `User_.Name` |
+| Signal in fields | Role | Extra generated |
+|---|---|---|
+| ≥1 field with `input:"..."` ≠ `"-"` | **form** | `Widget` on each field; imports `form/input` |
+| ≥1 field with `db:"..."` ≠ `"-"` **or** `ID` field (convention) | **DB** | `FieldDB`; synced as table |
+| neither | **codec-only (DTO)** | nothing extra; `NoDB=true` (no table sync) |
 
-**Composition examples:**
+**Composition — the roles are independent and additive:**
 
-| Directives | Generated Layers |
+| Field tags present | Generated layers |
 |---|---|
-| *(none)* | DB only |
-| `// orm:form_widgets` | DB + form |
-| `// orm:form_widgets` + `// orm:no_db` | form layer only |
-| `// orm:no_db` | json/transport only (`Schema` + `Pointers` + `List`) |
-| `// orm:typed_fields` | DB + typed field accessors |
+| *(no tags)* | codec-only: `ModelName`, codec, `*List` |
+| `input:` only | form-only: codec + widgets; no DB sync |
+| `db:` or `ID` only | DB-only: codec + `FieldDB` + table sync; no widgets |
+| `input:` + `db:`/`ID` | full: codec + widgets + `FieldDB` + table sync |
+| `// orm:typed_fields` comment | adds typed field accessors `User_.Name` to any role |
+
+> **Escape hatches (field level only):**
+> - `input:"-"` on a field → excluded from form (doesn't count toward `isForm`).
+> - `db:"-"` on a field → excluded from DB, including on `ID` (overrides the convention).
+> - These are the only overrides; no struct-level directives are needed.
 
 ### 4.3. CLI flags
 
@@ -409,11 +419,13 @@ ormc [-root <dir>]
 
 ### 4.5. Struct tag rules
 
-| Tag | DB struct | `orm:no_db` struct |
+| Tag | DB struct | codec-only / form-only |
 |-----|-----------|-----------------|
 | `json:",omitempty"` | allowed — sets `OmitEmpty: true` in schema | allowed |
 | `json:"name"` | **compile error** — column name always derived from field name as `snake_case` | allowed — sets `ColumnName` |
-| `db:"pk,unique,..."` | allowed — sets constraints | ignored |
+| `db:"pk,unique,..."` | allowed — sets constraints | `db:"-"` to exclude; other values ignored |
+| `input:"<type|modifiers>"` | marks field as form input (sets `isForm` for the struct) | same |
+| `input:"-"` | excludes field from form; doesn't count toward `isForm` | same |
 
 ---
 

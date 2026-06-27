@@ -2,9 +2,10 @@
 
 ## Core Principle
 
-**ormc asigna widgets por defecto segun el Go type del campo.**
-El tag `input:` solo se usa para override o modifiers.
-Solo structs con directiva `// ormc:form` o `// ormc:formonly` generan widgets.
+**ormc infiere el rol del struct desde los tags de campo — sin directivos de struct.**
+Un struct con ≥1 campo `input:` genera widgets (form). Un struct con ≥1 campo `db:` o campo `ID` genera
+FieldDB y se sincroniza como tabla (DB). Los roles son aditivos: un struct puede ser form + DB a la vez.
+El tag `input:` controla tanto el widget override como si el struct es formulario.
 
 ---
 
@@ -36,38 +37,34 @@ graph TD
 
 ---
 
-## Struct Directives
+## Role Inference (from field tags)
 
 ```mermaid
 graph LR
-    subgraph Directives
-        none["(sin directiva)"]
-        form["// ormc:form"]
-        formonly["// ormc:formonly"]
+    subgraph Field_Tags
+        inputTag["`input:\"...\"` en algún campo"]
+        dbTag["`db:\"...\"` en algún campo o campo `ID`"]
+        neither["(sin tags de rol)"]
     end
 
-    none -->|genera| DB[DB: ModelName, ReadOne, ReadAll]
-    none -->|genera| Schema[Schema, Pointers, Validate]
-    none -->|NO genera| Widgets[Widgets en Schema]
-
-    form -->|genera| DB2[DB: ModelName, ReadOne, ReadAll]
-    form -->|genera| Schema2[Schema, Pointers, Validate]
-    form -->|genera| Widgets2[Widgets en Schema]
-
-    formonly -->|NO genera| DB3[DB code]
-    formonly -->|genera| Schema3[Schema, Pointers, Validate]
-    formonly -->|genera| Widgets3[Widgets en Schema]
+    inputTag -->|isForm=true| Widgets[Widgets en Schema + import form/input]
+    dbTag -->|isDB=true| DB[FieldDB + sync tabla]
+    neither -->|codec-only| Codec[Solo ModelName + codec + *List]
 ```
 
-| Directiva | DB/ORM | Widgets |
-| :--- | :--- | :--- |
-| _(ninguna)_ | si | no |
-| `// ormc:form` | si | si |
-| `// ormc:formonly` | no | si |
+| Señal en campos | isForm | isDB | Qué se añade |
+| :--- | :--- | :--- | :--- |
+| ninguna | no | no | solo codec (DTO) |
+| `input:` ≠ `"-"` | **si** | no | widgets; no sync tabla |
+| `db:` ≠ `"-"` o campo `ID` | no | **si** | FieldDB + sync tabla; sin widgets |
+| ambas | **si** | **si** | widgets + FieldDB + sync tabla |
+
+> `input:"-"` excluye ese campo del form pero no cuenta para `isForm`.
+> `db:"-"` excluye ese campo de DB y anula la convención `ID`.
 
 ---
 
-## Widget Assignment (solo structs con form/formonly)
+## Widget Assignment (solo structs con `isForm`)
 
 ### Default por Go type
 
@@ -104,14 +101,15 @@ sequenceDiagram
     rect rgb(240, 240, 240)
     Note over Ormc: Pass 1: collectAllStructs()
     Ormc->>AST: ParseStruct(structAST)
-    Note over AST: Detect directive: form / formonly / none
     Note over AST: Extract tags: db, json, input
-    AST->>AST: If form/formonly: resolve widget
+    Note over AST: Infer hasForm: ≥1 input: ≠ "-"
+    Note over AST: Infer hasDB: ≥1 db: ≠ "-" OR campo ID
+    AST->>AST: If isForm: resolve widget per field
     Note over AST: 1. input:"-" → skip
     Note over AST: 2. input:"type" → inputWidgets[type]
     Note over AST: 3. no tag → defaultWidgets[goType]
     Note over AST: 4. parse modifiers (required, min, max...)
-    AST-->>Ormc: Build FieldInfo
+    AST-->>Ormc: Build FieldInfo (IsForm, NoDB derived)
     end
 
     rect rgb(240, 240, 240)
@@ -121,9 +119,9 @@ sequenceDiagram
 
     rect rgb(240, 240, 240)
     Note over Ormc: Pass 3: GenerateForFile()
-    Ormc->>Gen: Schema() with Widget if form/formonly
+    Ormc->>Gen: Schema() with Widget if isForm
     Ormc->>Gen: Validate() → fmt.ValidateFields()
-    Ormc->>Gen: ModelName, Descriptors, ReadOne/ReadAll if !formonly
+    Ormc->>Gen: ModelName always; FieldDB + ReadOne/ReadAll if isDB
     Note over Gen: Import form/input only if widgets present
     end
 
@@ -176,19 +174,21 @@ graph TD
 
 ## Tag System (Final)
 
-```
-// ormc:form
+No struct-level directives needed. Role is inferred from field tags:
+
+```go
 type User struct {
-    ID        string  `db:"pk"`              // string → input.Text() default
-    Email     string  `input:"email"`        // override → input.Email()
-    Phone     string  `input:"phone"`        // override → input.Phone()
-    BirthDate string  `input:"date"`         // override → input.Date()
-    Bio       string  `input:"textarea"`     // override → input.Textarea()
-    Nick      string  `input:"required,min=3,max=20"` // default text + modifiers
-    Age       int     `db:"not_null"`        // int → input.Number() default
-    Active    bool                           // bool → input.Checkbox() default
-    InternalID string `input:"-"`            // excluded from form
+    ID         string  `db:"pk"`                       // ID convention → isDB=true
+    Email      string  `input:"email"`                 // input: → isForm=true; override → input.Email()
+    Phone      string  `input:"phone"`                 // override → input.Phone()
+    BirthDate  string  `input:"date"`                  // override → input.Date()
+    Bio        string  `input:"textarea"`              // override → input.Textarea()
+    Nick       string  `input:"required,min=3,max=20"` // default text + modifiers
+    Age        int     `db:"not_null"`                 // int → input.Number() default
+    Active     bool                                    // bool → input.Checkbox() default
+    InternalID string  `input:"-"`                     // excluded from form; no Widget
 }
+// Result: isForm=true (has input: fields), isDB=true (ID convention) → full: widgets + FieldDB + sync
 ```
 
 **Rules:**
