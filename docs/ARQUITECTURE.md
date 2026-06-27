@@ -360,11 +360,12 @@ Callers use `errors.Is(err, orm.ErrNotFound)` to branch on error type without st
 | `Pointers()` | always | any struct |
 | `IsNil()` | always | any struct |
 | `EncodeFields()` / `DecodeFields()` | always | any struct |
-| `*List` type | always | any struct (unused code is removed by DCE) |
+| `*List` type + `ReadAll<Name>` | only if `isDB` | ≥1 field with `db:` tag ≠ `"-"` |
 | `Widget:` in Schema fields | only if `isForm` | ≥1 field with `input:` tag ≠ `"-"` |
-| `DB: &fmt.FieldDB{...}` in Schema fields | only if `isDB` | ≥1 field with `db:` tag ≠ `"-"` OR `ID` convention |
+| `Validate()` | if `isForm` OR any `input:` tag | includes `input:"-"` (excluded fields still trigger) |
+| `DB: &fmt.FieldDB{...}` in Schema fields | only if `isDB` | ≥1 field with `db:` tag ≠ `"-"` |
 | `ReadOne<Name>` / `ReadAll<Name>` | only if `isDB` | same as DB above |
-| `<Name>_` field descriptors | **opt-in** | `// orm:typed_fields` struct comment |
+| `<Name>_` typed field accessors | **opt-in per struct** | `// orm:typed_fields` doc comment on the struct |
 
 ### 4.2. Role inference (from field tags — no struct directives)
 
@@ -374,23 +375,76 @@ or recognized for role assignment. The role controls which layers are generated:
 | Signal in fields | Role | Extra generated |
 |---|---|---|
 | ≥1 field with `input:"..."` ≠ `"-"` | **form** | `Widget` on each field; imports `form/input` |
-| ≥1 field with `db:"..."` ≠ `"-"` | **DB** | `FieldDB`; synced as table |
+| ≥1 field with `db:"..."` ≠ `"-"` | **DB** | `FieldDB`; synced as table; `ReadAll*`; `*List` |
 | neither | **codec-only (DTO)** | nothing extra; `NoDB=true` (no table sync) |
 
 **Composition — the roles are independent and additive:**
 
 | Field tags present | Generated layers |
 |---|---|
-| *(no tags)* | codec-only: `ModelName`, codec, `*List` |
-| `input:` only | form-only: codec + widgets; no DB sync |
-| `db:` or `ID` only | DB-only: codec + `FieldDB` + table sync; no widgets |
-| `input:` + `db:`/`ID` | full: codec + widgets + `FieldDB` + table sync |
-| `// orm:typed_fields` comment | adds typed field accessors `User_.Name` to any role |
+| *(no tags)* | codec-only: `ModelName`, codec |
+| `input:` only | form-only: codec + widgets + `Validate`; no DB sync |
+| `db:` only | DB-only: codec + `FieldDB` + table sync + `ReadAll*` + `*List`; no widgets |
+| `input:` + `db:` | full: codec + widgets + `FieldDB` + table sync + `ReadAll*` + `*List` + `Validate` |
 
 > **Escape hatches (field level only):**
-> - `input:"-"` on a field → excluded from form (doesn't count toward `isForm`).
+> - `input:"-"` on a field → excluded from form (doesn't count toward `isForm`), but still triggers `Validate()`.
 > - `db:"-"` on a field → excluded from DB mapping (field ignored by ORM).
-> - No struct-level directives are needed or recognized.
+> - No struct-level directives are needed or recognized for role assignment.
+
+### 4.2.1. Typed Field Accessors (`// orm:typed_fields`)
+
+For DB structs used in query conditions, `ormc` can generate a **typed accessor variable** that
+holds each column name as a string constant. This eliminates hardcoded string literals in
+`.Where(...)`, `orm.Eq(...)`, and `orm.OrderBy(...)` calls.
+
+**How to enable:** add `// orm:typed_fields` as a doc comment on the struct (the line immediately
+above `type`):
+
+```go
+// orm:typed_fields
+type Session struct {
+    ID        string `db:"pk"`
+    UserID    string `db:"ref=users"`
+    ExpiresAt int64
+    IP        string
+}
+```
+
+**What ormc generates:**
+
+```go
+var Session_ = struct {
+    ID        string
+    UserID    string
+    ExpiresAt string
+    IP        string
+}{
+    ID:        "id",
+    UserID:    "user_id",
+    ExpiresAt: "expires_at",
+    IP:        "ip",
+}
+```
+
+**Usage in query conditions:**
+
+```go
+// Without typed_fields — fragile string literals:
+db.Query(&Session{}).Where("expires_at").Gt(now)
+db.Update(s, orm.Eq("id", s.ID))
+
+// With typed_fields — compiler-verified column names:
+db.Query(&Session{}).Where(Session_.ExpiresAt).Gt(now)
+db.Update(s, orm.Eq(Session_.ID, s.ID))
+```
+
+**Rules:**
+- Only available on DB structs (`isDB = true`). Codec-only structs have no column names.
+- Fields excluded with `db:"-"` are **not** included in the accessor.
+- The variable name is always `StructName_` (trailing underscore).
+- The struct type is anonymous — only the variable is exported.
+- `// orm:typed_fields` is the only remaining struct-level directive; it is opt-in, not a role signal.
 
 ### 4.3. CLI flags
 
