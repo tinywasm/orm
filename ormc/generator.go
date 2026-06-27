@@ -59,6 +59,7 @@ type StructInfo struct {
 	Fields            []FieldInfo
 	ModelNameDeclared bool
 	IsForm            bool
+	HasAnyInputTag    bool // true when ≥1 field has input: tag (including input:"-")
 	NoDB              bool
 	WantTypedFields   bool
 	SourceFile        string
@@ -213,6 +214,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 
 	pkFound := false
 	hasForm := false
+	hasAnyInputTag := false
 	hasDB := false
 
 	type fieldTags struct {
@@ -430,8 +432,11 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 			OmitEmpty:  omitEmpty,
 		}
 
-		if inputTag != "" && inputTag != tagExclude {
-			hasForm = true
+		if inputTag != "" {
+			hasAnyInputTag = true
+			if inputTag != tagExclude {
+				hasForm = true
+			}
 		}
 
 		info.Fields = append(info.Fields, fi)
@@ -444,6 +449,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 	}
 
 	info.IsForm = hasForm
+	info.HasAnyInputTag = hasAnyInputTag
 	info.NoDB = !hasDB
 
 	if !info.NoDB {

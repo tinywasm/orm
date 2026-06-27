@@ -270,7 +270,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ fmt.FieldWriter) {}\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ fmt.FieldReader) {}\n\n", info.Name))
 
-		hasValidation := info.IsForm
+		hasValidation := info.IsForm || info.HasAnyInputTag
 		if !hasValidation {
 			for _, f := range info.Fields {
 				if f.NotNull || f.Letters || f.Numbers || f.Tilde || f.Spaces ||
