@@ -5,7 +5,7 @@
 
 ## Features
 
-- **Zero Reflection**: Interface-driven schema via `github.com/tinywasm/model`
+- **Zero Reflection**: Interface-driven schema via `github.com/tinywasm/model` with generated code
 - **Isomorphic**: Same generated code works in Go (backend) and WASM (frontend)
 - **Three Layers**: DB persistence, JSON transport, and Form UI — from one struct definition
 - **0-alloc Codec**: Symmetric, reflection-free serialization/deserialization methods generated for every model
