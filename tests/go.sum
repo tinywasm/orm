@@ -1,8 +1,10 @@
 github.com/tinywasm/fmt v0.25.0 h1:cF9R0GsMKQbsZclSjIh8A5RBsoULrpzAV1IAz9U2DJU=
 github.com/tinywasm/fmt v0.25.0/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
+github.com/tinywasm/form v0.2.12 h1:GKE93MLaLuh1cZwPdWgI8NxwuszZdV6ePFbPQyUdiJk=
+github.com/tinywasm/form v0.2.12/go.mod h1:kIoSeKtco/r3oj9YhdLdBldVNjYzQQjIGJWYfNpvKBk=
 github.com/tinywasm/model v0.0.2 h1:8+vWpve2ia4V+jBpTD5K25h6soNZ5fJsstalLQ2AWwo=
 github.com/tinywasm/model v0.0.2/go.mod h1:X+zb1GzaP9gLXEFVi+GSmZ4H9+W0UQnN2K9KcxE7vTE=
 github.com/tinywasm/modfind v0.0.4 h1:g7EFZArEftll9pxg5VAToIltVnEMRWfE+KEjPJpsNgY=
 github.com/tinywasm/modfind v0.0.4/go.mod h1:g1ZkkxCZ7vwDI5O23AMWlPJy4ctRWfWKZX/y+KMH1FM=
-github.com/tinywasm/orm v0.9.20 h1:MmtsdsG+9Y5E086uCZnr7TDVSjPnm2MCBjaIHz8w19M=
-github.com/tinywasm/orm v0.9.20/go.mod h1:slQadrUMJxfPaGCRc7SeyWYJfKH8ldgEDn/6hkbLcrk=
+github.com/tinywasm/orm v0.9.21 h1:myPDP3oUJbeCJhHCxcZGw1u+GQhChYWfSQNdaRSZ/aY=
+github.com/tinywasm/orm v0.9.21/go.mod h1:slQadrUMJxfPaGCRc7SeyWYJfKH8ldgEDn/6hkbLcrk=

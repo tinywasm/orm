@@ -6,8 +6,9 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/fmt v0.25.0
+	github.com/tinywasm/form v0.2.12
 	github.com/tinywasm/model v0.0.2
-	github.com/tinywasm/orm v0.9.20
+	github.com/tinywasm/orm v0.9.21
 )
 
 require github.com/tinywasm/modfind v0.0.4 // indirect
