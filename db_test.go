@@ -1,14 +1,14 @@
 package orm
 
+import "github.com/tinywasm/model"
+
 import (
 	"testing"
-
-	"github.com/tinywasm/fmt"
 )
 
 type mockCompiler struct{ Compiler }
 
-func (m *mockCompiler) Compile(q Query, model fmt.Model) (Plan, error) {
+func (m *mockCompiler) Compile(q Query, model model.Model) (Plan, error) {
 	return Plan{Query: "MOCK"}, nil
 }
 
@@ -39,8 +39,8 @@ type mockTxBoundExecutor struct {
 }
 
 func (m *mockTxBoundExecutor) Exec(query string, args ...any) error { return nil }
-func (m *mockTxBoundExecutor) Commit() error                       { return nil }
-func (m *mockTxBoundExecutor) Rollback() error                     { return nil }
+func (m *mockTxBoundExecutor) Commit() error                        { return nil }
+func (m *mockTxBoundExecutor) Rollback() error                      { return nil }
 
 type mockTxExecutor struct {
 	Executor
@@ -53,7 +53,7 @@ func (m *mockTxExecutor) BeginTx() (TxBoundExecutor, error) {
 
 func TestSyncSchema_RegistersModel(t *testing.T) {
 	db := New(&mockTxExecutor{}, &mockCompiler{})
-	fields := []fmt.Field{{Name: "id", Type: fmt.FieldInt}}
+	fields := []model.Field{{Name: "id", Type: model.FieldInt}}
 
 	err := db.SyncSchema("logs", fields)
 	if err != nil {

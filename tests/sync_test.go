@@ -1,10 +1,13 @@
 package tests
 
 import (
+	mdl "github.com/tinywasm/model"
+)
+
+import (
 	"errors"
 	"testing"
 
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
 
@@ -58,7 +61,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}},
+			Sch:   []mdl.Field{{Name: "name"}},
 		}
 
 		err := db.Sync(model)
@@ -83,7 +86,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}, {Name: "age"}},
+			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 		}
 
 		err := db.Sync(model)
@@ -117,7 +120,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}, {Name: "age"}},
+			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 		}
 
 		err := db.Sync(model)
@@ -139,7 +142,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}},
+			Sch:   []mdl.Field{{Name: "name"}},
 		}
 
 		err := db.Sync(model)
@@ -172,7 +175,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}},
+			Sch:   []mdl.Field{{Name: "name"}},
 		}
 
 		err := db.Sync(model)
@@ -198,7 +201,7 @@ func RunSyncTests(t *testing.T) {
 		model := &MockRenameModel{
 			MockModel: MockModel{
 				Table: "user",
-				Sch:   []fmt.Field{{Name: "id"}, {Name: "username"}},
+				Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 			},
 			Renames: map[string]string{
 				"username": "nick",
@@ -209,7 +212,7 @@ func RunSyncTests(t *testing.T) {
 		var compiledActions []orm.Action
 		var renameQuery orm.Query
 		db = orm.New(mockExec, &functionalCompiler{
-			compileFunc: func(q orm.Query, m fmt.Model) (orm.Plan, error) {
+			compileFunc: func(q orm.Query, m mdl.Model) (orm.Plan, error) {
 				compiledActions = append(compiledActions, q.Action)
 				if q.Action == orm.ActionRenameColumn {
 					renameQuery = q
@@ -256,7 +259,7 @@ func RunSyncTests(t *testing.T) {
 		var compiledActions []orm.Action
 		var dropQuery orm.Query
 		db := orm.New(mockExec, &functionalCompiler{
-			compileFunc: func(q orm.Query, m fmt.Model) (orm.Plan, error) {
+			compileFunc: func(q orm.Query, m mdl.Model) (orm.Plan, error) {
 				compiledActions = append(compiledActions, q.Action)
 				if q.Action == orm.ActionDropColumn {
 					dropQuery = q
@@ -267,7 +270,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "id"}, {Name: "username"}},
+			Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 		}
 
 		err := db.Sync(model)
@@ -304,7 +307,7 @@ func RunSyncTests(t *testing.T) {
 
 		var compiledActions []orm.Action
 		db := orm.New(mockExec, &functionalCompiler{
-			compileFunc: func(q orm.Query, m fmt.Model) (orm.Plan, error) {
+			compileFunc: func(q orm.Query, m mdl.Model) (orm.Plan, error) {
 				compiledActions = append(compiledActions, q.Action)
 				return orm.Plan{Query: "MOCK_QUERY"}, nil
 			},
@@ -312,7 +315,7 @@ func RunSyncTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "id"}, {Name: "username"}},
+			Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 		}
 
 		err := db.Sync(model)
@@ -329,10 +332,10 @@ func RunSyncTests(t *testing.T) {
 }
 
 type functionalCompiler struct {
-	compileFunc func(q orm.Query, m fmt.Model) (orm.Plan, error)
+	compileFunc func(q orm.Query, m mdl.Model) (orm.Plan, error)
 }
 
-func (f *functionalCompiler) Compile(q orm.Query, model fmt.Model) (orm.Plan, error) {
+func (f *functionalCompiler) Compile(q orm.Query, model mdl.Model) (orm.Plan, error) {
 	return f.compileFunc(q, model)
 }
 

@@ -1,6 +1,8 @@
 
 package ormc
 
+import "github.com/tinywasm/model"
+
 import (
 	"os"
 
@@ -51,31 +53,31 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 			buf.Write("}\n\n")
 		}
 
-		buf.Write(fmt.Sprintf("var _schema%s = []fmt.Field{\n", info.Name))
+		buf.Write(fmt.Sprintf("var _schema%s = []model.Field{\n", info.Name))
 		for _, f := range info.Fields {
-			typeStr := "fmt.FieldText"
+			typeStr := "model.FieldText"
 			switch f.Type {
-			case fmt.FieldInt:
-				typeStr = "fmt.FieldInt"
-			case fmt.FieldFloat:
-				typeStr = "fmt.FieldFloat"
-			case fmt.FieldBool:
-				typeStr = "fmt.FieldBool"
-			case fmt.FieldBlob:
-				typeStr = "fmt.FieldBlob"
-			case fmt.FieldStruct:
-				typeStr = "fmt.FieldStruct"
-			case fmt.FieldRaw:
-				typeStr = "fmt.FieldRaw"
-			case fmt.FieldIntSlice:
-				typeStr = "fmt.FieldIntSlice"
-			case fmt.FieldStructSlice:
-				typeStr = "fmt.FieldStructSlice"
+			case model.FieldInt:
+				typeStr = "model.FieldInt"
+			case model.FieldFloat:
+				typeStr = "model.FieldFloat"
+			case model.FieldBool:
+				typeStr = "model.FieldBool"
+			case model.FieldBlob:
+				typeStr = "model.FieldBlob"
+			case model.FieldStruct:
+				typeStr = "model.FieldStruct"
+			case model.FieldRaw:
+				typeStr = "model.FieldRaw"
+			case model.FieldIntSlice:
+				typeStr = "model.FieldIntSlice"
+			case model.FieldStructSlice:
+				typeStr = "model.FieldStructSlice"
 			}
 
 			buf.Write(fmt.Sprintf("\t\t{Name: \"%s\", Type: %s", f.ColumnName, typeStr))
 			if !info.NoDB && (f.PK || f.Unique || f.AutoInc) {
-				buf.Write(", DB: &fmt.FieldDB{")
+				buf.Write(", DB: &model.FieldDB{")
 				var parts []string
 				if f.PK {
 					parts = append(parts, "PK: true")
@@ -109,7 +111,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		}
 		buf.Write("\t}\n\n")
 
-		buf.Write(fmt.Sprintf("func (m *%s) Schema() []fmt.Field { return _schema%s }\n\n", info.Name, info.Name))
+		buf.Write(fmt.Sprintf("func (m *%s) Schema() []model.Field { return _schema%s }\n\n", info.Name, info.Name))
 
 		buf.Write(fmt.Sprintf("func (m *%s) Pointers() []any { return []any{", info.Name))
 		for i, f := range info.Fields {
@@ -122,23 +124,23 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 
 		buf.Write(fmt.Sprintf("func (m *%s) IsNil() bool { return m == nil }\n\n", info.Name))
 
-		buf.Write(fmt.Sprintf("func (m *%s) EncodeFields(w fmt.FieldWriter) {\n", info.Name))
+		buf.Write(fmt.Sprintf("func (m *%s) EncodeFields(w model.FieldWriter) {\n", info.Name))
 		for _, f := range info.Fields {
 			var line string
 			switch f.Type {
-			case fmt.FieldText:
+			case model.FieldText:
 				line = fmt.Sprintf("w.String(\"%s\", m.%s)", f.ColumnName, f.Name)
-			case fmt.FieldRaw:
+			case model.FieldRaw:
 				line = fmt.Sprintf("w.Raw(\"%s\", m.%s)", f.ColumnName, f.Name)
-			case fmt.FieldInt:
+			case model.FieldInt:
 				line = fmt.Sprintf("w.Int(\"%s\", int64(m.%s))", f.ColumnName, f.Name)
-			case fmt.FieldFloat:
+			case model.FieldFloat:
 				line = fmt.Sprintf("w.Float(\"%s\", float64(m.%s))", f.ColumnName, f.Name)
-			case fmt.FieldBool:
+			case model.FieldBool:
 				line = fmt.Sprintf("w.Bool(\"%s\", m.%s)", f.ColumnName, f.Name)
-			case fmt.FieldBlob:
+			case model.FieldBlob:
 				line = fmt.Sprintf("w.Bytes(\"%s\", m.%s)", f.ColumnName, f.Name)
-			case fmt.FieldStruct:
+			case model.FieldStruct:
 				if f.IsPointer {
 					if f.OmitEmpty {
 						line = fmt.Sprintf("w.Object(\"%s\", m.%s)", f.ColumnName, f.Name)
@@ -148,7 +150,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				} else {
 					line = fmt.Sprintf("w.Object(\"%s\", &m.%s)", f.ColumnName, f.Name)
 				}
-			case fmt.FieldIntSlice:
+			case model.FieldIntSlice:
 				if f.OmitEmpty {
 					buf.Write(fmt.Sprintf("\tif len(m.%s) != 0 {\n", f.Name))
 				}
@@ -156,7 +158,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				if f.OmitEmpty {
 					buf.Write("\t}\n")
 				}
-			case fmt.FieldStructSlice:
+			case model.FieldStructSlice:
 				isPtr := fmt.HasPrefix(f.GoType, "[]*")
 				if f.OmitEmpty {
 					buf.Write(fmt.Sprintf("\tif len(m.%s) != 0 {\n", f.Name))
@@ -176,15 +178,15 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 			if f.OmitEmpty && line != "" {
 				guard := ""
 				switch f.Type {
-				case fmt.FieldText:
+				case model.FieldText:
 					guard = fmt.Sprintf("m.%s != \"\"", f.Name)
-				case fmt.FieldRaw, fmt.FieldBlob:
+				case model.FieldRaw, model.FieldBlob:
 					guard = fmt.Sprintf("len(m.%s) != 0", f.Name)
-				case fmt.FieldInt, fmt.FieldFloat:
+				case model.FieldInt, model.FieldFloat:
 					guard = fmt.Sprintf("m.%s != 0", f.Name)
-				case fmt.FieldBool:
+				case model.FieldBool:
 					guard = fmt.Sprintf("m.%s", f.Name)
-				case fmt.FieldStruct:
+				case model.FieldStruct:
 					if f.IsPointer {
 						guard = fmt.Sprintf("m.%s != nil", f.Name)
 					}
@@ -200,22 +202,22 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		}
 		buf.Write("}\n\n")
 
-		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r fmt.FieldReader) {\n", info.Name))
+		buf.Write(fmt.Sprintf("func (m *%s) DecodeFields(r model.FieldReader) {\n", info.Name))
 		for _, f := range info.Fields {
 			switch f.Type {
-			case fmt.FieldText:
+			case model.FieldText:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.String(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
-			case fmt.FieldRaw:
+			case model.FieldRaw:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Raw(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
-			case fmt.FieldInt:
+			case model.FieldInt:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Int(\"%s\"); ok { m.%s = %s(v) }\n", f.ColumnName, f.Name, f.GoType))
-			case fmt.FieldFloat:
+			case model.FieldFloat:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Float(\"%s\"); ok { m.%s = %s(v) }\n", f.ColumnName, f.Name, f.GoType))
-			case fmt.FieldBool:
+			case model.FieldBool:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Bool(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
-			case fmt.FieldBlob:
+			case model.FieldBlob:
 				buf.Write(fmt.Sprintf("\tif v, ok := r.Bytes(\"%s\"); ok { m.%s = v }\n", f.ColumnName, f.Name))
-			case fmt.FieldStruct:
+			case model.FieldStruct:
 				elemType := f.GoType
 				if f.IsPointer {
 					buf.Write(fmt.Sprintf("\tif m.%s == nil { m.%s = new(%s) }\n", f.Name, f.Name, elemType))
@@ -223,11 +225,11 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 				} else {
 					buf.Write(fmt.Sprintf("\tr.Object(\"%s\", &m.%s)\n", f.ColumnName, f.Name))
 				}
-			case fmt.FieldIntSlice:
+			case model.FieldIntSlice:
 				elemType := fmt.Convert(f.GoType).TrimPrefix("[]").String()
 				buf.Write(fmt.Sprintf("\tif arr, ok := r.Array(\"%s\"); ok {\n", f.ColumnName))
 				buf.Write(fmt.Sprintf("\t\tn := arr.Len()\n\t\tm.%s = make(%s, n)\n\t\tfor i := 0; i < n; i++ {\n\t\t\tm.%s[i] = %s(arr.Int(i))\n\t\t}\n\t}\n", f.Name, f.GoType, f.Name, elemType))
-			case fmt.FieldStructSlice:
+			case model.FieldStructSlice:
 				isPtr := fmt.HasPrefix(f.GoType, "[]*")
 				elemType := fmt.Convert(f.GoType).TrimPrefix("[]").TrimPrefix("*").String()
 				buf.Write(fmt.Sprintf("\tif arr, ok := r.Array(\"%s\"); ok {\n", f.ColumnName))
@@ -263,14 +265,14 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		}
 
 		buf.Write(fmt.Sprintf("type %sList []*%s\n\n", info.Name, info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) Schema() []fmt.Field { return nil }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Schema() []model.Field { return nil }\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) Pointers() []any     { return nil }\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) Len() int             { return len(*s) }\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) At(i int) fmt.Fielder { return (*s)[i] }\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) Append() fmt.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n", info.Name, info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) At(i int) model.Fielder { return (*s)[i] }\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) Append() model.Fielder  { v := &%s{}; *s = append(*s, v); return v }\n", info.Name, info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) IsNil() bool          { return s == nil }\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ fmt.FieldWriter) {}\n", info.Name))
-		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ fmt.FieldReader) {}\n\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ model.FieldWriter) {}\n", info.Name))
+		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ model.FieldReader) {}\n\n", info.Name))
 
 		hasValidation := info.IsForm || info.HasAnyInputTag
 		if !hasValidation {
@@ -285,7 +287,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 
 		if hasValidation {
 			buf.Write(fmt.Sprintf("func (m *%s) Validate(action byte) error {\n", info.Name))
-			buf.Write("\treturn fmt.ValidateFields(action, m)\n")
+			buf.Write("\treturn model.ValidateFields(action, m)\n")
 			buf.Write("}\n\n")
 		}
 
@@ -315,8 +317,8 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 			buf.Write(fmt.Sprintf("func ReadAll%s(qb *orm.QB) (%sList, error) {\n", info.Name, info.Name))
 			buf.Write(fmt.Sprintf("\tvar results %sList\n", info.Name))
 			buf.Write("\terr := qb.ReadAll(\n")
-			buf.Write(fmt.Sprintf("\t\tfunc() fmt.Model { return &%s{} },\n", info.Name))
-			buf.Write(fmt.Sprintf("\t\tfunc(m fmt.Model) { results = append(results, m.(*%s)) },\n", info.Name))
+			buf.Write(fmt.Sprintf("\t\tfunc() model.Model { return &%s{} },\n", info.Name))
+			buf.Write(fmt.Sprintf("\t\tfunc(m model.Model) { results = append(results, m.(*%s)) },\n", info.Name))
 			buf.Write("\t)\n")
 			buf.Write("\treturn results, err\n")
 			buf.Write("}\n\n")
@@ -368,32 +370,32 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 
 type modelStub struct {
 	name   string
-	schema []fmt.Field
+	schema []model.Field
 	exts   []orm.FieldExt
 }
 
 func (m *modelStub) ModelName() string              { return m.name }
-func (m *modelStub) Schema() []fmt.Field            { return m.schema }
+func (m *modelStub) Schema() []model.Field            { return m.schema }
 func (m *modelStub) Pointers() []any                { return nil }
 func (m *modelStub) IsNil() bool                    { return m == nil }
-func (m *modelStub) EncodeFields(_ fmt.FieldWriter) {}
-func (m *modelStub) DecodeFields(_ fmt.FieldReader) {}
+func (m *modelStub) EncodeFields(_ model.FieldWriter) {}
+func (m *modelStub) DecodeFields(_ model.FieldReader) {}
 func (m *modelStub) SchemaExt() []orm.FieldExt      { return m.exts }
 
 func newModelStub(info StructInfo) *modelStub {
 	stub := &modelStub{name: info.ModelName}
 	for _, f := range info.Fields {
-		field := fmt.Field{
+		field := model.Field{
 			Name:    f.ColumnName,
 			Type:    goTypeToFieldType(f.GoType),
 			NotNull: f.NotNull,
 		}
 		if f.PK || f.Unique || f.AutoInc {
-			field.DB = &fmt.FieldDB{PK: f.PK, Unique: f.Unique, AutoInc: f.AutoInc}
+			field.DB = &model.FieldDB{PK: f.PK, Unique: f.Unique, AutoInc: f.AutoInc}
 		}
 		if f.Maximum > 0 {
 			if field.DB == nil {
-				field.DB = &fmt.FieldDB{}
+				field.DB = &model.FieldDB{}
 			}
 			field.Permitted.Maximum = f.Maximum
 		}
@@ -410,19 +412,19 @@ func newModelStub(info StructInfo) *modelStub {
 	return stub
 }
 
-func goTypeToFieldType(goType string) fmt.FieldType {
+func goTypeToFieldType(goType string) model.FieldType {
 	switch goType {
 	case "int", "int8", "int16", "int32", "int64",
 		"uint", "uint8", "uint16", "uint32", "uint64":
-		return fmt.FieldInt
+		return model.FieldInt
 	case "float32", "float64":
-		return fmt.FieldFloat
+		return model.FieldFloat
 	case "bool":
-		return fmt.FieldBool
+		return model.FieldBool
 	case "[]byte":
-		return fmt.FieldBlob
+		return model.FieldBlob
 	default:
-		return fmt.FieldText
+		return model.FieldText
 	}
 }
 
@@ -434,7 +436,7 @@ func (g *Generator) ExportSQL(root string, exporter ddl.Exporter) (string, error
 	if err != nil {
 		return "", err
 	}
-	var models []fmt.Model
+	var models []model.Model
 	for _, info := range all {
 		if info.NoDB {
 			continue

@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm/ddl"
 	"github.com/tinywasm/orm/ormc"
 	"github.com/tinywasm/postgres"

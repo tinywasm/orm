@@ -3,7 +3,7 @@ package tests
 import (
 	"time"
 
-	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 )
 
 //go:generate ormc
@@ -134,8 +134,8 @@ type WithPointers struct {
 }
 
 type MCPResponse struct {
-	Result fmt.RawJSON
-	Error  fmt.RawJSON `json:",omitempty"`
+	Result model.RawJSON
+	Error  model.RawJSON `json:",omitempty"`
 }
 
 type PlainResponse struct {

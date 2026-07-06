@@ -1,12 +1,13 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
+
 
 // QB represents a query builder.
 // Consumers hold a *QB reference in variables for incremental building.
 type QB struct {
 	db      *DB
-	model   fmt.Model
+	model   model.Model
 	conds   []Condition
 	orderBy []Order
 	groupBy []string
@@ -154,7 +155,7 @@ func (qb *QB) ReadOne() error {
 }
 
 // ReadAll executes the query and returns all results.
-func (qb *QB) ReadAll(new func() fmt.Model, onRow func(fmt.Model)) error {
+func (qb *QB) ReadAll(new func() model.Model, onRow func(model.Model)) error {
 	if err := validateQuery(ActionReadAll, qb.model); err != nil {
 		return err
 	}

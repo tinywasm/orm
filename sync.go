@@ -1,6 +1,7 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
+
 
 // RenameProvider is implemented by generated models when db:"old_name=X" tags are present.
 type RenameProvider interface {
@@ -15,7 +16,7 @@ type TableIntrospector interface {
 // SyncSchema reconciles one table to the given fields, with no model instance.
 // Wraps (table, fields) in a synthetic model and delegates to the existing
 // Sync algorithm (CreateTable + AddColumn + introspective rename/safe-drop).
-func (db *DB) SyncSchema(table string, fields []fmt.Field) error {
+func (db *DB) SyncSchema(table string, fields []model.Field) error {
 	m := &schemaModel{name: table, fields: fields}
 	if err := db.Sync(m); err != nil {
 		return err
@@ -26,20 +27,20 @@ func (db *DB) SyncSchema(table string, fields []fmt.Field) error {
 
 type schemaModel struct {
 	name   string
-	fields []fmt.Field
+	fields []model.Field
 }
 
 func (s *schemaModel) ModelName() string             { return s.name }
-func (s *schemaModel) Schema() []fmt.Field           { return s.fields }
+func (s *schemaModel) Schema() []model.Field           { return s.fields }
 func (s *schemaModel) Pointers() []any               { return nil }
 func (s *schemaModel) IsNil() bool                   { return s == nil }
-func (s *schemaModel) EncodeFields(fmt.FieldWriter) {}
-func (s *schemaModel) DecodeFields(fmt.FieldReader) {}
+func (s *schemaModel) EncodeFields(model.FieldWriter) {}
+func (s *schemaModel) DecodeFields(model.FieldReader) {}
 
 // Sync reconciles the database to match the given models.
 // Emits CreateTable, AddColumn, RenameColumn, and DropColumn Actions;
 // the engine adapter compiles and executes the dialect SQL.
-func (db *DB) Sync(models ...fmt.Model) error {
+func (db *DB) Sync(models ...model.Model) error {
 	if len(models) == 0 {
 		return nil
 	}
@@ -54,7 +55,7 @@ func (db *DB) Sync(models ...fmt.Model) error {
 	return db.syncAll(models...)
 }
 
-func (db *DB) syncAll(models ...fmt.Model) error {
+func (db *DB) syncAll(models ...model.Model) error {
 	for _, m := range models {
 		if err := db.syncModel(m); err != nil {
 			return err
@@ -63,7 +64,7 @@ func (db *DB) syncAll(models ...fmt.Model) error {
 	return nil
 }
 
-func (db *DB) syncModel(m fmt.Model) error {
+func (db *DB) syncModel(m model.Model) error {
 	tableName := m.ModelName()
 	schema := m.Schema()
 
@@ -198,7 +199,7 @@ func (db *DB) syncModel(m fmt.Model) error {
 	return nil
 }
 
-func (db *DB) execQuery(q Query, m fmt.Model) error {
+func (db *DB) execQuery(q Query, m model.Model) error {
 	plan, err := db.compiler.Compile(q, m)
 	if err != nil {
 		return err

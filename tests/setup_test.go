@@ -1,19 +1,20 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
 
 // MockCompiler captures the query and returns a predefined plan.
 type MockCompiler struct {
 	LastQuery  orm.Query
-	LastModel  fmt.Model
+	LastModel  model.Model
 	ReturnPlan orm.Plan
 	ReturnErr  error
 }
 
-func (m *MockCompiler) Compile(q orm.Query, model fmt.Model) (orm.Plan, error) {
+func (m *MockCompiler) Compile(q orm.Query, model model.Model) (orm.Plan, error) {
 	m.LastQuery = q
 	m.LastModel = model
 	if m.ReturnPlan.Query == "" {
@@ -106,7 +107,7 @@ func (m *MockRows) Err() error {
 // MockModel is a mock implementation of the Model interface.
 type MockModel struct {
 	Table    string
-	Sch      []fmt.Field
+	Sch      []model.Field
 	Vals     []any
 	ValidErr error
 }
@@ -115,8 +116,8 @@ func (m *MockModel) Validate(action byte) error {
 	return m.ValidErr
 }
 
-func (m MockModel) ModelName() string   { return m.Table }
-func (m MockModel) Schema() []fmt.Field { return m.Sch }
+func (m MockModel) ModelName() string     { return m.Table }
+func (m MockModel) Schema() []model.Field { return m.Sch }
 func (m MockModel) Pointers() []any {
 	ptrs := make([]any, len(m.Vals))
 	for i := range m.Vals {

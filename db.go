@@ -1,6 +1,7 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
+
 
 // DB represents a database connection.
 // Consumers instantiate it via New().
@@ -8,7 +9,7 @@ type DB struct {
 	exec     Executor
 	compiler Compiler
 	log      func(messages ...any)
-	models   []fmt.Model
+	models   []model.Model
 }
 
 // New creates a new DB instance.
@@ -32,13 +33,13 @@ func (db *DB) logw(messages ...any) {
 }
 
 // Create inserts a new model into the database.
-func (db *DB) Create(m fmt.Model) error {
+func (db *DB) Create(m model.Model) error {
 	if err := validateQuery(ActionCreate, m); err != nil {
 		return err
 	}
 	schema := m.Schema()
 	ptrs := m.Pointers()
-	allValues := fmt.ReadValues(schema, ptrs)
+	allValues := model.ReadValues(schema, ptrs)
 	var columns []string
 	var values []any
 	for i, f := range schema {
@@ -67,7 +68,7 @@ func (db *DB) Create(m fmt.Model) error {
 // Update modifies an existing row. At least one Condition is required.
 // Providing zero conditions is a compile-time error — there is no variadic
 // fallback — preventing accidental full-table UPDATE statements.
-func (db *DB) Update(m fmt.Model, cond Condition, rest ...Condition) error {
+func (db *DB) Update(m model.Model, cond Condition, rest ...Condition) error {
 	if err := validateQuery(ActionUpdate, m); err != nil {
 		return err
 	}
@@ -81,7 +82,7 @@ func (db *DB) Update(m fmt.Model, cond Condition, rest ...Condition) error {
 		Action:     ActionUpdate,
 		Table:      m.ModelName(),
 		Columns:    columns,
-		Values:     fmt.ReadValues(schema, m.Pointers()),
+		Values:     model.ReadValues(schema, m.Pointers()),
 		Conditions: conds,
 	}
 	plan, err := db.compiler.Compile(q, m)
@@ -95,11 +96,11 @@ func (db *DB) Update(m fmt.Model, cond Condition, rest ...Condition) error {
 type emptyModel struct{}
 
 func (e emptyModel) ModelName() string { return "" }
-func (e emptyModel) Schema() []fmt.Field { return nil }
+func (e emptyModel) Schema() []model.Field { return nil }
 func (e emptyModel) Pointers() []any   { return nil }
 
 // CreateTable creates a new table for the given model.
-func (db *DB) CreateTable(m fmt.Model) error {
+func (db *DB) CreateTable(m model.Model) error {
 	if err := validateQuery(ActionCreateTable, m); err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (db *DB) CreateTable(m fmt.Model) error {
 }
 
 // DropTable drops the table for the given model.
-func (db *DB) DropTable(m fmt.Model) error {
+func (db *DB) DropTable(m model.Model) error {
 	if err := validateQuery(ActionDropTable, m); err != nil {
 		return err
 	}
@@ -150,7 +151,7 @@ func (db *DB) CreateDatabase(name string) error {
 // Delete deletes a model from the database.
 // At least one Condition is required. Providing zero conditions is a compile-time
 // error, preventing accidental full-table DELETE statements.
-func (db *DB) Delete(m fmt.Model, cond Condition, rest ...Condition) error {
+func (db *DB) Delete(m model.Model, cond Condition, rest ...Condition) error {
 	if err := validateQuery(ActionDelete, m); err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (db *DB) Delete(m fmt.Model, cond Condition, rest ...Condition) error {
 }
 
 // Query creates a new QB instance.
-func (db *DB) Query(m fmt.Model) *QB {
+func (db *DB) Query(m model.Model) *QB {
 	return &QB{
 		db:    db,
 		model: m,
@@ -185,7 +186,7 @@ func (db *DB) RawExecutor() Executor {
 	return db.exec
 }
 
-func (db *DB) registerModel(m fmt.Model) {
+func (db *DB) registerModel(m model.Model) {
 	for _, existing := range db.models {
 		if existing.ModelName() == m.ModelName() {
 			return
@@ -194,6 +195,6 @@ func (db *DB) registerModel(m fmt.Model) {
 	db.models = append(db.models, m)
 }
 
-func (db *DB) RegisteredModels() []fmt.Model { return db.models }
+func (db *DB) RegisteredModels() []model.Model { return db.models }
 
 func (db *DB) Compiler() Compiler { return db.compiler }

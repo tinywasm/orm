@@ -2,73 +2,74 @@
 
 package ormcp
 
-import (
-	"github.com/tinywasm/fmt"
-)
+import "github.com/tinywasm/model"
 
 func (m *QueryArgs) ModelName() string {
 	return "query_args"
 }
 
-var _schemaQueryArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText},
-	}
+var _schemaQueryArgs = []model.Field{
+	{Name: "SQL", Type: model.FieldText},
+}
 
-func (m *QueryArgs) Schema() []fmt.Field { return _schemaQueryArgs }
+func (m *QueryArgs) Schema() []model.Field { return _schemaQueryArgs }
 
 func (m *QueryArgs) Pointers() []any { return []any{&m.SQL} }
 
 func (m *QueryArgs) IsNil() bool { return m == nil }
 
-func (m *QueryArgs) EncodeFields(w fmt.FieldWriter) {
+func (m *QueryArgs) EncodeFields(w model.FieldWriter) {
 	w.String("SQL", m.SQL)
 }
 
-func (m *QueryArgs) DecodeFields(r fmt.FieldReader) {
-	if v, ok := r.String("SQL"); ok { m.SQL = v }
+func (m *QueryArgs) DecodeFields(r model.FieldReader) {
+	if v, ok := r.String("SQL"); ok {
+		m.SQL = v
+	}
 }
 
 type QueryArgsList []*QueryArgs
 
-func (s *QueryArgsList) Schema() []fmt.Field { return nil }
-func (s *QueryArgsList) Pointers() []any     { return nil }
-func (s *QueryArgsList) Len() int             { return len(*s) }
-func (s *QueryArgsList) At(i int) fmt.Fielder { return (*s)[i] }
-func (s *QueryArgsList) Append() fmt.Fielder  { v := &QueryArgs{}; *s = append(*s, v); return v }
-func (s *QueryArgsList) IsNil() bool          { return s == nil }
-func (s *QueryArgsList) EncodeFields(_ fmt.FieldWriter) {}
-func (s *QueryArgsList) DecodeFields(_ fmt.FieldReader) {}
+func (s *QueryArgsList) Schema() []model.Field            { return nil }
+func (s *QueryArgsList) Pointers() []any                  { return nil }
+func (s *QueryArgsList) Len() int                         { return len(*s) }
+func (s *QueryArgsList) At(i int) model.Fielder           { return (*s)[i] }
+func (s *QueryArgsList) Append() model.Fielder            { v := &QueryArgs{}; *s = append(*s, v); return v }
+func (s *QueryArgsList) IsNil() bool                      { return s == nil }
+func (s *QueryArgsList) EncodeFields(_ model.FieldWriter) {}
+func (s *QueryArgsList) DecodeFields(_ model.FieldReader) {}
 
 func (m *ExecArgs) ModelName() string {
 	return "exec_args"
 }
 
-var _schemaExecArgs = []fmt.Field{
-		{Name: "SQL", Type: fmt.FieldText},
-	}
+var _schemaExecArgs = []model.Field{
+	{Name: "SQL", Type: model.FieldText},
+}
 
-func (m *ExecArgs) Schema() []fmt.Field { return _schemaExecArgs }
+func (m *ExecArgs) Schema() []model.Field { return _schemaExecArgs }
 
 func (m *ExecArgs) Pointers() []any { return []any{&m.SQL} }
 
 func (m *ExecArgs) IsNil() bool { return m == nil }
 
-func (m *ExecArgs) EncodeFields(w fmt.FieldWriter) {
+func (m *ExecArgs) EncodeFields(w model.FieldWriter) {
 	w.String("SQL", m.SQL)
 }
 
-func (m *ExecArgs) DecodeFields(r fmt.FieldReader) {
-	if v, ok := r.String("SQL"); ok { m.SQL = v }
+func (m *ExecArgs) DecodeFields(r model.FieldReader) {
+	if v, ok := r.String("SQL"); ok {
+		m.SQL = v
+	}
 }
 
 type ExecArgsList []*ExecArgs
 
-func (s *ExecArgsList) Schema() []fmt.Field { return nil }
-func (s *ExecArgsList) Pointers() []any     { return nil }
-func (s *ExecArgsList) Len() int             { return len(*s) }
-func (s *ExecArgsList) At(i int) fmt.Fielder { return (*s)[i] }
-func (s *ExecArgsList) Append() fmt.Fielder  { v := &ExecArgs{}; *s = append(*s, v); return v }
-func (s *ExecArgsList) IsNil() bool          { return s == nil }
-func (s *ExecArgsList) EncodeFields(_ fmt.FieldWriter) {}
-func (s *ExecArgsList) DecodeFields(_ fmt.FieldReader) {}
-
+func (s *ExecArgsList) Schema() []model.Field            { return nil }
+func (s *ExecArgsList) Pointers() []any                  { return nil }
+func (s *ExecArgsList) Len() int                         { return len(*s) }
+func (s *ExecArgsList) At(i int) model.Fielder           { return (*s)[i] }
+func (s *ExecArgsList) Append() model.Fielder            { v := &ExecArgs{}; *s = append(*s, v); return v }
+func (s *ExecArgsList) IsNil() bool                      { return s == nil }
+func (s *ExecArgsList) EncodeFields(_ model.FieldWriter) {}
+func (s *ExecArgsList) DecodeFields(_ model.FieldReader) {}

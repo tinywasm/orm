@@ -55,7 +55,7 @@ func TestOrmc_Notilde(t *testing.T) {
 		if !strings.Contains(s, "Widget: input.SetTilde(input.Text(), false)") {
 			t.Errorf("expected .SetTilde(false) in Widget, got:\n%s", s)
 		}
-		if !strings.Contains(s, "Permitted: fmt.Permitted{Minimum: 2}") {
+		if !strings.Contains(s, "Permitted: model.Permitted{Minimum: 2}") {
 			t.Errorf("expected Permitted{Minimum: 2}, got:\n%s", s)
 		}
 	})

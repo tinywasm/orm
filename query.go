@@ -1,6 +1,7 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
+
 
 // Action represents the type of database operation.
 type Action int
@@ -36,7 +37,7 @@ type Query struct {
 	Table      string
 	Database   string
 	Columns    []string
-	Column     *fmt.Field
+	Column     *model.Field
 	OldName    string
 	Values     []any
 	Conditions []Condition

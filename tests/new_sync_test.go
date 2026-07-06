@@ -1,5 +1,7 @@
 package tests
 
+import "github.com/tinywasm/model"
+
 import (
 	"errors"
 	"testing"
@@ -49,7 +51,7 @@ func TestSyncSchema(t *testing.T) {
 	t.Run("O3 - SyncSchema issues correct actions", func(t *testing.T) {
 		var compiledActions []orm.Action
 		mockCompiler := &functionalCompiler{
-			compileFunc: func(q orm.Query, m fmt.Model) (orm.Plan, error) {
+			compileFunc: func(q orm.Query, m model.Model) (orm.Plan, error) {
 				compiledActions = append(compiledActions, q.Action)
 				return orm.Plan{Query: "MOCK"}, nil
 			},
@@ -57,7 +59,7 @@ func TestSyncSchema(t *testing.T) {
 		mockExec := &MockExecutor{} // Not an introspector, fallback to additive
 		db := orm.New(mockExec, mockCompiler)
 
-		fields := []fmt.Field{
+		fields := []model.Field{
 			{Name: "id"},
 			{Name: "name"},
 		}
@@ -114,7 +116,7 @@ func TestObservability(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}, {Name: "age"}},
+			Sch:   []model.Field{{Name: "name"}, {Name: "age"}},
 		}
 
 		err := db.Sync(model)
@@ -135,7 +137,7 @@ func TestObservability(t *testing.T) {
 	t.Run("O6 - AddColumn error logged inside Tx", func(t *testing.T) {
 		var logs []string
 		mockCompiler := &functionalCompiler{
-			compileFunc: func(q orm.Query, m fmt.Model) (orm.Plan, error) {
+			compileFunc: func(q orm.Query, m model.Model) (orm.Plan, error) {
 				if q.Action == orm.ActionCreateTable {
 					return orm.Plan{Query: "CREATE TABLE"}, nil
 				}
@@ -165,7 +167,7 @@ func TestObservability(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}},
+			Sch:   []model.Field{{Name: "name"}},
 		}
 
 		err := db.Sync(model)

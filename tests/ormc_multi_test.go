@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tinywasm/fmt"
+	mdl "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/orm/ormc"
 )
@@ -162,7 +163,7 @@ func TestQB_ClauseChain(t *testing.T) {
 			Where("f").Like("%x%").
 			Where("g").In([]int{1, 2}).
 			Or().Where("h").Eq(9).
-			ReadAll(func() fmt.Model { return &MockModel{} }, func(fmt.Model) {})
+			ReadAll(func() mdl.Model { return &MockModel{} }, func(mdl.Model) {})
 
 		conds := mockCompiler.LastQuery.Conditions
 		expected := []struct {

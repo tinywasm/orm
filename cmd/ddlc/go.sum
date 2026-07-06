@@ -1,6 +1,12 @@
+github.com/lib/pq v1.11.2 h1:x6gxUeu39V0BHZiugWe8LXZYZ+Utk7hSJGThs8sdzfs=
+github.com/lib/pq v1.11.2/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
 github.com/tinywasm/fmt v0.25.0 h1:cF9R0GsMKQbsZclSjIh8A5RBsoULrpzAV1IAz9U2DJU=
 github.com/tinywasm/fmt v0.25.0/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
 github.com/tinywasm/model v0.0.2 h1:8+vWpve2ia4V+jBpTD5K25h6soNZ5fJsstalLQ2AWwo=
 github.com/tinywasm/model v0.0.2/go.mod h1:X+zb1GzaP9gLXEFVi+GSmZ4H9+W0UQnN2K9KcxE7vTE=
 github.com/tinywasm/modfind v0.0.4 h1:g7EFZArEftll9pxg5VAToIltVnEMRWfE+KEjPJpsNgY=
 github.com/tinywasm/modfind v0.0.4/go.mod h1:g1ZkkxCZ7vwDI5O23AMWlPJy4ctRWfWKZX/y+KMH1FM=
+github.com/tinywasm/postgres v0.3.3 h1:rUBXLgVbK8UDh35GzLT06W1s3mEEqgi5Z6l/i+0YDwE=
+github.com/tinywasm/postgres v0.3.3/go.mod h1:Y51Dagx278GHmckvOvkjLkAa9Unp7tH0LmN8oZzXJ0k=
+github.com/tinywasm/sqlt v0.0.5 h1:oxBeZVcgskJqbr4XY+pWUUc05er/lkqfmH8qVtH8cxw=
+github.com/tinywasm/sqlt v0.0.5/go.mod h1:DjmrPdhEc/BzNVu7gthTu1Z5bM4LdmJjinHG2v1y79c=

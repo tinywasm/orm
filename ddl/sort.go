@@ -1,6 +1,7 @@
 package ddl
 
 import (
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
@@ -8,8 +9,8 @@ import (
 // TopologicalSort returns models sorted so parents come before children (Kahn's BFS).
 // Models not implementing SchemaExt() are treated as having no FK deps.
 // Returns error on circular FK dependency.
-func TopologicalSort(models []fmt.Model) ([]fmt.Model, error) {
-	byName := make(map[string]fmt.Model, len(models))
+func TopologicalSort(models []model.Model) ([]model.Model, error) {
+	byName := make(map[string]model.Model, len(models))
 	rdeps := make(map[string][]string)
 	inDeg := make(map[string]int, len(models))
 
@@ -33,7 +34,7 @@ func TopologicalSort(models []fmt.Model) ([]fmt.Model, error) {
 		}
 	}
 
-	result := make([]fmt.Model, 0, len(models))
+	result := make([]model.Model, 0, len(models))
 	for len(queue) > 0 {
 		name := queue[0]
 		queue = queue[1:]

@@ -1,11 +1,12 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
 
-// FieldExt extends fmt.Field with database-specific metadata (foreign keys).
+
+// FieldExt extends model.Field with database-specific metadata (foreign keys).
 // Used internally by adapters that support FK constraints.
 type FieldExt struct {
-	fmt.Field
+	model.Field
 	Ref       string // FK: target table name. Empty = no FK.
 	RefColumn string // FK: target column. Empty = auto-detect PK of Ref table.
 	OnDelete  string // Override ON DELETE action. Empty = CASCADE (default for all FKs).

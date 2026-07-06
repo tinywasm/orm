@@ -1,22 +1,23 @@
 package ormc
 
+import "github.com/tinywasm/model"
+
 import (
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/modfind"
 )
 
 type mockSyncer struct {
-	synced map[string][]fmt.Field
+	synced map[string][]model.Field
 }
 
-func (s *mockSyncer) SyncSchema(table string, fields []fmt.Field) error {
+func (s *mockSyncer) SyncSchema(table string, fields []model.Field) error {
 	if s.synced == nil {
-		s.synced = make(map[string][]fmt.Field)
+		s.synced = make(map[string][]model.Field)
 	}
 	s.synced[table] = fields
 	return nil
@@ -42,7 +43,7 @@ type User struct {
 	os.WriteFile(filepath.Join(readonlyDir, "model_orm.go"), []byte(`package readonly
 import "github.com/tinywasm/fmt"
 func (m *Item) ModelName() string { return "items" }
-var _schemaItem = []fmt.Field{{Name: "id", Type: fmt.FieldText}}
+var _schemaItem = []model.Field{{Name: "id", Type: model.FieldText}}
 `), 0644)
 
 	// Set an old mtime for readonly file to verify it's not rewritten

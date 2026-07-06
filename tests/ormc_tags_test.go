@@ -140,7 +140,7 @@ type Repro struct {
 	}
 	outStr := string(output)
 
-	// raw must be stripped from json tags (fields should use fmt.RawJSON type instead)
+	// raw must be stripped from json tags (fields should use model.RawJSON type instead)
 	if strings.Contains(outStr, `json:",omitempty,raw"`) || strings.Contains(outStr, `json:",raw"`) {
 		t.Errorf("Expected raw to be stripped from json tags, got: %s", outStr)
 	}

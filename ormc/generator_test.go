@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
 )
 
 // writeTemp writes content to a temp file and returns its path.
@@ -45,7 +45,7 @@ type Child struct { X string }
 	if childField == nil {
 		t.Fatal("field Child not found")
 	}
-	if childField.Type != fmt.FieldStruct {
+	if childField.Type != model.FieldStruct {
 		t.Fatalf("expected FieldStruct, got %v", childField.Type)
 	}
 	if childField.IsPointer {
@@ -98,7 +98,7 @@ type Model struct {
 	}
 	for _, f := range info.Fields {
 		if f.Name == "ID" {
-			if f.Type != fmt.FieldText {
+			if f.Type != model.FieldText {
 				t.Fatalf("ID: expected FieldText (alias of string), got %v", f.Type)
 			}
 			return
@@ -153,10 +153,10 @@ type Child struct {
 	}
 
 	// Bug 2 Verification: type aliases should map to primitive field types
-	if !strings.Contains(s, "{Name: \"id\", Type: fmt.FieldText") {
+	if !strings.Contains(s, "{Name: \"id\", Type: model.FieldText") {
 		t.Errorf("MyID (string alias) should map to FieldText")
 	}
-	if !strings.Contains(s, "{Name: \"count\", Type: fmt.FieldInt") {
+	if !strings.Contains(s, "{Name: \"count\", Type: model.FieldInt") {
 		t.Errorf("MyInt (int alias) should map to FieldInt")
 	}
 }
@@ -176,7 +176,7 @@ type Model struct {
 	}
 	for _, f := range info.Fields {
 		if f.Name == "IDs" {
-			if f.Type != fmt.FieldIntSlice {
+			if f.Type != model.FieldIntSlice {
 				t.Fatalf("IDs: expected FieldIntSlice (slice of alias of int), got %v", f.Type)
 			}
 			return
@@ -211,7 +211,7 @@ type Model struct {
 	}
 	s := string(content)
 
-	if !strings.Contains(s, "{Name: \"config\", Type: fmt.FieldRaw") {
+	if !strings.Contains(s, "{Name: \"config\", Type: model.FieldRaw") {
 		t.Errorf("config field should map to FieldRaw")
 	}
 
@@ -265,10 +265,10 @@ type Child struct { X string }
 	s := string(content)
 
 	// Verify schema has OmitEmpty: true
-	if !strings.Contains(s, "{Name: \"text\", Type: fmt.FieldText, OmitEmpty: true}") {
+	if !strings.Contains(s, "{Name: \"text\", Type: model.FieldText, OmitEmpty: true}") {
 		t.Errorf("text field should have OmitEmpty: true in schema")
 	}
-	if !strings.Contains(s, "{Name: \"raw\", Type: fmt.FieldRaw, OmitEmpty: true}") {
+	if !strings.Contains(s, "{Name: \"raw\", Type: model.FieldRaw, OmitEmpty: true}") {
 		t.Errorf("raw field should have OmitEmpty: true in schema")
 	}
 

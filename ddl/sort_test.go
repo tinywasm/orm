@@ -1,5 +1,7 @@
 package ddl
 
+import "github.com/tinywasm/model"
+
 import (
 	"testing"
 
@@ -13,17 +15,17 @@ type mockModel struct {
 }
 
 func (m *mockModel) ModelName() string         { return m.name }
-func (m *mockModel) Schema() []fmt.Field       { return nil }
+func (m *mockModel) Schema() []model.Field       { return nil }
 func (m *mockModel) Pointers() []any           { return nil }
 func (m *mockModel) IsNil() bool               { return m == nil }
-func (m *mockModel) EncodeFields(fmt.FieldWriter) {}
-func (m *mockModel) DecodeFields(fmt.FieldReader) {}
+func (m *mockModel) EncodeFields(model.FieldWriter) {}
+func (m *mockModel) DecodeFields(model.FieldReader) {}
 func (m *mockModel) SchemaExt() []orm.FieldExt { return m.exts }
 
 func TestTopologicalSort_NoDeps(t *testing.T) {
 	users := &mockModel{name: "users"}
 	roles := &mockModel{name: "roles"}
-	models := []fmt.Model{users, roles}
+	models := []model.Model{users, roles}
 
 	sorted, err := TopologicalSort(models)
 	if err != nil {
@@ -42,7 +44,7 @@ func TestTopologicalSort_WithFK(t *testing.T) {
 			{Ref: "users"},
 		},
 	}
-	models := []fmt.Model{sessions, users}
+	models := []model.Model{sessions, users}
 
 	sorted, err := TopologicalSort(models)
 	if err != nil {
@@ -73,7 +75,7 @@ func TestTopologicalSort_Cycle(t *testing.T) {
 		name: "b",
 		exts: []orm.FieldExt{{Ref: "a"}},
 	}
-	models := []fmt.Model{a, b}
+	models := []model.Model{a, b}
 
 	_, err := TopologicalSort(models)
 	if err == nil {
@@ -89,15 +91,15 @@ type basicModel struct {
 }
 
 func (m *basicModel) ModelName() string         { return m.name }
-func (m *basicModel) Schema() []fmt.Field       { return nil }
+func (m *basicModel) Schema() []model.Field       { return nil }
 func (m *basicModel) Pointers() []any           { return nil }
 func (m *basicModel) IsNil() bool               { return m == nil }
-func (m *basicModel) EncodeFields(fmt.FieldWriter) {}
-func (m *basicModel) DecodeFields(fmt.FieldReader) {}
+func (m *basicModel) EncodeFields(model.FieldWriter) {}
+func (m *basicModel) DecodeFields(model.FieldReader) {}
 
 func TestTopologicalSort_NoSchemaExt(t *testing.T) {
 	m := &basicModel{name: "m"}
-	models := []fmt.Model{m}
+	models := []model.Model{m}
 
 	sorted, err := TopologicalSort(models)
 	if err != nil {

@@ -1,28 +1,29 @@
 package ormc
 
+import "github.com/tinywasm/model"
+
 import (
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"strings"
 
-	"github.com/tinywasm/fmt"
 )
 
-var fieldTypeByName = map[string]fmt.FieldType{
-	"FieldText":   fmt.FieldText,
-	"FieldInt":    fmt.FieldInt,
-	"FieldFloat":  fmt.FieldFloat,
-	"FieldBool":   fmt.FieldBool,
-	"FieldBlob":   fmt.FieldBlob,
-	"FieldStruct": fmt.FieldStruct,
-	"FieldRaw":    fmt.FieldRaw,
+var fieldTypeByName = map[string]model.FieldType{
+	"FieldText":   model.FieldText,
+	"FieldInt":    model.FieldInt,
+	"FieldFloat":  model.FieldFloat,
+	"FieldBool":   model.FieldBool,
+	"FieldBlob":   model.FieldBlob,
+	"FieldStruct": model.FieldStruct,
+	"FieldRaw":    model.FieldRaw,
 }
 
-// parseGenerated extracts (modelName → []fmt.Field) from a generated *_orm.go
+// parseGenerated extracts (modelName → []model.Field) from a generated *_orm.go
 // file by reading its `func (m *T) ModelName() string { return "<table>" }` and
-// its `var _schema<T> = []fmt.Field{ … }` composite literal.
-func parseGenerated(path string) (map[string][]fmt.Field, error) {
+// its `var _schema<T> = []model.Field{ … }` composite literal.
+func parseGenerated(path string) (map[string][]model.Field, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
@@ -78,7 +79,7 @@ func parseGenerated(path string) (map[string][]fmt.Field, error) {
 		}
 	}
 
-	schemas := make(map[string][]fmt.Field)
+	schemas := make(map[string][]model.Field)
 	for _, decl := range node.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || gen.Tok != token.VAR {
@@ -109,13 +110,13 @@ func parseGenerated(path string) (map[string][]fmt.Field, error) {
 				continue
 			}
 
-			var fields []fmt.Field
+			var fields []model.Field
 			for _, elt := range lit.Elts {
 				fieldLit, ok := elt.(*ast.CompositeLit)
 				if !ok {
 					continue
 				}
-				var field fmt.Field
+				var field model.Field
 				for _, kv := range fieldLit.Elts {
 					kve, ok := kv.(*ast.KeyValueExpr)
 					if !ok {
@@ -162,8 +163,8 @@ func parseGenerated(path string) (map[string][]fmt.Field, error) {
 	return schemas, nil
 }
 
-func parseFieldDB(expr ast.Expr) *fmt.FieldDB {
-	// Expecting &fmt.FieldDB{...}
+func parseFieldDB(expr ast.Expr) *model.FieldDB {
+	// Expecting &model.FieldDB{...}
 	unary, ok := expr.(*ast.UnaryExpr)
 	if !ok || unary.Op != token.AND {
 		return nil
@@ -173,7 +174,7 @@ func parseFieldDB(expr ast.Expr) *fmt.FieldDB {
 		return nil
 	}
 
-	db := &fmt.FieldDB{}
+	db := &model.FieldDB{}
 	for _, elt := range lit.Elts {
 		kve, ok := elt.(*ast.KeyValueExpr)
 		if !ok {

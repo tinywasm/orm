@@ -1,6 +1,8 @@
 
 package ormc
 
+import "github.com/tinywasm/model"
+
 import (
 	"go/ast"
 	"go/parser"
@@ -21,7 +23,7 @@ const (
 type FieldInfo struct {
 	Name       string
 	ColumnName string
-	Type       fmt.FieldType
+	Type       model.FieldType
 	PK         bool
 	Unique     bool
 	NotNull    bool
@@ -260,7 +262,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 		}
 
 		// Field Type mapping
-		var fieldType fmt.FieldType
+		var fieldType model.FieldType
 		var typeStr string
 		var isPointer bool
 
@@ -307,23 +309,23 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 
 		switch typeStr {
 		case "string":
-			fieldType = fmt.FieldText
+			fieldType = model.FieldText
 		case "int", "int32", "int64", "uint", "uint32", "uint64":
-			fieldType = fmt.FieldInt
+			fieldType = model.FieldInt
 		case "float32", "float64":
-			fieldType = fmt.FieldFloat
+			fieldType = model.FieldFloat
 		case "bool":
-			fieldType = fmt.FieldBool
+			fieldType = model.FieldBool
 		case "[]byte":
-			fieldType = fmt.FieldBlob
-		case "RawJSON", "fmt.RawJSON":
-			fieldType = fmt.FieldRaw
+			fieldType = model.FieldBlob
+		case "RawJSON", "model.RawJSON":
+			fieldType = model.FieldRaw
 		case "[]int", "[]int32", "[]int64", "[]uint", "[]uint32", "[]uint64":
-			fieldType = fmt.FieldIntSlice
+			fieldType = model.FieldIntSlice
 		default:
 			if fmt.HasPrefix(typeStr, "[]") {
 				// Slice of struct (likely)
-				fieldType = fmt.FieldStructSlice
+				fieldType = model.FieldStructSlice
 				elemType := fmt.Convert(typeStr).TrimPrefix("[]").TrimPrefix("*").String()
 				info.SliceFields = append(info.SliceFields, SliceFieldInfo{
 					Name:     fieldName,
@@ -331,14 +333,14 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 				})
 			} else if typeStr != "" && !fmt.Contains(typeStr, "chan ") {
 				// If it's a struct (but not time.Time, not slice, not chan), map to FieldStruct
-				fieldType = fmt.FieldStruct
+				fieldType = model.FieldStruct
 			} else {
 				g.log(fmt.Sprintf("Warning: unsupported type %s for field %s.%s; skipping. Add db:\"-\" to suppress.", typeStr, structName, fieldName))
 				continue
 			}
 		}
 
-		if isPointer && fieldType != fmt.FieldStruct {
+		if isPointer && fieldType != model.FieldStruct {
 			g.log(fmt.Sprintf("Warning: pointers to primitive types not supported for field %s.%s; skipping. Add db:\"-\" to suppress.", structName, fieldName))
 			continue
 		}
@@ -393,7 +395,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 				case p == "not_null":
 					notNull = true
 				case p == "autoinc" || p == "autoincrement":
-					if fieldType == fmt.FieldText {
+					if fieldType == model.FieldText {
 						return StructInfo{}, fmt.Err("autoincrement not allowed on FieldText")
 					}
 					autoInc = true
@@ -418,7 +420,7 @@ func (g *Generator) ParseStruct(structName string, goFile string) (StructInfo, e
 					omitEmpty = true
 				}
 				if p == "raw" {
-					fieldType = fmt.FieldRaw
+					fieldType = model.FieldRaw
 				}
 			}
 		}
@@ -615,7 +617,7 @@ func writePermittedFields(buf *fmt.Conv, f FieldInfo) {
 		return
 	}
 
-	buf.Write(", Permitted: fmt.Permitted{")
+	buf.Write(", Permitted: model.Permitted{")
 	parts := []string{}
 	if f.Letters {
 		parts = append(parts, "Letters: true")
@@ -690,16 +692,16 @@ func (g *Generator) parseStructsInFile(path string) ([]StructInfo, error) {
 	return infos, nil
 }
 
-// asFields maps FieldInfo to fmt.Field for sync.
-func (s StructInfo) asFields() []fmt.Field {
-	fields := make([]fmt.Field, len(s.Fields))
+// asFields maps FieldInfo to model.Field for sync.
+func (s StructInfo) asFields() []model.Field {
+	fields := make([]model.Field, len(s.Fields))
 	for i, f := range s.Fields {
-		fields[i] = fmt.Field{
+		fields[i] = model.Field{
 			Name:      f.ColumnName,
 			Type:      f.Type,
 			NotNull:   f.NotNull,
 			OmitEmpty: f.OmitEmpty,
-			DB: &fmt.FieldDB{
+			DB: &model.FieldDB{
 				PK:      f.PK,
 				Unique:  f.Unique,
 				AutoInc: f.AutoInc,

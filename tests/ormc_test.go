@@ -2,6 +2,7 @@
 
 package tests
 
+
 import (
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 
 func TestOrmc(t *testing.T) {
 	// Regression: no_db structs with only primitive fields (no db: / input: tags)
-	// must still generate {Name}List for fmt.FielderSlice support.
+	// must still generate {Name}List for model.FielderSlice support.
 	//
 	// This was broken: {Name}List was guarded by !info.NoDB, so transport-only
 	// structs (e.g. TimeSlot returned by MCP list tools) never received a List type
@@ -38,15 +39,15 @@ func TestOrmc(t *testing.T) {
 		// MUST generate Schema/Pointers (Fielder contract)
 		mustHave := []string{
 			"func (m *TimeSlotResponse) ModelName() string {",
-			"func (m *TimeSlotResponse) Schema() []fmt.Field {",
+			"func (m *TimeSlotResponse) Schema() []model.Field {",
 			"func (m *TimeSlotResponse) Pointers() []any {",
 			// MUST generate List with all five FielderSlice methods
 			"type TimeSlotResponseList []*TimeSlotResponse",
-			"func (s *TimeSlotResponseList) Schema() []fmt.Field { return nil }",
+			"func (s *TimeSlotResponseList) Schema() []model.Field { return nil }",
 			"func (s *TimeSlotResponseList) Pointers() []any     { return nil }",
 			"func (s *TimeSlotResponseList) Len() int",
-			"func (s *TimeSlotResponseList) At(i int) fmt.Fielder",
-			"func (s *TimeSlotResponseList) Append() fmt.Fielder",
+			"func (s *TimeSlotResponseList) At(i int) model.Fielder",
+			"func (s *TimeSlotResponseList) Append() model.Fielder",
 		}
 		for _, want := range mustHave {
 			if !strings.Contains(s, want) {
@@ -87,7 +88,7 @@ func TestOrmc(t *testing.T) {
 		// MUST generate Fielder methods
 		expectedStrings := []string{
 			"func (m *LoginForm) ModelName() string {",
-			"func (m *LoginForm) Schema() []fmt.Field {",
+			"func (m *LoginForm) Schema() []model.Field {",
 			"func (m *LoginForm) Pointers() []any {",
 			"Widget: input.Email()",
 			"Widget: input.Password()",
@@ -136,13 +137,13 @@ func TestOrmc(t *testing.T) {
 		expectedStrings := []string{
 			"func (m *UserForm) ModelName() string {",
 			"return \"user_form\"",
-			"{Name: \"name\", Type: fmt.FieldText, Widget: input.Text(), Permitted: fmt.Permitted{Letters: true, Tilde: true, Spaces: true, Minimum: 2, Maximum: 100}}",
-			"{Name: \"email\", Type: fmt.FieldText, NotNull: true, Widget: input.Email()}",
-			"{Name: \"password\", Type: fmt.FieldText, NotNull: true, Widget: input.Password(), Permitted: fmt.Permitted{Minimum: 8}}",
-			"{Name: \"bio\", Type: fmt.FieldText, Widget: input.Textarea(), Permitted: fmt.Permitted{Tilde: true, Spaces: true}}",
-			"{Name: \"id\", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}, Widget: input.Text()}",
+			"{Name: \"name\", Type: model.FieldText, Widget: input.Text(), Permitted: model.Permitted{Letters: true, Tilde: true, Spaces: true, Minimum: 2, Maximum: 100}}",
+			"{Name: \"email\", Type: model.FieldText, NotNull: true, Widget: input.Email()}",
+			"{Name: \"password\", Type: model.FieldText, NotNull: true, Widget: input.Password(), Permitted: model.Permitted{Minimum: 8}}",
+			"{Name: \"bio\", Type: model.FieldText, Widget: input.Textarea(), Permitted: model.Permitted{Tilde: true, Spaces: true}}",
+			"{Name: \"id\", Type: model.FieldText, DB: &model.FieldDB{PK: true}, Widget: input.Text()}",
 			"func (m *UserForm) Validate(action byte) error {",
-			"return fmt.ValidateFields(action, m)",
+			"return model.ValidateFields(action, m)",
 			"\"github.com/tinywasm/form/input\"",
 		}
 
@@ -178,14 +179,14 @@ func TestOrmc(t *testing.T) {
 			"package tests",
 			"func (m *User) ModelName() string {",
 			"return \"user\"",
-			"func (m *User) Schema() []fmt.Field {",
-			"{Name: \"id\", Type: fmt.FieldInt, DB: &fmt.FieldDB{PK: true}}",
-			"{Name: \"first_name\", Type: fmt.FieldText, NotNull: true}",
-			"{Name: \"last_name\", Type: fmt.FieldText},",
-			"{Name: \"email\", Type: fmt.FieldText, DB: &fmt.FieldDB{Unique: true}}",
-			"{Name: \"score\", Type: fmt.FieldFloat},",
-			"{Name: \"is_active\", Type: fmt.FieldBool},",
-			"{Name: \"avatar\", Type: fmt.FieldBlob},",
+			"func (m *User) Schema() []model.Field {",
+			"{Name: \"id\", Type: model.FieldInt, DB: &model.FieldDB{PK: true}}",
+			"{Name: \"first_name\", Type: model.FieldText, NotNull: true}",
+			"{Name: \"last_name\", Type: model.FieldText},",
+			"{Name: \"email\", Type: model.FieldText, DB: &model.FieldDB{Unique: true}}",
+			"{Name: \"score\", Type: model.FieldFloat},",
+			"{Name: \"is_active\", Type: model.FieldBool},",
+			"{Name: \"avatar\", Type: model.FieldBlob},",
 			"func (m *User) Pointers() []any {",
 			"&m.ID",
 			"&m.FirstName",
@@ -195,13 +196,13 @@ func TestOrmc(t *testing.T) {
 			"func ReadOneUser(qb *orm.QB, model *User) (*User, error) {",
 			"func ReadAllUser(qb *orm.QB) (UserList, error) {",
 			"type UserList []*User",
-			"func (s *UserList) Schema() []fmt.Field { return nil }",
+			"func (s *UserList) Schema() []model.Field { return nil }",
 			"func (s *UserList) Pointers() []any     { return nil }",
 			"func (s *UserList) Len() int             { return len(*s) }",
-			"func (s *UserList) At(i int) fmt.Fielder { return (*s)[i] }",
-			"func (s *UserList) Append() fmt.Fielder",
-			"func (m *User) EncodeFields(w fmt.FieldWriter) {",
-			"func (m *User) DecodeFields(r fmt.FieldReader) {",
+			"func (s *UserList) At(i int) model.Fielder { return (*s)[i] }",
+			"func (s *UserList) Append() model.Fielder",
+			"func (m *User) EncodeFields(w model.FieldWriter) {",
+			"func (m *User) DecodeFields(r model.FieldReader) {",
 			"func (m *User) IsNil() bool {",
 		}
 
@@ -235,8 +236,8 @@ func TestOrmc(t *testing.T) {
 		content := string(contentBytes)
 
 		expectedStrings := []string{
-			"{Name: \"id\", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}}",
-			"{Name: \"user_id\", Type: fmt.FieldInt},",
+			"{Name: \"id\", Type: model.FieldText, DB: &model.FieldDB{PK: true}}",
+			"{Name: \"user_id\", Type: model.FieldInt},",
 		}
 
 		for _, expected := range expectedStrings {
@@ -317,11 +318,11 @@ func TestOrmc(t *testing.T) {
 
 		expectedStrings := []string{
 			// int32 → FieldInt
-			`{Name: "idnumeric", Type: fmt.FieldInt, DB: &fmt.FieldDB{PK: true}, NotNull: true}`,
+			`{Name: "idnumeric", Type: model.FieldInt, DB: &model.FieldDB{PK: true}, NotNull: true}`,
 			// uint64 → FieldInt
-			`{Name: "count_uint", Type: fmt.FieldInt},`,
+			`{Name: "count_uint", Type: model.FieldInt},`,
 			// float32 → FieldFloat
-			`{Name: "ratio_f32", Type: fmt.FieldFloat},`,
+			`{Name: "ratio_f32", Type: model.FieldFloat},`,
 		}
 
 		for _, expected := range expectedStrings {
@@ -368,11 +369,11 @@ func TestOrmc(t *testing.T) {
 		content := string(contentBytes)
 
 		expectedStrings := []string{
-			`{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}, Widget: input.Text()}`,
-			`{Name: "name", Type: fmt.FieldText, Widget: input.Text()}`,
-			`{Name: "email", Type: fmt.FieldText, Widget: input.Email()}`,
-			`{Name: "bio", Type: fmt.FieldText, Widget: input.Textarea()}`,
-			`{Name: "home_addr", Type: fmt.FieldStruct}`,
+			`{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}, Widget: input.Text()}`,
+			`{Name: "name", Type: model.FieldText, Widget: input.Text()}`,
+			`{Name: "email", Type: model.FieldText, Widget: input.Email()}`,
+			`{Name: "bio", Type: model.FieldText, Widget: input.Textarea()}`,
+			`{Name: "home_addr", Type: model.FieldStruct}`,
 		}
 
 		for _, expected := range expectedStrings {
@@ -398,12 +399,12 @@ func TestOrmc(t *testing.T) {
 		content := string(contentBytes)
 
 		// Addr (*Address) should be present as FieldStruct
-		if !strings.Contains(content, `{Name: "addr", Type: fmt.FieldStruct}`) {
+		if !strings.Contains(content, `{Name: "addr", Type: model.FieldStruct}`) {
 			t.Errorf("Generated file missing expected string for Addr:\n%s", content)
 		}
 
 		// Count (*int) should be ABSENT
-		if !strings.Contains(content, `{Name: "id", Type: fmt.FieldText, DB: &fmt.FieldDB{PK: true}}`) {
+		if !strings.Contains(content, `{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}}`) {
 			t.Errorf("Generated file missing expected string for ID:\n%s", content)
 		}
 
@@ -424,12 +425,12 @@ func TestOrmc(t *testing.T) {
 		}
 		defer os.Remove(outFile)
 		content := string(contentBytes)
-		if !strings.Contains(content, "fmt.FieldStruct") {
+		if !strings.Contains(content, "model.FieldStruct") {
 			t.Errorf("expected FieldStruct in generated output, got:\n%s", content)
 		}
 	})
 
-	t.Run("fmt.RawJSON type generates FieldRaw", func(t *testing.T) {
+	t.Run("model.RawJSON type generates FieldRaw", func(t *testing.T) {
 		err := ormc.New().GenerateForStruct("MCPResponse", "models.go")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -445,8 +446,8 @@ func TestOrmc(t *testing.T) {
 		s := string(content)
 
 		mustHave := []string{
-			`{Name: "result", Type: fmt.FieldRaw`,
-			`{Name: "error", Type: fmt.FieldRaw, OmitEmpty: true`,
+			`{Name: "result", Type: model.FieldRaw`,
+			`{Name: "error", Type: model.FieldRaw, OmitEmpty: true`,
 		}
 		for _, want := range mustHave {
 			if !strings.Contains(s, want) {
@@ -471,15 +472,15 @@ func TestOrmc(t *testing.T) {
 		s := string(content)
 
 		mustHave := []string{
-			`{Name: "message", Type: fmt.FieldText`,
-			`{Name: "code", Type: fmt.FieldText, OmitEmpty: true`,
+			`{Name: "message", Type: model.FieldText`,
+			`{Name: "code", Type: model.FieldText, OmitEmpty: true`,
 		}
 		for _, want := range mustHave {
 			if !strings.Contains(s, want) {
 				t.Errorf("missing expected string: %s\nContent:\n%s", want, s)
 			}
 		}
-		if strings.Contains(s, "fmt.FieldRaw") {
+		if strings.Contains(s, "model.FieldRaw") {
 			t.Error("should not contain FieldRaw")
 		}
 	})
@@ -498,7 +499,7 @@ func TestOrmc(t *testing.T) {
 		defer os.Remove(outFile)
 
 		content := string(contentBytes)
-		expected := `{Name: "id", Type: fmt.FieldInt, DB: &fmt.FieldDB{PK: true, AutoInc: true}`
+		expected := `{Name: "id", Type: model.FieldInt, DB: &model.FieldDB{PK: true, AutoInc: true}`
 		if !strings.Contains(content, expected) {
 			t.Errorf("Expected string: %q not found in output:\n%s", expected, content)
 		}

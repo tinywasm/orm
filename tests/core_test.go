@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tinywasm/fmt"
+	mdl "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 
@@ -18,7 +18,7 @@ func RunCoreTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "name"}, {Name: "age"}},
+			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 			Vals:  []any{"Alice", 30},
 		}
 
@@ -46,7 +46,7 @@ func RunCoreTests(t *testing.T) {
 
 		model := &MockModel{
 			Table: "user",
-			Sch:   []fmt.Field{{Name: "age"}},
+			Sch:   []mdl.Field{{Name: "age"}},
 			Vals:  []any{31},
 		}
 
@@ -145,11 +145,11 @@ func RunCoreTests(t *testing.T) {
 
 		newCalled := 0
 		onRowCalled := 0
-		newFunc := func() fmt.Model {
+		newFunc := func() mdl.Model {
 			newCalled++
 			return &MockModel{}
 		}
-		onRow := func(m fmt.Model) {
+		onRow := func(m mdl.Model) {
 			onRowCalled++
 		}
 
@@ -187,7 +187,7 @@ func RunCoreTests(t *testing.T) {
 		db := orm.New(&MockExecutor{}, &MockCompiler{})
 		model := &MockModel{
 			Table:    "user",
-			Sch:      []fmt.Field{{Name: "col1"}},
+			Sch:      []mdl.Field{{Name: "col1"}},
 			Vals:     []any{1},
 			ValidErr: errors.New("custom validation error"),
 		}
@@ -203,7 +203,7 @@ func RunCoreTests(t *testing.T) {
 		db := orm.New(&MockExecutor{}, &MockCompiler{})
 		model := &MockModel{
 			Table:    "user",
-			Sch:      []fmt.Field{{Name: "col1"}},
+			Sch:      []mdl.Field{{Name: "col1"}},
 			Vals:     []any{1},
 			ValidErr: errors.New("custom validation error"),
 		}
@@ -417,7 +417,7 @@ func RunCoreTests(t *testing.T) {
 		mockExec.ReturnQueryRows = &MockRows{Count: 0}
 		db.Query(model).
 			Limit(5).
-			ReadAll(func() fmt.Model { return nil }, func(fmt.Model) {})
+			ReadAll(func() mdl.Model { return nil }, func(mdl.Model) {})
 
 		if mockCompiler.LastQuery.Limit != 5 {
 			t.Errorf("Expected Limit 5, got %d", mockCompiler.LastQuery.Limit)
@@ -474,7 +474,7 @@ func RunCoreTests(t *testing.T) {
 
 	// 16. Errors coverage
 	t.Run("Errors", func(t *testing.T) {
-		model := &MockModel{Table: "t", Sch: []fmt.Field{{Name: "a"}}, Vals: []any{1}}
+		model := &MockModel{Table: "t", Sch: []mdl.Field{{Name: "a"}}, Vals: []any{1}}
 
 		// Create Plan Error
 		db1 := orm.New(&MockExecutor{}, &MockCompiler{ReturnErr: errors.New("plan err")})
@@ -554,8 +554,8 @@ func RunCoreTests(t *testing.T) {
 		}
 		// ReadAll Scan Error
 		db5 := orm.New(&MockExecutor{ReturnQueryRows: &MockRows{Count: 1, ScanErr: errors.New("scan err")}}, &MockCompiler{})
-		f := func() fmt.Model { return &MockModel{} }
-		e := func(m fmt.Model) {}
+		f := func() mdl.Model { return &MockModel{} }
+		e := func(m mdl.Model) {}
 		if err := db5.Query(model).ReadAll(f, e); err == nil || err.Error() != "scan err" {
 			t.Errorf("Expected scan err, got %v", err)
 		}
