@@ -36,7 +36,7 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 	}
 
 	buf.Write("import (\n")
-	buf.Write("\t\"github.com/tinywasm/fmt\"\n")
+	buf.Write("\t\"github.com/tinywasm/model\"\n")
 	if hasModel {
 		buf.Write("\t\"github.com/tinywasm/orm\"\n")
 	}
