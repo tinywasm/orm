@@ -3,7 +3,7 @@ module github.com/tinywasm/orm/cmd/ddlc
 go 1.25.2
 
 require (
-	github.com/tinywasm/orm v0.9.20
+	github.com/tinywasm/orm v0.9.21
 	github.com/tinywasm/postgres v0.3.4
 	github.com/tinywasm/sqlt v0.0.6
 )
