@@ -93,6 +93,8 @@ type Field struct {
     Widget    Widget     // interfaz; nil = sin binding de UI
     DB        *FieldDB   // nil para structs transporte/form-only
     Ref       *Definition // solo FieldStruct/FieldStructSlice: Definition anidada (referencia tipada).
+    Exclude   bool        // el campo existe en el struct generado pero NO entra en
+                          // Pointers()/EncodeFields()/DecodeFields() — sin persistencia, sin codec.
     Permitted            // reglas de validación (embebido)
 }
 
@@ -162,6 +164,43 @@ ormc lee del AST el identificador referenciado (`&AddressModel` → `AddressMode
 de §4.2 (`<Struct>Model`→`Struct`) → tipo anidado `Address`. Si `Ref` es nil → **falla ruidoso**. Como
 `Ref` es tipado, una referencia inexistente **no compila** (no llega al generador). Selector de otro
 paquete (`pkg.AddressModel`) → tipo `pkg.Address`.
+
+### 4.5 `Field.Exclude` — campo en el struct, fuera del codec
+
+Caso real que motiva este campo: un `password_hash` que el struct debe poder llevar en memoria (código
+de aplicación lo setea/compara por un canal propio), pero que **nunca** debe pasar por scan de DB ni
+por el codec JSON.
+
+```go
+{Name: "password_hash", Type: model.FieldText, Exclude: true}
+```
+
+Reglas de emisión cuando `Exclude == true`. **Invariante que no se puede romper:** `Schema()` y
+`Pointers()` deben seguir siendo paralelos — misma longitud, mismo índice i-ésimo referido al mismo
+campo (contrato de `model.Fielder`, del que dependen `orm` scan, `form.sync`, `json` codec). Por tanto:
+
+- **Sí** emitir el campo en el `type struct` generado (con su tipo Go normal según §4.4) — vive en el
+  struct, se puede leer/escribir desde código de aplicación.
+- **`Schema()` NO incluye** los campos con `Exclude == true`: devuelve solo el subconjunto no
+  excluido, en su orden relativo original.
+- **`Pointers()` NO incluye** el puntero de esos campos: mismo subconjunto, mismo orden — preservando
+  el paralelismo con `Schema()`.
+- **`EncodeFields()`/`DecodeFields()` NO los tocan.**
+- `Definition.Fields` (la fuente de verdad que el autor escribió) SÍ conserva el campo completo con
+  `Exclude: true` — es metadata de generación, no se filtra ahí. El filtro ocurre solo en lo que
+  `ormc` emite como `Schema()`/`Pointers()`.
+
+**Zero-alloc con exclusión:** si ninguna `Field` tiene `Exclude: true`, `Schema()` sigue siendo
+`return XModel.Fields` directo (caso de hoy). Si **alguna** lo tiene, `ormc` debe emitir además una
+variable de paquete filtrada en tiempo de generación (no en runtime) y devolverla:
+
+```go
+var _schemaStaff = []model.Field{ /* subconjunto de StaffModel.Fields sin password_hash */ }
+func (m *Staff) Schema() []model.Field { return _schemaStaff }
+```
+
+Sigue siendo zero-alloc (variable de paquete); el filtrado ocurre una vez, en build-time, no en cada
+llamada.
 
 ---
 
@@ -286,6 +325,9 @@ la fuente de campos es la `Definition` leída, (b) emitir el `type struct`, (c) 
   `Validate`, `XList` (+8 métodos), `ReadOneX`/`ReadAllX`, `ModelName()`.
 - Una `Definition` cuya variable no termina en `Model`, o un `FieldStruct`/`FieldStructSlice` con
   `Ref` nil, produce un **error de generación ruidoso** (no un fallo silencioso).
+- Un campo con `Exclude: true` aparece en el `type struct` generado pero **no** en `Pointers()` ni en
+  `EncodeFields()`/`DecodeFields()`; `Schema()` y `Pointers()` siguen siendo paralelos (misma longitud,
+  mismo índice) tras el filtrado.
 - No queda parseo de tags string ni comentarios `// ormc:form*` en el camino de lectura.
 - El código generado no importa stdlib prohibida ni usa `reflect`.
 
@@ -297,7 +339,7 @@ la fuente de campos es la `Definition` leída, (b) emitir el `type struct`, (c) 
 |---|---|---|---|
 | 1 | Lector de `Definition` | `parse_definition.go`: AST → estructura interna (var, Name, Fields) | lee el literal de §1 correctamente |
 | 2 | Mapeos | `Field.Type`(+`Ref` para anidados)→tipo Go; `Field.Name`→ident Go; nombre struct desde var | tablas de §4 cubiertas + errores ruidosos |
-| 3 | Emisión | adaptar `generate.go`: emitir `type struct` + `Schema()`→`Var.Fields` + resto | salida == §5 |
+| 3 | Emisión | adaptar `generate.go`: emitir `type struct` + `Schema()`→`Var.Fields` (o filtrado si hay `Exclude`) + resto | salida == §5, `Exclude` respetado (§4.5) |
 | 4 | Retirar canal viejo | borrar tags/struct-parse (§6) | no quedan referencias; compila |
 | 5 | Migrar fuentes propias | `tests/models.go`, regenerar `*_orm.go`, ajustar tests | `gotest ./...` verde |
 | 6 | Docs | ARQUITECTURE/README/WHY actualizados | reflejan el flujo invertido |
