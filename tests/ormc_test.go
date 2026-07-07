@@ -36,7 +36,7 @@ func TestOrmc(t *testing.T) {
 			"package tests",
 			"func (m *User) ModelName() string { return \"user\" }",
 			"func (m *User) Schema() []model.Field { return UserModel.Fields }",
-			"func (m *User) Pointers() []any { return []any{&m.ID, &m.FirstName, &m.LastName, &m.Email, &m.Score, &m.IsActive, &m.Avatar} }",
+			"func (m *User) Pointers() []any { return []any{&m.Id, &m.FirstName, &m.LastName, &m.Email, &m.Score, &m.IsActive, &m.Avatar} }",
 			"func ReadOneUser(qb *orm.QB, model *User) (*User, error) {",
 			"func ReadAllUser(qb *orm.QB) (UserList, error) {",
 			"type UserList []*User",
@@ -62,6 +62,7 @@ func TestOrmc(t *testing.T) {
 		expectedStrings := []string{
 			"func (m *Order) SchemaExt() []orm.FieldExt {",
 			"Ref: \"user\", RefColumn: \"id\"",
+			"var User_ = struct {",
 		}
 
 		for _, expected := range expectedStrings {

@@ -33,7 +33,7 @@ The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt
 - **`orm/ormc` is a separate Go subpackage** (package `ormc`). It is backend-only by nature: its stdlib deps (`go/ast`, `go/parser`, `os/exec`) make it impossible to import from WASM — no `//go:build` tags needed or allowed in the subpackage.
 - **`orm/ormc` does not import the root `orm` package.** It emits runtime type names as string literals inside generated code (`"orm.QB"`, `"orm.DB"`). This keeps the dependency graph cycle-free.
 - **No new constructors per flag combination.** If a tag changes one boolean, expose a setter on the widget (`SetTilde(bool) *text`) and have `ormc` emit it. Don't create `TextNoTilde()`, `TextNoTildeNoSpaces()`, etc.
-- **Directives are orthogonal and composable.** Use atomic directives: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers, `orm:typed_fields` for field accessors.
+- **Directives are orthogonal and composable.** Use atomic directives: `orm:form_widgets` for the form layer, `orm:no_db` for suppressing DB helpers.
 - **One source of truth per concern.** Widget defaults live in the widget. Tag → setter mapping lives in `ormc`. Validation rules live in `fmt.Permitted`. Do not duplicate.
 - **Typed serialization codec.** `ormc` also emits `EncodeFields(w fmt.FieldWriter)` /
   `DecodeFields(r fmt.FieldReader)` (the typed visitor codec from `tinywasm/fmt`). These MUST be

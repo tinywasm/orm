@@ -324,17 +324,15 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 
 		if !info.NoDB {
 			// Metadata Descriptors
-			if info.WantTypedFields {
-				buf.Write(fmt.Sprintf("var %s_ = struct {\n", info.Name))
-				for _, f := range info.Fields {
-					buf.Write(fmt.Sprintf("\t%s string\n", f.Name))
-				}
-				buf.Write("}{\n")
-				for _, f := range info.Fields {
-					buf.Write(fmt.Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
-				}
-				buf.Write("}\n\n")
+			buf.Write(fmt.Sprintf("var %s_ = struct {\n", info.Name))
+			for _, f := range info.Fields {
+				buf.Write(fmt.Sprintf("\t%s string\n", f.Name))
 			}
+			buf.Write("}{\n")
+			for _, f := range info.Fields {
+				buf.Write(fmt.Sprintf("\t%s: \"%s\",\n", f.Name, f.ColumnName))
+			}
+			buf.Write("}\n\n")
 
 			// Typed Read Operations
 			buf.Write(fmt.Sprintf("func ReadOne%s(qb *orm.QB, model *%s) (*%s, error) {\n", info.Name, info.Name, info.Name))
