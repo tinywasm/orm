@@ -7,3 +7,5 @@ require (
 	github.com/tinywasm/model v0.0.5
 	github.com/tinywasm/modfind v0.0.4
 )
+
+replace github.com/tinywasm/orm => ../../

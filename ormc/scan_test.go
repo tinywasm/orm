@@ -31,9 +31,13 @@ func TestScanModules(t *testing.T) {
 	writableDir := filepath.Join(tmpDir, "writable")
 	os.MkdirAll(writableDir, 0755)
 	os.WriteFile(filepath.Join(writableDir, "model.go"), []byte(`package main
-type User struct {
-	ID   string `+"`"+`db:"pk"`+"`"+`
-	Name string
+import "github.com/tinywasm/model"
+var UserModel = model.Definition{
+	Name: "user",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+	},
 }
 `), 0644)
 

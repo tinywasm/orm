@@ -14,3 +14,5 @@ require (
 	github.com/tinywasm/model v0.0.5 // indirect
 	github.com/tinywasm/modfind v0.0.4 // indirect
 )
+
+replace github.com/tinywasm/orm => ../../
