@@ -11,6 +11,6 @@ require (
 require (
 	github.com/lib/pq v1.11.2 // indirect
 	github.com/tinywasm/fmt v0.25.0 // indirect
-	github.com/tinywasm/model v0.0.2 // indirect
+	github.com/tinywasm/model v0.0.3 // indirect
 	github.com/tinywasm/modfind v0.0.4 // indirect
 )
