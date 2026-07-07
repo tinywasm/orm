@@ -760,3 +760,4 @@ func ReadAllShortAutoInc(qb *orm.QB) (ShortAutoIncList, error) {
 	)
 	return results, err
 }
+

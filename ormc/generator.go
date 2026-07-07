@@ -50,13 +50,6 @@ type FieldInfo struct {
 	Tags              []string // input modifiers e.g. "notilde", "min=2"
 }
 
-// SliceFieldInfo records a slice-of-struct field found in a parent struct.
-// Not DB-mapped; used only for relation resolution.
-type SliceFieldInfo struct {
-	Name     string // e.g. "Roles"
-	ElemType string // e.g. "Role"
-}
-
 type StructInfo struct {
 	Name              string
 	ModelName         string
@@ -68,7 +61,6 @@ type StructInfo struct {
 	NoDB              bool
 	WantTypedFields   bool
 	SourceFile        string
-	SliceFields       []SliceFieldInfo // populated by ParseStruct; used by ResolveRelations
 }
 
 // buildAliasMap scans all .go files in dir and returns a map of

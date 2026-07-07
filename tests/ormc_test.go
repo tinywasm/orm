@@ -15,9 +15,7 @@ func TestOrmc(t *testing.T) {
 	t.Run("Generate User", func(t *testing.T) {
 		o := ormc.New()
 		cwd, _ := os.Getwd()
-		t.Logf("CWD: %s", cwd)
 		o.SetRootDir(cwd)
-		o.SetLog(t.Log)
 
 		err := o.Run()
 		if err != nil {
