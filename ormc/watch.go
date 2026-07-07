@@ -7,16 +7,15 @@ func (g *Generator) NewFileEvent(fileName, extension, filePath, event string) er
 	}
 
 	// 1. Parse only that file
-	infos, err := g.parseStructsInFile(filePath)
+	infos, err := g.parseDefinitionsInFile(filePath)
 	if err != nil {
 		return err
 	}
 
-	// 2. Merge into cache and resolve relations
+	// 2. Merge into cache
 	for _, info := range infos {
 		g.cache[info.Name] = info
 	}
-	g.ResolveRelations(g.cache)
 
 	// 3. Regenerate just <file>_orm.go
 	if err := g.GenerateForFile(infos, filePath); err != nil {

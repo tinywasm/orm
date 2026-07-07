@@ -54,16 +54,15 @@ func (g *Generator) scanWritableModule(dir string) error {
 
 		fileName := info.Name()
 		if fileName == "model.go" || fileName == "models.go" {
-			infos, err := g.parseStructsInFile(path)
+			infos, err := g.parseDefinitionsInFile(path)
 			if err != nil {
 				return nil // skip unparseable
 			}
 
-			// Merge into cache for relation resolution
+			// Merge into cache
 			for _, info := range infos {
 				g.cache[info.Name] = info
 			}
-			g.ResolveRelations(g.cache)
 
 			// Generate in-place
 			if err := g.GenerateForFile(infos, path); err != nil {

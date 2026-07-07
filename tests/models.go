@@ -1,161 +1,131 @@
 package tests
 
 import (
-	"time"
-
 	"github.com/tinywasm/model"
 )
 
-//go:generate ormc
-
-// orm:typed_fields
-type User struct {
-	ID        int    `db:"pk"`
-	FirstName string `db:"not_null"`
-	LastName  string
-	Email     string `db:"unique"`
-	Score     float64
-	IsActive  bool
-	Avatar    []byte
-	age       int // unexported
+var UserModel = model.Definition{
+	Name: "user",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldInt, DB: &model.FieldDB{PK: true}},
+		{Name: "first_name", Type: model.FieldText, NotNull: true},
+		{Name: "last_name", Type: model.FieldText},
+		{Name: "email", Type: model.FieldText, DB: &model.FieldDB{Unique: true}},
+		{Name: "score", Type: model.FieldFloat},
+		{Name: "is_active", Type: model.FieldBool},
+		{Name: "avatar", Type: model.FieldBlob},
+	},
 }
 
-type Order struct {
-	ID     string `db:"pk"`
-	UserID int    `db:"ref=user:id"`
-	Total  float64
+var OrderModel = model.Definition{
+	Name: "order",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "user_id", Type: model.FieldInt, Ref: &UserModel, DB: &model.FieldDB{RefColumn: "id"}},
+		{Name: "total", Type: model.FieldFloat},
+	},
 }
 
-type BadTimeNoTag struct {
-	ID        string `db:"pk"`
-	Name      string
-	CreatedAt time.Time
+var ModelWithIgnoredModel = model.Definition{
+	Name: "model_with_ignored",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+		{Name: "tags", Type: model.FieldText, Exclude: true}, // Exclude replaces the need for db:"-" for in-memory fields
+		{Name: "score", Type: model.FieldFloat},
+	},
 }
 
-type ModelWithIgnored struct {
-	ID      string `db:"pk"`
-	Name    string
-	Tags    []string `db:"-"` // slice: silently ignored
-	Friends []User   `db:"-"` // struct slice: silently ignored
-	Score   float64
+var MultiAModel = model.Definition{
+	Name: "multi_a_records",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+	},
 }
 
-type MultiA struct {
-	ID   string `db:"pk"`
-	Name string
+var MultiBModel = model.Definition{
+	Name: "multi_b",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "value", Type: model.FieldInt},
+	},
 }
 
-func (MultiA) ModelName() string { return "multi_a_records" } // manually declared → D5
-
-type MultiB struct {
-	ID    string `db:"pk"`
-	Value int64
+var NumericTypesModel = model.Definition{
+	Name: "numeric_types",
+	Fields: model.Fields{
+		{Name: "id_numeric", Type: model.FieldInt, DB: &model.FieldDB{PK: true}},
+		{Name: "count_uint", Type: model.FieldInt},
+		{Name: "ratio_f32", Type: model.FieldFloat},
+	},
 }
 
-type BadAutoInc struct {
-	ID string `db:"autoincrement"`
+var RefNoColumnModel = model.Definition{
+	Name: "ref_no_column",
+	Fields: model.Fields{
+		{Name: "id_ref", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "parent_id", Type: model.FieldInt, Ref: &MultiAModel},
+	},
 }
 
-type Unsupp struct {
-	Ch chan int
+var PointerReceiverModel = model.Definition{
+	Name: "ptr_table",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+	},
 }
 
-// NumericTypes covers int32, uint64, float32 mapping and bitmask constraints.
-type NumericTypes struct {
-	IDNumeric int32 `db:"pk,not_null"` // PK + NotNull → bitmask 5
-	CountUint uint64
-	RatioF32  float32
+var UserFormModel = model.Definition{
+	Name: "user_form",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText, Permitted: model.Permitted{Minimum: 2, Maximum: 100}},
+		{Name: "email", Type: model.FieldText, NotNull: true},
+		{Name: "password", Type: model.FieldText, NotNull: true, Permitted: model.Permitted{Minimum: 8}},
+		{Name: "bio", Type: model.FieldText, Permitted: model.Permitted{Tilde: true, Spaces: true}},
+		{Name: "age", Type: model.FieldInt},
+	},
 }
 
-// RefNoColumn covers db:"ref=table" without a specific column (RefColumn must be "").
-type RefNoColumn struct {
-	IDRef    string `db:"pk"`
-	ParentID int64  `db:"ref=parent"`
+var LoginFormModel = model.Definition{
+	Name: "login_form",
+	Fields: model.Fields{
+		{Name: "email", Type: model.FieldText, NotNull: true},
+		{Name: "password", Type: model.FieldText, NotNull: true},
+	},
 }
 
-// PointerReceiver tests that detectTableName handles pointer receivers (*T).
-type PointerReceiver struct {
-	ID   string `db:"pk"`
-	Name string
+var AddressModel = model.Definition{
+	Name: "address",
+	Fields: model.Fields{
+		{Name: "street", Type: model.FieldText},
+		{Name: "city", Type: model.FieldText},
+	},
 }
 
-func (*PointerReceiver) ModelName() string { return "ptr_table" }
-
-// MockParent / MockChild: relation auto-detection fixture.
-type MockParent struct {
-	ID   string `db:"pk"`
-	Name string
-	Kids []MockChild // no tag — relation auto-detected via MockChild.MockParentID
+var UserWithCompositionModel = model.Definition{
+	Name: "user_with_composition",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.FieldText},
+		{Name: "home_addr", Type: model.FieldStruct, Ref: &AddressModel},
+	},
 }
 
-type MockChild struct {
-	ID           string `db:"pk"`
-	MockParentID string `db:"ref=mock_parent"`
-	Value        string
+var UserWithNoTildeModel = model.Definition{
+	Name: "user_with_no_tilde",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
+		{Name: "nombre", Type: model.FieldText, NotNull: true},
+	},
 }
 
-// orm:form_widgets
-type UserForm struct {
-	ID       string `db:"pk"`
-	Name     string `input:"name,min=2,max=100"`
-	Email    string `db:"not_null" input:"email,required"`
-	Password string `input:"password,required,min=8"`
-	Bio      string `input:"textarea,tilde,spaces"`
-	Age      int64
-}
-
-type LoginForm struct {
-	Email    string `input:"email,required"`
-	Password string `input:"password,required"`
-}
-
-type TimeSlotResponse struct {
-	StartUTC int64
-	EndUTC   int64
-}
-
-type Address struct {
-	Street string
-	City   string
-}
-
-type UserWithJSON struct {
-	ID       string  `db:"pk"`
-	Name     string  ``
-	Email    string  `input:"email"`
-	Bio      string  `input:"textarea"`
-	HomeAddr Address ``
-}
-
-type WithPointers struct {
-	ID    string   `db:"pk"`
-	Count *int     // pointer to primitive -> should be skipped with warning
-	Addr  *Address // pointer to struct -> FieldStruct
-}
-
-type MCPResponse struct {
-	Result model.RawJSON
-	Error  model.RawJSON `json:",omitempty"`
-}
-
-type PlainResponse struct {
-	Message string `json:"message"`
-	Code    string `json:",omitempty"`
-}
-
-type UserWithNoTilde struct {
-	ID     string `db:"pk"`
-	Nombre string `input:"required,notilde"`
-}
-
-// orm:form_widgets
-type UserWithNoTildeAndMin struct {
-	ID     string `db:"pk"`
-	Nombre string `input:"required,min=2,notilde"`
-}
-
-// orm:form_widgets
-type ShortAutoInc struct {
-	ID    int `db:"pk,autoinc"`
-	Value int64
+var ShortAutoIncModel = model.Definition{
+	Name: "short_auto_inc",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldInt, DB: &model.FieldDB{PK: true, AutoInc: true}},
+		{Name: "value", Type: model.FieldInt},
+	},
 }
