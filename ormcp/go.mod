@@ -8,7 +8,7 @@ require (
 	github.com/tinywasm/json v0.5.8
 	github.com/tinywasm/mcp v0.1.16
 	github.com/tinywasm/model v0.0.5
-	github.com/tinywasm/orm v0.9.22
+	github.com/tinywasm/orm v0.9.23
 )
 
 require (
@@ -17,5 +17,3 @@ require (
 	github.com/tinywasm/time v0.5.0 // indirect
 	github.com/tinywasm/unixid v0.2.23 // indirect
 )
-
-replace github.com/tinywasm/orm => ../
