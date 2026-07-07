@@ -158,7 +158,7 @@ func (g *Generator) parseField(cl *ast.CompositeLit) (FieldInfo, error) {
 		case "Name":
 			if lit, ok := kv.Value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 				fi.ColumnName, _ = strconv.Unquote(lit.Value)
-				fi.Name = ToPascalCase(fi.ColumnName)
+				fi.Name = fmt.Convert(fi.ColumnName).CamelUp().String()
 			}
 		case "Type":
 			fi.Type = parseFieldType(kv.Value)
@@ -355,35 +355,6 @@ func ToSnakeCase(s string) string {
 	return fmt.Convert(s).SnakeLow().String()
 }
 
-func ToPascalCase(s string) string {
-	parts := strings.Split(s, "_")
-	for i, p := range parts {
-		lp := strings.ToLower(p)
-		if upper, ok := knownUpper[lp]; ok {
-			parts[i] = upper
-		} else {
-			if len(lp) > 0 {
-				parts[i] = strings.ToUpper(lp[:1]) + lp[1:]
-			}
-		}
-	}
-	return strings.Join(parts, "")
-}
-
-var knownUpper = map[string]string{
-	"id":   "ID",
-	"url":  "URL",
-	"api":  "API",
-	"http": "HTTP",
-	"json": "JSON",
-	"sql":  "SQL",
-	"uuid": "UUID",
-	"db":   "DB",
-	"ip":   "IP",
-	"html": "HTML",
-	"css":  "CSS",
-	"js":   "JS",
-}
 
 func FieldTypeToGoType(ft model.FieldType, ref string) string {
 	switch ft {

@@ -295,7 +295,62 @@ var UserModel = model.Definition{
 	}
 
 	// Pointers should be filtered
-	if !strings.Contains(s, "return []any{&m.ID, &m.Name}") {
+	if !strings.Contains(s, "return []any{&m.Id, &m.Name}") {
 		t.Errorf("Pointers() should not include &m.Secret")
+	}
+}
+
+func TestGenerate_AlwaysOnHelper(t *testing.T) {
+	src := `package p
+import "github.com/tinywasm/model"
+var ItemModel = model.Definition{
+	Name: "item",
+	Fields: model.Fields{
+		{Name: "id", Type: model.FieldInt, DB: &model.FieldDB{PK: true}},
+		{Name: "tenant_id", Type: model.FieldText},
+		{Name: "sku", Type: model.FieldText},
+	},
+}
+var NoDBModel = model.Definition{
+	Name: "no_db",
+	Fields: model.Fields{
+		{Name: "x", Type: model.FieldText},
+	},
+}
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseDefinitionsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	// Verify Item_ helper is generated (DB model)
+	if !strings.Contains(s, "var Item_ = struct {") {
+		t.Errorf("missing Item_ helper for DB model")
+	}
+	// Verify pure algorithmic casing: Id, TenantId, Sku
+	if !strings.Contains(s, "Id string") || !strings.Contains(s, "TenantId string") || !strings.Contains(s, "Sku string") {
+		t.Errorf("incorrect helper struct fields casing")
+	}
+	if !strings.Contains(s, "Id: \"id\"") || !strings.Contains(s, "TenantId: \"tenant_id\"") || !strings.Contains(s, "Sku: \"sku\"") {
+		t.Errorf("incorrect helper struct field values")
+	}
+
+	// Verify NoDB_ helper is NOT generated (non-DB model)
+	if strings.Contains(s, "var NoDB_ = struct {") {
+		t.Errorf("unexpected NoDB_ helper for non-DB model")
 	}
 }

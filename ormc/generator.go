@@ -57,10 +57,9 @@ type StructInfo struct {
 	Fields            []FieldInfo
 	ModelNameDeclared bool
 	IsForm            bool
-	HasAnyInputTag    bool // true when ≥1 field has input: tag (including input:"-")
-	NoDB              bool
-	WantTypedFields   bool
-	SourceFile        string
+	HasAnyInputTag bool // true when ≥1 field has input: tag (including input:"-")
+	NoDB           bool
+	SourceFile     string
 }
 
 // buildAliasMap scans all .go files in dir and returns a map of

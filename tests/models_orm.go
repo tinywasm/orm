@@ -8,7 +8,7 @@ import (
 )
 
 type User struct {
-	ID int64
+	Id int64
 	FirstName string
 	LastName string
 	Email string
@@ -21,12 +21,12 @@ func (m *User) ModelName() string { return "user" }
 
 func (m *User) Schema() []model.Field { return UserModel.Fields }
 
-func (m *User) Pointers() []any { return []any{&m.ID, &m.FirstName, &m.LastName, &m.Email, &m.Score, &m.IsActive, &m.Avatar} }
+func (m *User) Pointers() []any { return []any{&m.Id, &m.FirstName, &m.LastName, &m.Email, &m.Score, &m.IsActive, &m.Avatar} }
 
 func (m *User) IsNil() bool { return m == nil }
 
 func (m *User) EncodeFields(w model.FieldWriter) {
-	w.Int("id", m.ID)
+	w.Int("id", m.Id)
 	w.String("first_name", m.FirstName)
 	w.String("last_name", m.LastName)
 	w.String("email", m.Email)
@@ -36,7 +36,7 @@ func (m *User) EncodeFields(w model.FieldWriter) {
 }
 
 func (m *User) DecodeFields(r model.FieldReader) {
-	if v, ok := r.Int("id"); ok { m.ID = v }
+	if v, ok := r.Int("id"); ok { m.Id = v }
 	if v, ok := r.String("first_name"); ok { m.FirstName = v }
 	if v, ok := r.String("last_name"); ok { m.LastName = v }
 	if v, ok := r.String("email"); ok { m.Email = v }
@@ -60,6 +60,24 @@ func (m *User) Validate(action byte) error {
 	return model.ValidateFields(action, m)
 }
 
+var User_ = struct {
+	Id string
+	FirstName string
+	LastName string
+	Email string
+	Score string
+	IsActive string
+	Avatar string
+}{
+	Id: "id",
+	FirstName: "first_name",
+	LastName: "last_name",
+	Email: "email",
+	Score: "score",
+	IsActive: "is_active",
+	Avatar: "avatar",
+}
+
 func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 	err := qb.ReadOne()
 	if err != nil {
@@ -78,8 +96,8 @@ func ReadAllUser(qb *orm.QB) (UserList, error) {
 }
 
 type Order struct {
-	ID string
-	UserID int64
+	Id string
+	UserId int64
 	Total float64
 }
 
@@ -87,19 +105,19 @@ func (m *Order) ModelName() string { return "order" }
 
 func (m *Order) Schema() []model.Field { return OrderModel.Fields }
 
-func (m *Order) Pointers() []any { return []any{&m.ID, &m.UserID, &m.Total} }
+func (m *Order) Pointers() []any { return []any{&m.Id, &m.UserId, &m.Total} }
 
 func (m *Order) IsNil() bool { return m == nil }
 
 func (m *Order) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
-	w.Int("user_id", m.UserID)
+	w.String("id", m.Id)
+	w.Int("user_id", m.UserId)
 	w.Float("total", m.Total)
 }
 
 func (m *Order) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
-	if v, ok := r.Int("user_id"); ok { m.UserID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
+	if v, ok := r.Int("user_id"); ok { m.UserId = v }
 	if v, ok := r.Float("total"); ok { m.Total = v }
 }
 
@@ -113,6 +131,16 @@ func (s *OrderList) Append() model.Fielder  { v := &Order{}; *s = append(*s, v);
 func (s *OrderList) IsNil() bool          { return s == nil }
 func (s *OrderList) EncodeFields(_ model.FieldWriter) {}
 func (s *OrderList) DecodeFields(_ model.FieldReader) {}
+
+var Order_ = struct {
+	Id string
+	UserId string
+	Total string
+}{
+	Id: "id",
+	UserId: "user_id",
+	Total: "total",
+}
 
 func ReadOneOrder(qb *orm.QB, model *Order) (*Order, error) {
 	err := qb.ReadOne()
@@ -138,7 +166,7 @@ func (m *Order) SchemaExt() []orm.FieldExt {
 }
 
 type ModelWithIgnored struct {
-	ID string
+	Id string
 	Name string
 	Tags string
 	Score float64
@@ -154,18 +182,18 @@ var _schemaModelWithIgnored = []model.Field{
 
 func (m *ModelWithIgnored) Schema() []model.Field { return _schemaModelWithIgnored }
 
-func (m *ModelWithIgnored) Pointers() []any { return []any{&m.ID, &m.Name, &m.Score} }
+func (m *ModelWithIgnored) Pointers() []any { return []any{&m.Id, &m.Name, &m.Score} }
 
 func (m *ModelWithIgnored) IsNil() bool { return m == nil }
 
 func (m *ModelWithIgnored) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("name", m.Name)
 	w.Float("score", m.Score)
 }
 
 func (m *ModelWithIgnored) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 	if v, ok := r.Float("score"); ok { m.Score = v }
 }
@@ -180,6 +208,18 @@ func (s *ModelWithIgnoredList) Append() model.Fielder  { v := &ModelWithIgnored{
 func (s *ModelWithIgnoredList) IsNil() bool          { return s == nil }
 func (s *ModelWithIgnoredList) EncodeFields(_ model.FieldWriter) {}
 func (s *ModelWithIgnoredList) DecodeFields(_ model.FieldReader) {}
+
+var ModelWithIgnored_ = struct {
+	Id string
+	Name string
+	Tags string
+	Score string
+}{
+	Id: "id",
+	Name: "name",
+	Tags: "tags",
+	Score: "score",
+}
 
 func ReadOneModelWithIgnored(qb *orm.QB, model *ModelWithIgnored) (*ModelWithIgnored, error) {
 	err := qb.ReadOne()
@@ -199,7 +239,7 @@ func ReadAllModelWithIgnored(qb *orm.QB) (ModelWithIgnoredList, error) {
 }
 
 type MultiA struct {
-	ID string
+	Id string
 	Name string
 }
 
@@ -207,17 +247,17 @@ func (m *MultiA) ModelName() string { return "multi_a_records" }
 
 func (m *MultiA) Schema() []model.Field { return MultiAModel.Fields }
 
-func (m *MultiA) Pointers() []any { return []any{&m.ID, &m.Name} }
+func (m *MultiA) Pointers() []any { return []any{&m.Id, &m.Name} }
 
 func (m *MultiA) IsNil() bool { return m == nil }
 
 func (m *MultiA) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("name", m.Name)
 }
 
 func (m *MultiA) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 }
 
@@ -231,6 +271,14 @@ func (s *MultiAList) Append() model.Fielder  { v := &MultiA{}; *s = append(*s, v
 func (s *MultiAList) IsNil() bool          { return s == nil }
 func (s *MultiAList) EncodeFields(_ model.FieldWriter) {}
 func (s *MultiAList) DecodeFields(_ model.FieldReader) {}
+
+var MultiA_ = struct {
+	Id string
+	Name string
+}{
+	Id: "id",
+	Name: "name",
+}
 
 func ReadOneMultiA(qb *orm.QB, model *MultiA) (*MultiA, error) {
 	err := qb.ReadOne()
@@ -250,7 +298,7 @@ func ReadAllMultiA(qb *orm.QB) (MultiAList, error) {
 }
 
 type MultiB struct {
-	ID string
+	Id string
 	Value int64
 }
 
@@ -258,17 +306,17 @@ func (m *MultiB) ModelName() string { return "multi_b" }
 
 func (m *MultiB) Schema() []model.Field { return MultiBModel.Fields }
 
-func (m *MultiB) Pointers() []any { return []any{&m.ID, &m.Value} }
+func (m *MultiB) Pointers() []any { return []any{&m.Id, &m.Value} }
 
 func (m *MultiB) IsNil() bool { return m == nil }
 
 func (m *MultiB) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.Int("value", m.Value)
 }
 
 func (m *MultiB) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.Int("value"); ok { m.Value = v }
 }
 
@@ -282,6 +330,14 @@ func (s *MultiBList) Append() model.Fielder  { v := &MultiB{}; *s = append(*s, v
 func (s *MultiBList) IsNil() bool          { return s == nil }
 func (s *MultiBList) EncodeFields(_ model.FieldWriter) {}
 func (s *MultiBList) DecodeFields(_ model.FieldReader) {}
+
+var MultiB_ = struct {
+	Id string
+	Value string
+}{
+	Id: "id",
+	Value: "value",
+}
 
 func ReadOneMultiB(qb *orm.QB, model *MultiB) (*MultiB, error) {
 	err := qb.ReadOne()
@@ -301,7 +357,7 @@ func ReadAllMultiB(qb *orm.QB) (MultiBList, error) {
 }
 
 type NumericTypes struct {
-	IDNumeric int64
+	IdNumeric int64
 	CountUint int64
 	RatioF32 float64
 }
@@ -310,18 +366,18 @@ func (m *NumericTypes) ModelName() string { return "numeric_types" }
 
 func (m *NumericTypes) Schema() []model.Field { return NumericTypesModel.Fields }
 
-func (m *NumericTypes) Pointers() []any { return []any{&m.IDNumeric, &m.CountUint, &m.RatioF32} }
+func (m *NumericTypes) Pointers() []any { return []any{&m.IdNumeric, &m.CountUint, &m.RatioF32} }
 
 func (m *NumericTypes) IsNil() bool { return m == nil }
 
 func (m *NumericTypes) EncodeFields(w model.FieldWriter) {
-	w.Int("id_numeric", m.IDNumeric)
+	w.Int("id_numeric", m.IdNumeric)
 	w.Int("count_uint", m.CountUint)
 	w.Float("ratio_f32", m.RatioF32)
 }
 
 func (m *NumericTypes) DecodeFields(r model.FieldReader) {
-	if v, ok := r.Int("id_numeric"); ok { m.IDNumeric = v }
+	if v, ok := r.Int("id_numeric"); ok { m.IdNumeric = v }
 	if v, ok := r.Int("count_uint"); ok { m.CountUint = v }
 	if v, ok := r.Float("ratio_f32"); ok { m.RatioF32 = v }
 }
@@ -336,6 +392,16 @@ func (s *NumericTypesList) Append() model.Fielder  { v := &NumericTypes{}; *s = 
 func (s *NumericTypesList) IsNil() bool          { return s == nil }
 func (s *NumericTypesList) EncodeFields(_ model.FieldWriter) {}
 func (s *NumericTypesList) DecodeFields(_ model.FieldReader) {}
+
+var NumericTypes_ = struct {
+	IdNumeric string
+	CountUint string
+	RatioF32 string
+}{
+	IdNumeric: "id_numeric",
+	CountUint: "count_uint",
+	RatioF32: "ratio_f32",
+}
 
 func ReadOneNumericTypes(qb *orm.QB, model *NumericTypes) (*NumericTypes, error) {
 	err := qb.ReadOne()
@@ -355,26 +421,26 @@ func ReadAllNumericTypes(qb *orm.QB) (NumericTypesList, error) {
 }
 
 type RefNoColumn struct {
-	IDRef string
-	ParentID int64
+	IdRef string
+	ParentId int64
 }
 
 func (m *RefNoColumn) ModelName() string { return "ref_no_column" }
 
 func (m *RefNoColumn) Schema() []model.Field { return RefNoColumnModel.Fields }
 
-func (m *RefNoColumn) Pointers() []any { return []any{&m.IDRef, &m.ParentID} }
+func (m *RefNoColumn) Pointers() []any { return []any{&m.IdRef, &m.ParentId} }
 
 func (m *RefNoColumn) IsNil() bool { return m == nil }
 
 func (m *RefNoColumn) EncodeFields(w model.FieldWriter) {
-	w.String("id_ref", m.IDRef)
-	w.Int("parent_id", m.ParentID)
+	w.String("id_ref", m.IdRef)
+	w.Int("parent_id", m.ParentId)
 }
 
 func (m *RefNoColumn) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id_ref"); ok { m.IDRef = v }
-	if v, ok := r.Int("parent_id"); ok { m.ParentID = v }
+	if v, ok := r.String("id_ref"); ok { m.IdRef = v }
+	if v, ok := r.Int("parent_id"); ok { m.ParentId = v }
 }
 
 type RefNoColumnList []*RefNoColumn
@@ -387,6 +453,14 @@ func (s *RefNoColumnList) Append() model.Fielder  { v := &RefNoColumn{}; *s = ap
 func (s *RefNoColumnList) IsNil() bool          { return s == nil }
 func (s *RefNoColumnList) EncodeFields(_ model.FieldWriter) {}
 func (s *RefNoColumnList) DecodeFields(_ model.FieldReader) {}
+
+var RefNoColumn_ = struct {
+	IdRef string
+	ParentId string
+}{
+	IdRef: "id_ref",
+	ParentId: "parent_id",
+}
 
 func ReadOneRefNoColumn(qb *orm.QB, model *RefNoColumn) (*RefNoColumn, error) {
 	err := qb.ReadOne()
@@ -412,7 +486,7 @@ func (m *RefNoColumn) SchemaExt() []orm.FieldExt {
 }
 
 type PointerReceiver struct {
-	ID string
+	Id string
 	Name string
 }
 
@@ -420,17 +494,17 @@ func (m *PointerReceiver) ModelName() string { return "ptr_table" }
 
 func (m *PointerReceiver) Schema() []model.Field { return PointerReceiverModel.Fields }
 
-func (m *PointerReceiver) Pointers() []any { return []any{&m.ID, &m.Name} }
+func (m *PointerReceiver) Pointers() []any { return []any{&m.Id, &m.Name} }
 
 func (m *PointerReceiver) IsNil() bool { return m == nil }
 
 func (m *PointerReceiver) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("name", m.Name)
 }
 
 func (m *PointerReceiver) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 }
 
@@ -444,6 +518,14 @@ func (s *PointerReceiverList) Append() model.Fielder  { v := &PointerReceiver{};
 func (s *PointerReceiverList) IsNil() bool          { return s == nil }
 func (s *PointerReceiverList) EncodeFields(_ model.FieldWriter) {}
 func (s *PointerReceiverList) DecodeFields(_ model.FieldReader) {}
+
+var PointerReceiver_ = struct {
+	Id string
+	Name string
+}{
+	Id: "id",
+	Name: "name",
+}
 
 func ReadOnePointerReceiver(qb *orm.QB, model *PointerReceiver) (*PointerReceiver, error) {
 	err := qb.ReadOne()
@@ -463,7 +545,7 @@ func ReadAllPointerReceiver(qb *orm.QB) (PointerReceiverList, error) {
 }
 
 type UserForm struct {
-	ID string
+	Id string
 	Name string
 	Email string
 	Password string
@@ -475,12 +557,12 @@ func (m *UserForm) ModelName() string { return "user_form" }
 
 func (m *UserForm) Schema() []model.Field { return UserFormModel.Fields }
 
-func (m *UserForm) Pointers() []any { return []any{&m.ID, &m.Name, &m.Email, &m.Password, &m.Bio, &m.Age} }
+func (m *UserForm) Pointers() []any { return []any{&m.Id, &m.Name, &m.Email, &m.Password, &m.Bio, &m.Age} }
 
 func (m *UserForm) IsNil() bool { return m == nil }
 
 func (m *UserForm) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("name", m.Name)
 	w.String("email", m.Email)
 	w.String("password", m.Password)
@@ -489,7 +571,7 @@ func (m *UserForm) EncodeFields(w model.FieldWriter) {
 }
 
 func (m *UserForm) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 	if v, ok := r.String("email"); ok { m.Email = v }
 	if v, ok := r.String("password"); ok { m.Password = v }
@@ -510,6 +592,22 @@ func (s *UserFormList) DecodeFields(_ model.FieldReader) {}
 
 func (m *UserForm) Validate(action byte) error {
 	return model.ValidateFields(action, m)
+}
+
+var UserForm_ = struct {
+	Id string
+	Name string
+	Email string
+	Password string
+	Bio string
+	Age string
+}{
+	Id: "id",
+	Name: "name",
+	Email: "email",
+	Password: "password",
+	Bio: "bio",
+	Age: "age",
 }
 
 func ReadOneUserForm(qb *orm.QB, model *UserForm) (*UserForm, error) {
@@ -602,7 +700,7 @@ func (s *AddressList) EncodeFields(_ model.FieldWriter) {}
 func (s *AddressList) DecodeFields(_ model.FieldReader) {}
 
 type UserWithComposition struct {
-	ID string
+	Id string
 	Name string
 	HomeAddr Address
 }
@@ -611,18 +709,18 @@ func (m *UserWithComposition) ModelName() string { return "user_with_composition
 
 func (m *UserWithComposition) Schema() []model.Field { return UserWithCompositionModel.Fields }
 
-func (m *UserWithComposition) Pointers() []any { return []any{&m.ID, &m.Name, &m.HomeAddr} }
+func (m *UserWithComposition) Pointers() []any { return []any{&m.Id, &m.Name, &m.HomeAddr} }
 
 func (m *UserWithComposition) IsNil() bool { return m == nil }
 
 func (m *UserWithComposition) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("name", m.Name)
 	w.Object("home_addr", &m.HomeAddr)
 }
 
 func (m *UserWithComposition) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 	r.Object("home_addr", &m.HomeAddr)
 }
@@ -637,6 +735,16 @@ func (s *UserWithCompositionList) Append() model.Fielder  { v := &UserWithCompos
 func (s *UserWithCompositionList) IsNil() bool          { return s == nil }
 func (s *UserWithCompositionList) EncodeFields(_ model.FieldWriter) {}
 func (s *UserWithCompositionList) DecodeFields(_ model.FieldReader) {}
+
+var UserWithComposition_ = struct {
+	Id string
+	Name string
+	HomeAddr string
+}{
+	Id: "id",
+	Name: "name",
+	HomeAddr: "home_addr",
+}
 
 func ReadOneUserWithComposition(qb *orm.QB, model *UserWithComposition) (*UserWithComposition, error) {
 	err := qb.ReadOne()
@@ -656,7 +764,7 @@ func ReadAllUserWithComposition(qb *orm.QB) (UserWithCompositionList, error) {
 }
 
 type UserWithNoTilde struct {
-	ID string
+	Id string
 	Nombre string
 }
 
@@ -664,17 +772,17 @@ func (m *UserWithNoTilde) ModelName() string { return "user_with_no_tilde" }
 
 func (m *UserWithNoTilde) Schema() []model.Field { return UserWithNoTildeModel.Fields }
 
-func (m *UserWithNoTilde) Pointers() []any { return []any{&m.ID, &m.Nombre} }
+func (m *UserWithNoTilde) Pointers() []any { return []any{&m.Id, &m.Nombre} }
 
 func (m *UserWithNoTilde) IsNil() bool { return m == nil }
 
 func (m *UserWithNoTilde) EncodeFields(w model.FieldWriter) {
-	w.String("id", m.ID)
+	w.String("id", m.Id)
 	w.String("nombre", m.Nombre)
 }
 
 func (m *UserWithNoTilde) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { m.ID = v }
+	if v, ok := r.String("id"); ok { m.Id = v }
 	if v, ok := r.String("nombre"); ok { m.Nombre = v }
 }
 
@@ -691,6 +799,14 @@ func (s *UserWithNoTildeList) DecodeFields(_ model.FieldReader) {}
 
 func (m *UserWithNoTilde) Validate(action byte) error {
 	return model.ValidateFields(action, m)
+}
+
+var UserWithNoTilde_ = struct {
+	Id string
+	Nombre string
+}{
+	Id: "id",
+	Nombre: "nombre",
 }
 
 func ReadOneUserWithNoTilde(qb *orm.QB, model *UserWithNoTilde) (*UserWithNoTilde, error) {
@@ -711,7 +827,7 @@ func ReadAllUserWithNoTilde(qb *orm.QB) (UserWithNoTildeList, error) {
 }
 
 type ShortAutoInc struct {
-	ID int64
+	Id int64
 	Value int64
 }
 
@@ -719,17 +835,17 @@ func (m *ShortAutoInc) ModelName() string { return "short_auto_inc" }
 
 func (m *ShortAutoInc) Schema() []model.Field { return ShortAutoIncModel.Fields }
 
-func (m *ShortAutoInc) Pointers() []any { return []any{&m.ID, &m.Value} }
+func (m *ShortAutoInc) Pointers() []any { return []any{&m.Id, &m.Value} }
 
 func (m *ShortAutoInc) IsNil() bool { return m == nil }
 
 func (m *ShortAutoInc) EncodeFields(w model.FieldWriter) {
-	w.Int("id", m.ID)
+	w.Int("id", m.Id)
 	w.Int("value", m.Value)
 }
 
 func (m *ShortAutoInc) DecodeFields(r model.FieldReader) {
-	if v, ok := r.Int("id"); ok { m.ID = v }
+	if v, ok := r.Int("id"); ok { m.Id = v }
 	if v, ok := r.Int("value"); ok { m.Value = v }
 }
 
@@ -743,6 +859,14 @@ func (s *ShortAutoIncList) Append() model.Fielder  { v := &ShortAutoInc{}; *s = 
 func (s *ShortAutoIncList) IsNil() bool          { return s == nil }
 func (s *ShortAutoIncList) EncodeFields(_ model.FieldWriter) {}
 func (s *ShortAutoIncList) DecodeFields(_ model.FieldReader) {}
+
+var ShortAutoInc_ = struct {
+	Id string
+	Value string
+}{
+	Id: "id",
+	Value: "value",
+}
 
 func ReadOneShortAutoInc(qb *orm.QB, model *ShortAutoInc) (*ShortAutoInc, error) {
 	err := qb.ReadOne()
