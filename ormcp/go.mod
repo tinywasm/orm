@@ -4,7 +4,7 @@ go 1.25.2
 
 require (
 	github.com/tinywasm/context v0.0.18
-	github.com/tinywasm/fmt v0.25.0
+	github.com/tinywasm/fmt v0.25.1
 	github.com/tinywasm/json v0.5.8
 	github.com/tinywasm/mcp v0.1.16
 	github.com/tinywasm/model v0.0.5
