@@ -12,6 +12,7 @@ func exportTool(db *orm.DB) mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_export_schema",
 		Description: "Export the full CREATE TABLE DDL for all synced tables as SQL text.",
+		InputSchema: EmptyInputSchema,
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {

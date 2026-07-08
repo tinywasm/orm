@@ -41,7 +41,7 @@ func (p *DaemonProvider) schemaToolD() mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_schema",
 		Description: "List all tables and their columns with types and constraints. Use this first to understand the database structure before writing queries.",
-		InputSchema: "", // no input args
+		InputSchema: EmptyInputSchema,
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
@@ -57,6 +57,7 @@ func (p *DaemonProvider) exportToolD() mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_export_schema",
 		Description: "Export the full CREATE TABLE DDL for all synced tables as SQL text.",
+		InputSchema: EmptyInputSchema,
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
