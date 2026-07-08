@@ -1,7 +1,8 @@
-# PLAN — Generar `inputSchema` JSON Schema válido en las MCP tools de ormcp (`db_*`)
+# PLAN — ormcp: declarar `Args` en las tools `db_*` (sin generar schema) + test de respaldo
 
 > This plan is dispatched via the CodeJob workflow. See skill: `agents-workflow`.
 > **Módulo:** `github.com/tinywasm/orm/ormcp` (go.mod propio, junto a este `docs/`).
+> **Depende de:** `github.com/tinywasm/mcp` con `Tool.Args model.Fielder` (ver MASTER_PLAN, gate mcp).
 
 You are an external agent with **zero prior context** about this project. Everything you
 need is in this file. Read it fully before writing code.
@@ -10,197 +11,71 @@ need is in this file. Read it fully before writing code.
 
 ## 1. Problema
 
-Las MCP tools `db_query`, `db_exec`, `db_schema` y `db_export_schema` exponen un `inputSchema`
-**inválido**. Un cliente MCP como Claude Code valida la respuesta de `tools/list` contra JSON
-Schema (Zod); si **una sola** tool es inválida, **descarta el array COMPLETO** → el servidor MCP
-aparece "Connected" pero el agente **no ve ninguna tool**.
+Las tools `db_query`, `db_exec`, `db_schema`, `db_export_schema` exponen un `inputSchema`
+**inválido**: `encodeSchema` (en `provider.go`) serializa el struct de args con valores cero
+(`{"SQL":""}`), y las tools sin args ponen `InputSchema: ""` (→ `null`). Clientes MCP como Claude
+Code descartan TODO el `tools/list` si una tool es inválida → el agente no ve ninguna tool.
 
-Evidencia real (log de Claude Code):
+**Generar el JSON Schema NO es responsabilidad de ormcp.** Ahora `tinywasm/mcp` lo genera desde el
+modelo de args (`Tool.Args model.Fielder` → `Schema()`). ormcp solo declara `Args`.
 
-```
-Failed to fetch tools: [
-  { "path": ["tools", 12, "inputSchema", "type"], "message": "Invalid input: expected \"object\"" },
-  { "path": ["tools", 18, "inputSchema"], "message": "Invalid input: expected object, received null" },
-  ...
-]
-```
-
-### Dos causas
-
-**(a) Tools con argumentos** — `encodeSchema` en `provider.go` serializa el struct con valores
-cero en vez de generar JSON Schema:
-
-```go
-// provider.go  (ROTO)
-func encodeSchema(f model.Encodable) string {
-	var s string
-	_ = json.Encode(f, &s)   // ❌ produce {"SQL":""}, no un JSON Schema
-	return s
-}
-```
-
-Para `db_query` esto emite `{"SQL":""}`. Válido sería:
-`{"type":"object","properties":{"SQL":{"type":"string"}},"required":["SQL"]}`.
-
-**(b) Tools sin argumentos** — `db_schema` y `db_export_schema` ponen `InputSchema: ""`, que se
-emite como `null` en la respuesta. Válido sería `{"type":"object","properties":{}}`.
-
-Los tipos de args (`QueryArgs`, `ExecArgs`) son modelos ormc que **ya exponen**
-`Schema() []model.Field`:
-
-```go
-func (m *QueryArgs) Schema() []model.Field { return _schemaQueryArgs }
-```
-
-Por lo tanto el JSON Schema válido se genera desde `Schema()`, sin reflection ni hardcodeo.
+Los modelos ya están al estándar nuevo (`models.go`: `QueryArgs`/`ExecArgs` con `Validate()`; ormc
+genera `Schema() []model.Field`). No hay que tocar los modelos.
 
 ---
 
 ## 2. Cambios
 
-### 2.1 `provider.go` — reescribir `encodeSchema` + añadir mapeo + constante vacía
+### 2.1 Borrar `encodeSchema` de `provider.go`
 
-**Reglas del ecosistema TinyWasm (OBLIGATORIAS):**
-- **Sin stdlib**: usar `github.com/tinywasm/fmt` (buffer `fmt.Conv` con `.Write(string)` /
-  `.String()`, ya usado en este archivo en `scanRowsToText`). NO `strings`/`strconv`/`bytes`/`encoding/json`.
-- **Sin strings mágicos duplicados**: fragmentos de schema centralizados en `jsonSchemaType`;
-  schema vacío en constante nombrada `EmptyInputSchema`.
+Elimina la función `encodeSchema` (serializaba el struct). ormcp ya no genera JSON Schema.
 
-`provider.go` ya importa `fmt`, `json`, `mcp`, `orm` y `model`. Reemplazar la función
-`encodeSchema` por lo siguiente (y añadir la constante y el mapeo en el mismo archivo):
+### 2.2 Declarar `Args` en cada tool
 
-```go
-// EmptyInputSchema is the JSON Schema for a tool that takes no arguments.
-// MCP clients require inputSchema to be a valid JSON Schema object; an empty
-// string or null is rejected and causes the ENTIRE tools/list to be discarded
-// (Claude Code validates tools/list with Zod).
-const EmptyInputSchema = `{"type":"object","properties":{}}`
+En los 6 sitios `InputSchema:` de las tools (ver abajo), reemplaza:
 
-// encodeSchema builds a valid JSON Schema "object" string for an MCP tool's
-// inputSchema, derived from the args model's Schema() field metadata. Replaces
-// the previous broken behavior that json-encoded the struct's zero values
-// (e.g. {"SQL":""}), which is NOT a JSON Schema and is rejected by MCP clients.
-// Returns EmptyInputSchema for a nil model or one with no fields.
-func encodeSchema(m model.Fielder) string {
-	if m == nil {
-		return EmptyInputSchema
-	}
-	fields := m.Schema()
-	if len(fields) == 0 {
-		return EmptyInputSchema
-	}
-	var b fmt.Conv
-	b.Write(`{"type":"object","properties":{`)
-	var required []string
-	for i, f := range fields {
-		if i > 0 {
-			b.Write(",")
-		}
-		b.Write(`"`)
-		b.Write(f.Name)
-		b.Write(`":`)
-		b.Write(jsonSchemaType(f.Type))
-		if f.NotNull {
-			required = append(required, f.Name)
-		}
-	}
-	b.Write("}")
-	if len(required) > 0 {
-		b.Write(`,"required":[`)
-		for i, name := range required {
-			if i > 0 {
-				b.Write(",")
-			}
-			b.Write(`"`)
-			b.Write(name)
-			b.Write(`"`)
-		}
-		b.Write("]")
-	}
-	b.Write("}")
-	return b.String()
-}
+| Archivo | Tool | Antes | Después |
+|---|---|---|---|
+| `tool_query.go` | db_query | `InputSchema: encodeSchema(new(QueryArgs))` | `Args: new(QueryArgs)` |
+| `tool_exec.go` | db_exec | `InputSchema: encodeSchema(new(ExecArgs))` | `Args: new(ExecArgs)` |
+| `daemon_provider.go` | db_query | `InputSchema: encodeSchema(new(QueryArgs))` | `Args: new(QueryArgs)` |
+| `daemon_provider.go` | db_exec | `InputSchema: encodeSchema(new(ExecArgs))` | `Args: new(ExecArgs)` |
+| `tool_schema.go` | db_schema | `InputSchema: ""` | (quitar la línea; `Args` nil → mcp emite objeto vacío) |
+| `daemon_provider.go` | db_schema (`schemaToolD`) | `InputSchema: ""` | (quitar la línea) |
+| `tool_export_schema.go` / `exportToolD` | db_export_schema | (sin `InputSchema`) | (dejar sin `Args`; mcp emite objeto vacío) |
 
-// jsonSchemaType maps a model.FieldType to its JSON Schema fragment.
-//   FieldText, FieldRaw, FieldBlob -> string
-//   FieldInt                       -> integer
-//   FieldFloat                     -> number
-//   FieldBool                      -> boolean
-//   FieldIntSlice                  -> array of integer
-//   FieldStruct                    -> object
-//   FieldStructSlice               -> array of object
-func jsonSchemaType(t model.FieldType) string {
-	switch t {
-	case model.FieldInt:
-		return `{"type":"integer"}`
-	case model.FieldFloat:
-		return `{"type":"number"}`
-	case model.FieldBool:
-		return `{"type":"boolean"}`
-	case model.FieldIntSlice:
-		return `{"type":"array","items":{"type":"integer"}}`
-	case model.FieldStruct:
-		return `{"type":"object"}`
-	case model.FieldStructSlice:
-		return `{"type":"array","items":{"type":"object"}}`
-	default: // FieldText, FieldRaw, FieldBlob
-		return `{"type":"string"}`
-	}
-}
-```
+Para las tools sin argumentos, NO pongas `InputSchema` ni `Args`: mcp genera
+`{"type":"object","properties":{}}` por defecto.
 
-> Si `encodeSchema` cambiaba de firma (`model.Encodable` → `model.Fielder`) rompe algún call
-> site, ajusta el call site pasando el mismo `new(XxxArgs)` (todos satisfacen `model.Fielder`).
+### 2.3 Bump de `mcp`
 
-### 2.2 Reemplazar los sitios `InputSchema: ""` por `EmptyInputSchema`
-
-Hay **tres** tools sin argumentos que deben usar la constante en vez de `""`:
-
-- `tool_schema.go:14` → `InputSchema: EmptyInputSchema,`
-- `daemon_provider.go:44` (`schemaToolD`) → `InputSchema: EmptyInputSchema,`
-- `tool_export_schema.go` (`db_export_schema`) — actualmente **no fija** `InputSchema` (queda
-  `""`). Añade explícitamente `InputSchema: EmptyInputSchema,` en ese `mcp.Tool{...}`.
-
-> Revisa `daemon_provider.go` `exportToolD` también: si no fija `InputSchema`, añádelo con
-> `EmptyInputSchema`. Cualquier `mcp.Tool` sin args debe llevar `EmptyInputSchema`, nunca `""`.
-
-Las tools con args (`tool_query.go`, `tool_exec.go`, `daemon_provider.go` query/exec) ya llaman
-`encodeSchema(new(QueryArgs))` / `encodeSchema(new(ExecArgs))` y quedan correctas automáticamente
-tras 2.1 — no requieren cambios.
+Sube `github.com/tinywasm/mcp` en `go.mod` a la versión con `Tool.Args`. `go mod tidy`.
 
 ---
 
-## 3. Tests
+## 3. Test de respaldo
 
-Añade `provider_schema_test.go` (paquete `ormcp`) que verifique:
+Ya existe `mcp_inputschema_test.go` (paquete `ormcp`, NO lo borres): construye un `mcp.Server` con
+`NewDaemonProvider().Tools()`, llama `tools/list` y exige que CADA tool tenga
+`inputSchema = {"type":"object",...}` (nunca `null` ni el struct serializado), y que `db_query`
+exponga `"SQL":{"type":"string"}`. Usa **solo `tinywasm/json`**. Debe **pasar** tras estos cambios.
 
-1. `encodeSchema(new(QueryArgs))` produce:
-   `{"type":"object","properties":{"SQL":{"type":"string"}},"required":["SQL"]}`
-   (ajusta `required` según el flag `NotNull` real de `_schemaQueryArgs`; si `SQL` no es
-   `NotNull`, omite `required` — verifica el schema generado del modelo).
-2. `encodeSchema(nil)` devuelve `EmptyInputSchema`.
-3. Para cada tool de **ambos** providers (`Provider` y `DaemonProvider`), su `InputSchema`:
-   - No es `""` ni `"null"`.
-   - Decodifica como JSON válido con `github.com/tinywasm/json`.
-   - Contiene `"type":"object"` en la raíz.
-
-Ejecutar: `go test ./...` (o `gotest ./...`). Todos deben pasar.
+Ejecuta `go test ./...` (o `gotest ./...`): todo verde.
 
 ---
 
 ## 4. Documentación
 
-- Actualiza `docs/ARCHITECTURE.md` / `README.md` de ormcp si describen cómo se genera el
-  `inputSchema` de las tools `db_*`. Si no existe tal sección, no crees documentación nueva.
+- Actualiza `docs/`/`README.md` de ormcp si describen la generación del `inputSchema`: ahora la
+  hace `mcp` desde `Tool.Args`; ormcp solo declara los modelos.
 
 ---
 
-## Reglas de calidad (recordatorio)
+## Reglas de calidad
 
 - Sin stdlib: `tinywasm/fmt`, `tinywasm/json`, `tinywasm/model`, `tinywasm/orm`, `tinywasm/mcp`.
-- Sin literales string repetidos en lógica: schema fragments en `jsonSchemaType`; vacío en
-  `EmptyInputSchema` (nunca `""` inline en un `mcp.Tool`).
-- No introducir `encoding/json`, `reflect`, `strings`, `strconv`, `bytes`.
+  Para JSON en tests, **solo `tinywasm/json`**.
+- Nada de lógica de JSON Schema en ormcp (ni `encodeSchema`, ni `""` como inputSchema).
 
 ---
 
@@ -208,8 +83,7 @@ Ejecutar: `go test ./...` (o `gotest ./...`). Todos deben pasar.
 
 | # | Stage | Output |
 |---|-------|--------|
-| 1 | Reescribir `encodeSchema` + `jsonSchemaType` + `EmptyInputSchema` en `provider.go` | JSON Schema válido desde `Schema()` |
-| 2 | Reemplazar los 3+ sitios `InputSchema: ""` (schema/export, daemon) por `EmptyInputSchema` | no-arg tools válidas |
-| 3 | Compilar y ajustar call sites si el tipo del parámetro lo requiere | build verde |
-| 4 | Añadir `provider_schema_test.go` con las aserciones de §3 | tests verdes |
-| 5 | Actualizar docs si existen | docs consistentes |
+| 1 | Borrar `encodeSchema` de `provider.go` | sin generación en el provider |
+| 2 | Cambiar los 6 sitios: args → `Args: new(XxxArgs)`; no-arg → quitar `InputSchema` | tools model-driven |
+| 3 | Bump `mcp` + `go mod tidy` | dependencia nueva |
+| 4 | `go test ./...` verde (incl. `mcp_inputschema_test.go`) | acceptance test pasa |
