@@ -132,6 +132,10 @@ func (s *OrderList) IsNil() bool          { return s == nil }
 func (s *OrderList) EncodeFields(_ model.FieldWriter) {}
 func (s *OrderList) DecodeFields(_ model.FieldReader) {}
 
+func (m *Order) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
+
 var Order_ = struct {
 	Id string
 	UserId string
@@ -209,6 +213,10 @@ func (s *ModelWithIgnoredList) IsNil() bool          { return s == nil }
 func (s *ModelWithIgnoredList) EncodeFields(_ model.FieldWriter) {}
 func (s *ModelWithIgnoredList) DecodeFields(_ model.FieldReader) {}
 
+func (m *ModelWithIgnored) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
+
 var ModelWithIgnored_ = struct {
 	Id string
 	Name string
@@ -272,6 +280,10 @@ func (s *MultiAList) IsNil() bool          { return s == nil }
 func (s *MultiAList) EncodeFields(_ model.FieldWriter) {}
 func (s *MultiAList) DecodeFields(_ model.FieldReader) {}
 
+func (m *MultiA) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
+
 var MultiA_ = struct {
 	Id string
 	Name string
@@ -330,6 +342,10 @@ func (s *MultiBList) Append() model.Fielder  { v := &MultiB{}; *s = append(*s, v
 func (s *MultiBList) IsNil() bool          { return s == nil }
 func (s *MultiBList) EncodeFields(_ model.FieldWriter) {}
 func (s *MultiBList) DecodeFields(_ model.FieldReader) {}
+
+func (m *MultiB) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
 var MultiB_ = struct {
 	Id string
@@ -393,6 +409,10 @@ func (s *NumericTypesList) IsNil() bool          { return s == nil }
 func (s *NumericTypesList) EncodeFields(_ model.FieldWriter) {}
 func (s *NumericTypesList) DecodeFields(_ model.FieldReader) {}
 
+func (m *NumericTypes) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
+
 var NumericTypes_ = struct {
 	IdNumeric string
 	CountUint string
@@ -453,6 +473,10 @@ func (s *RefNoColumnList) Append() model.Fielder  { v := &RefNoColumn{}; *s = ap
 func (s *RefNoColumnList) IsNil() bool          { return s == nil }
 func (s *RefNoColumnList) EncodeFields(_ model.FieldWriter) {}
 func (s *RefNoColumnList) DecodeFields(_ model.FieldReader) {}
+
+func (m *RefNoColumn) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
 var RefNoColumn_ = struct {
 	IdRef string
@@ -518,6 +542,10 @@ func (s *PointerReceiverList) Append() model.Fielder  { v := &PointerReceiver{};
 func (s *PointerReceiverList) IsNil() bool          { return s == nil }
 func (s *PointerReceiverList) EncodeFields(_ model.FieldWriter) {}
 func (s *PointerReceiverList) DecodeFields(_ model.FieldReader) {}
+
+func (m *PointerReceiver) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
 var PointerReceiver_ = struct {
 	Id string
@@ -699,6 +727,10 @@ func (s *AddressList) IsNil() bool          { return s == nil }
 func (s *AddressList) EncodeFields(_ model.FieldWriter) {}
 func (s *AddressList) DecodeFields(_ model.FieldReader) {}
 
+func (m *Address) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
+
 type UserWithComposition struct {
 	Id string
 	Name string
@@ -735,6 +767,10 @@ func (s *UserWithCompositionList) Append() model.Fielder  { v := &UserWithCompos
 func (s *UserWithCompositionList) IsNil() bool          { return s == nil }
 func (s *UserWithCompositionList) EncodeFields(_ model.FieldWriter) {}
 func (s *UserWithCompositionList) DecodeFields(_ model.FieldReader) {}
+
+func (m *UserWithComposition) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
 var UserWithComposition_ = struct {
 	Id string
@@ -859,6 +895,10 @@ func (s *ShortAutoIncList) Append() model.Fielder  { v := &ShortAutoInc{}; *s = 
 func (s *ShortAutoIncList) IsNil() bool          { return s == nil }
 func (s *ShortAutoIncList) EncodeFields(_ model.FieldWriter) {}
 func (s *ShortAutoIncList) DecodeFields(_ model.FieldReader) {}
+
+func (m *ShortAutoInc) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
 var ShortAutoInc_ = struct {
 	Id string

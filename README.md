@@ -121,7 +121,8 @@ Run from the **project root**. Scans subdirectories for `model.go` / `models.go`
 - `Schema() []model.Field`, `Pointers() []any` (parallel, zero-alloc).
 - `EncodeFields(model.FieldWriter)`, `DecodeFields(model.FieldReader)` (symmetric codec).
 - `IsNil() bool`.
-- `Validate(action byte) error` (calling `model.ValidateFields`).
+- `Validate(action byte) error` (calling `model.ValidateFields`). Always generated —
+  validation is secure by default; models with no rules get a cheap no-op.
 - `ModelName() string`.
 - `ReadOneT()`, `ReadAllT()`, `TList` type (for DB models).
 - `SchemaExt() []orm.FieldExt` (for scalar FKs).
