@@ -11,7 +11,6 @@ func schemaTool(db *orm.DB) mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_schema",
 		Description: "List all tables and their columns with types and constraints. Use this first to understand the database structure before writing queries.",
-		InputSchema: "", // no input args
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {

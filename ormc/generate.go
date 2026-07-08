@@ -305,22 +305,9 @@ func (o *Generator) GenerateForFile(infos []StructInfo, sourceFile string) error
 		buf.Write(fmt.Sprintf("func (s *%sList) EncodeFields(_ model.FieldWriter) {}\n", info.Name))
 		buf.Write(fmt.Sprintf("func (s *%sList) DecodeFields(_ model.FieldReader) {}\n\n", info.Name))
 
-		hasValidation := info.IsForm || info.HasAnyInputTag
-		if !hasValidation {
-			for _, f := range info.Fields {
-				if f.NotNull || f.Letters || f.Numbers || f.Tilde || f.Spaces ||
-					len(f.Extra) > 0 || f.Minimum > 0 || f.Maximum > 0 {
-					hasValidation = true
-					break
-				}
-			}
-		}
-
-		if hasValidation {
-			buf.Write(fmt.Sprintf("func (m *%s) Validate(action byte) error {\n", info.Name))
-			buf.Write("\treturn model.ValidateFields(action, m)\n")
-			buf.Write("}\n\n")
-		}
+		buf.Write(fmt.Sprintf("func (m *%s) Validate(action byte) error {\n", info.Name))
+		buf.Write("\treturn model.ValidateFields(action, m)\n")
+		buf.Write("}\n\n")
 
 		if !info.NoDB {
 			// Metadata Descriptors

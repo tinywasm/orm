@@ -11,7 +11,7 @@ func execTool(db *orm.DB) mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_exec",
 		Description: "Execute a SQL statement that modifies data or schema: INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE, etc.",
-		InputSchema: encodeSchema(new(ExecArgs)),
+		Args:        new(ExecArgs),
 		Resource:    "database",
 		Action:      'u',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
@@ -28,7 +28,7 @@ func executeExec(db *orm.DB, req mcp.Request) (*mcp.Result, error) {
 	if err := req.Bind(&args); err != nil {
 		return nil, err
 	}
-	if err := db.RawExecutor().Exec(args.SQL); err != nil {
+	if err := db.RawExecutor().Exec(args.Sql); err != nil {
 		return nil, err
 	}
 	return mcp.Text("OK"), nil

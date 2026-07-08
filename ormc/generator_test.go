@@ -354,3 +354,41 @@ var NoDBModel = model.Definition{
 		t.Errorf("unexpected NoDB_ helper for non-DB model")
 	}
 }
+
+func TestGenerate_UnconditionalValidate(t *testing.T) {
+	src := `package p
+import "github.com/tinywasm/model"
+var PingArgsModel = model.Definition{
+	Name: "ping_args",
+	Fields: model.Fields{
+		{Name: "count", Type: model.FieldInt},
+	},
+}
+`
+	tmpFile := writeTemp(t, src)
+	g := New()
+	infos, err := g.parseDefinitionsInFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = g.GenerateForFile(infos, tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genFile := strings.TrimSuffix(tmpFile, ".go") + "_orm.go"
+	content, err := os.ReadFile(genFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	// Verify Validate method is generated even without any rules
+	if !strings.Contains(s, "func (m *PingArgs) Validate(action byte) error {") {
+		t.Errorf("missing Validate method for model without rules")
+	}
+	if !strings.Contains(s, "return model.ValidateFields(action, m)") {
+		t.Errorf("incorrect Validate method body")
+	}
+}

@@ -56,9 +56,8 @@ type StructInfo struct {
 	PackageName       string
 	Fields            []FieldInfo
 	ModelNameDeclared bool
-	IsForm            bool
-	HasAnyInputTag bool // true when ≥1 field has input: tag (including input:"-")
-	NoDB           bool
+	IsForm bool
+	NoDB   bool
 	SourceFile     string
 }
 

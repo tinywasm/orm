@@ -6,26 +6,24 @@ import (
 	"github.com/tinywasm/model"
 )
 
-func (m *QueryArgs) ModelName() string {
-	return "query_args"
+type QueryArgs struct {
+	Sql string
 }
 
-var _schemaQueryArgs = []model.Field{
-		{Name: "SQL", Type: model.FieldText},
-	}
+func (m *QueryArgs) ModelName() string { return "query_args" }
 
-func (m *QueryArgs) Schema() []model.Field { return _schemaQueryArgs }
+func (m *QueryArgs) Schema() []model.Field { return QueryArgsModel.Fields }
 
-func (m *QueryArgs) Pointers() []any { return []any{&m.SQL} }
+func (m *QueryArgs) Pointers() []any { return []any{&m.Sql} }
 
 func (m *QueryArgs) IsNil() bool { return m == nil }
 
 func (m *QueryArgs) EncodeFields(w model.FieldWriter) {
-	w.String("SQL", m.SQL)
+	w.String("SQL", m.Sql)
 }
 
 func (m *QueryArgs) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("SQL"); ok { m.SQL = v }
+	if v, ok := r.String("SQL"); ok { m.Sql = v }
 }
 
 type QueryArgsList []*QueryArgs
@@ -39,26 +37,28 @@ func (s *QueryArgsList) IsNil() bool          { return s == nil }
 func (s *QueryArgsList) EncodeFields(_ model.FieldWriter) {}
 func (s *QueryArgsList) DecodeFields(_ model.FieldReader) {}
 
-func (m *ExecArgs) ModelName() string {
-	return "exec_args"
+func (m *QueryArgs) Validate(action byte) error {
+	return model.ValidateFields(action, m)
 }
 
-var _schemaExecArgs = []model.Field{
-		{Name: "SQL", Type: model.FieldText},
-	}
+type ExecArgs struct {
+	Sql string
+}
 
-func (m *ExecArgs) Schema() []model.Field { return _schemaExecArgs }
+func (m *ExecArgs) ModelName() string { return "exec_args" }
 
-func (m *ExecArgs) Pointers() []any { return []any{&m.SQL} }
+func (m *ExecArgs) Schema() []model.Field { return ExecArgsModel.Fields }
+
+func (m *ExecArgs) Pointers() []any { return []any{&m.Sql} }
 
 func (m *ExecArgs) IsNil() bool { return m == nil }
 
 func (m *ExecArgs) EncodeFields(w model.FieldWriter) {
-	w.String("SQL", m.SQL)
+	w.String("SQL", m.Sql)
 }
 
 func (m *ExecArgs) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("SQL"); ok { m.SQL = v }
+	if v, ok := r.String("SQL"); ok { m.Sql = v }
 }
 
 type ExecArgsList []*ExecArgs
@@ -71,4 +71,8 @@ func (s *ExecArgsList) Append() model.Fielder  { v := &ExecArgs{}; *s = append(*
 func (s *ExecArgsList) IsNil() bool          { return s == nil }
 func (s *ExecArgsList) EncodeFields(_ model.FieldWriter) {}
 func (s *ExecArgsList) DecodeFields(_ model.FieldReader) {}
+
+func (m *ExecArgs) Validate(action byte) error {
+	return model.ValidateFields(action, m)
+}
 
