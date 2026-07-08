@@ -1,25 +1,17 @@
 package ormcp
 
-import "github.com/tinywasm/fmt"
+import "github.com/tinywasm/model"
 
-type QueryArgs struct {
-	SQL string `json:"SQL"`
+var QueryArgsModel = model.Definition{
+	Name: "query_args",
+	Fields: model.Fields{
+		{Name: "SQL", Type: model.FieldText, NotNull: true},
+	},
 }
 
-func (m *QueryArgs) Validate(_ byte) error {
-	if m.SQL == "" {
-		return fmt.Err("SQL", "required")
-	}
-	return nil
-}
-
-type ExecArgs struct {
-	SQL string `json:"SQL"`
-}
-
-func (m *ExecArgs) Validate(_ byte) error {
-	if m.SQL == "" {
-		return fmt.Err("SQL", "required")
-	}
-	return nil
+var ExecArgsModel = model.Definition{
+	Name: "exec_args",
+	Fields: model.Fields{
+		{Name: "SQL", Type: model.FieldText, NotNull: true},
+	},
 }

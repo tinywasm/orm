@@ -41,7 +41,6 @@ func (p *DaemonProvider) schemaToolD() mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_schema",
 		Description: "List all tables and their columns with types and constraints. Use this first to understand the database structure before writing queries.",
-		InputSchema: "", // no input args
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
@@ -72,7 +71,7 @@ func (p *DaemonProvider) queryToolD() mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_query",
 		Description: "Execute a read-only SQL query (SELECT/WITH) and return the results as text. Use db_exec for INSERT, UPDATE, DELETE, or DDL.",
-		InputSchema: encodeSchema(new(QueryArgs)),
+		Args:        new(QueryArgs),
 		Resource:    "database",
 		Action:      'r',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {
@@ -88,7 +87,7 @@ func (p *DaemonProvider) execToolD() mcp.Tool {
 	return mcp.Tool{
 		Name:        "db_exec",
 		Description: "Execute a SQL statement that modifies data or schema: INSERT, UPDATE, DELETE, CREATE TABLE, ALTER TABLE, DROP TABLE, etc.",
-		InputSchema: encodeSchema(new(ExecArgs)),
+		Args:        new(ExecArgs),
 		Resource:    "database",
 		Action:      'u',
 		Execute: func(ctx *context.Context, req mcp.Request) (*mcp.Result, error) {

@@ -1,10 +1,7 @@
 package ormcp
 
-import "github.com/tinywasm/model"
-
 import (
 	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/json"
 	"github.com/tinywasm/mcp"
 	"github.com/tinywasm/orm"
 )
@@ -31,13 +28,6 @@ func (p *Provider) Tools() []mcp.Tool {
 		tools = append([]mcp.Tool{schemaTool(p.db)}, tools...)
 	}
 	return tools
-}
-
-// encodeSchema encodes a model.Fielder as a JSON schema string for InputSchema.
-func encodeSchema(f model.Encodable) string {
-	var s string
-	_ = json.Encode(f, &s)
-	return s
 }
 
 func scanRowsToText(rows orm.Rows) string {
