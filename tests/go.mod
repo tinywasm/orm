@@ -5,11 +5,14 @@ module github.com/tinywasm/orm/tests
 go 1.25.2
 
 require (
+	github.com/tinywasm/ddlc v0.0.1
 	github.com/tinywasm/fmt v0.25.1
 	github.com/tinywasm/model v0.0.7
 	github.com/tinywasm/orm v0.9.26
 )
 
-require github.com/tinywasm/modfind v0.0.4 // indirect
-
 replace github.com/tinywasm/orm => ..
+
+replace github.com/tinywasm/ddlc => ../../ddlc
+
+replace github.com/tinywasm/model => github.com/tinywasm/model v0.0.6
