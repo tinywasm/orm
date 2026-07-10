@@ -6,5 +6,3 @@ require (
 	github.com/tinywasm/fmt v0.25.1
 	github.com/tinywasm/model v0.0.7
 )
-
-replace github.com/tinywasm/model => github.com/tinywasm/model v0.0.6

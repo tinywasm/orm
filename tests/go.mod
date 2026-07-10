@@ -12,7 +12,3 @@ require (
 )
 
 replace github.com/tinywasm/orm => ..
-
-replace github.com/tinywasm/ddlc => ../../ddlc
-
-replace github.com/tinywasm/model => github.com/tinywasm/model v0.0.6
