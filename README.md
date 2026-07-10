@@ -9,13 +9,28 @@
 - **Zero Reflection**: Interface-driven schema via `github.com/tinywasm/model` with generated code.
 - **Isomorphic**: Same generated code works in Go (backend) and WASM (frontend).
 - **0-alloc Codec**: Symmetric, reflection-free serialization/deserialization methods generated for every model.
-- **Code Generator**: `ormc` CLI generates concrete Go structs and all the plumbing.
+- **Query Builder**: Reflection-free, type-safe query building.
+
+## Ecosystem
+
+This repository contains the **runtime only**. Other parts of the ecosystem:
+
+| Component | Repository | Role |
+|---|---|---|
+| **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator. |
+| **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and utilities. |
+| **ormcp** | [tinywasm/ormcp](https://github.com/tinywasm/ormcp) | MCP tool provider for LLM interaction. |
 
 ## Installation
 
 ```bash
 go get github.com/tinywasm/orm
-go install github.com/tinywasm/orm/cmd/ormc@latest
+```
+
+To install the code generator:
+
+```bash
+go install github.com/tinywasm/ormc/cmd/ormc@latest
 ```
 
 ## Declarative Workflow
@@ -31,25 +46,24 @@ package user
 
 import (
     "github.com/tinywasm/model"
-    "github.com/tinywasm/form/input"
 )
 
 var UserModel = model.Definition{
     Name: "user",
     Fields: model.Fields{
-        {Name: "id",    Type: model.FieldInt,  DB: &model.FieldDB{PK: true, AutoInc: true}},
-        {Name: "name",  Type: model.FieldText, NotNull: true, Widget: input.Text(), Permitted: model.Permitted{Minimum: 2}},
-        {Name: "email", Type: model.FieldText, NotNull: true, Widget: input.Email(), DB: &model.FieldDB{Unique: true}},
-        {Name: "bio",   Type: model.FieldText, Widget: input.Textarea(), OmitEmpty: true},
-        {Name: "addr",  Type: model.FieldStruct, Ref: &AddressModel},
+        {Name: "id",    Type: model.Int(),  DB: &model.FieldDB{PK: true, AutoInc: true}},
+        {Name: "name",  Type: model.Text(), NotNull: true, Permitted: model.Permitted{Minimum: 2}},
+        {Name: "email", Type: model.Text(), NotNull: true, DB: &model.FieldDB{Unique: true}},
+        {Name: "bio",   Type: model.Text(), OmitEmpty: true},
+        {Name: "addr",  Type: model.Struct(), Ref: &AddressModel},
     },
 }
 
 var AddressModel = model.Definition{
     Name: "address",
     Fields: model.Fields{
-        {Name: "street", Type: model.FieldText},
-        {Name: "city",   Type: model.FieldText},
+        {Name: "street", Type: model.Text()},
+        {Name: "city",   Type: model.Text()},
     },
 }
 ```
@@ -80,52 +94,49 @@ func GetUser(db *orm.DB, id int64) (*user.User, error) {
 | Field | Meaning |
 |-------|---------|
 | `Name` | wire/DB column name (snake_case). Becomes PascalCase in the generated struct. |
-| `Type` | Enum: `FieldText`, `FieldInt`, `FieldFloat`, `FieldBool`, `FieldBlob`, `FieldStruct`, `FieldIntSlice`, `FieldStructSlice`, `FieldRaw`. |
+| `Type` | `model.Kind` (e.g. `model.Text()`, `model.Int()`, `model.Struct()`). |
 | `NotNull` | `NOT NULL` constraint in DB. |
 | `OmitEmpty` | Skips field if zero-value in codecs. |
 | `Exclude` | Field exists in generated struct but is skipped in `Schema()`, `Pointers()`, and codecs (e.g. for `password_hash`). |
-| `Widget` | Binding for UI rendering (requires `github.com/tinywasm/form/input`). |
+| `Widget` | Binding for UI rendering (see `tinywasm/form/input`). |
 | `DB` | Database-specific metadata (`PK`, `Unique`, `AutoInc`, `RefColumn`, `OnDelete`). |
 | `Ref` | Points to another `*model.Definition`. Used for composition or scalar Foreign Keys. |
 | `Permitted` | Validation rules (Minimum, Maximum, Letters, Numbers, etc.). |
 
 ### Relations
 
-1.  **Composition**: When `Type` is `FieldStruct` or `FieldStructSlice`. The field becomes a nested struct or slice of structs part of the same row/JSON.
-2.  **Scalar Foreign Key**: When `Type` is a scalar (e.g. `FieldInt`) and `Ref` is non-nil. Adds DDL metadata for `FOREIGN KEY` constraints.
+1.  **Composition**: When `Type` is `model.Struct()` or `model.StructSlice()`. The field becomes a nested struct or slice of structs part of the same row/JSON.
+2.  **Scalar Foreign Key**: When `Type` is a scalar (e.g. `model.Int()`) and `Ref` is non-nil. Adds DDL metadata for `FOREIGN KEY` constraints.
 
 ```go
-{Name: "user_id", Type: model.FieldInt, Ref: &UserModel, DB: &model.FieldDB{RefColumn: "id", OnDelete: "CASCADE"}}
+{Name: "user_id", Type: model.Int(), Ref: &UserModel, DB: &model.FieldDB{RefColumn: "id", OnDelete: "CASCADE"}}
 ```
 
 ## Schema Types Mapping
 
-| `model.FieldType` | Generated Go Type | Codec Method |
+| `model.Kind` | Generated Go Type | Codec Method |
 |---|---|---|
-| `FieldText`, `FieldRaw` | `string` | `String` / `Raw` |
-| `FieldInt` | `int64` | `Int` |
-| `FieldFloat` | `float64` | `Float` |
-| `FieldBool` | `bool` | `Bool` |
-| `FieldBlob` | `[]byte` | `Bytes` |
-| `FieldIntSlice` | `[]int` | `Array` |
-| `FieldStruct` | `T` (from `Ref`) | `Object` |
-| `FieldStructSlice` | `[]*T` (from `Ref`) | `Array` |
+| `model.Text()`, `model.Raw()` | `string` | `String` / `Raw` |
+| `model.Int()` | `int64` | `Int` |
+| `model.Float()` | `float64` | `Float` |
+| `model.Bool()` | `bool` | `Bool` |
+| `model.Blob()` | `[]byte` | `Bytes` |
+| `model.IntSlice()` | `[]int` | `Array` |
+| `model.Struct()` | `T` (from `Ref`) | `Object` |
+| `model.StructSlice()` | `[]*T` (from `Ref`) | `Array` |
 
-## ormc — Code Generation
+## Generated Code
 
-Run from the **project root**. Scans subdirectories for `model.go` / `models.go`.
-
-**Generated per model:**
+The `ormc` generator produces:
 
 - `type T struct` declaration.
 - `Schema() []model.Field`, `Pointers() []any` (parallel, zero-alloc).
 - `EncodeFields(model.FieldWriter)`, `DecodeFields(model.FieldReader)` (symmetric codec).
 - `IsNil() bool`.
-- `Validate(action byte) error` (calling `model.ValidateFields`). Always generated —
-  validation is secure by default; models with no rules get a cheap no-op.
+- `Validate(action byte) error` (calling `model.ValidateFields`). Always generated.
 - `ModelName() string`.
 - `ReadOneT()`, `ReadAllT()`, `TList` type (for DB models).
-- `SchemaExt() []orm.FieldExt` (for scalar FKs).
+- `SchemaExt() []ddlc.FieldExt` (requires [tinywasm/ddlc](https://github.com/tinywasm/ddlc)).
 
 ## More Documentation
 

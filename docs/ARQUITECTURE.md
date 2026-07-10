@@ -2,11 +2,21 @@
 
 The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (no `reflect`), and isomorphic (WASM/Backend) ORM, strictly following the architectural mandates of the `tinywasm` ecosystem.
 
+## Repository Split (2026-07-10)
+
+This repository now contains the **runtime only**. Other components have been moved to their own repositories to keep the dependency graph lean:
+
+| Component | Repository | Role |
+|---|---|---|
+| **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator and schema synchronization logic. |
+| **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and topological sorting. |
+| **ormcp** | [tinywasm/ormcp](https://github.com/tinywasm/ormcp) | MCP tool provider for LLM interaction. |
+
 ## Background
 
 - [Why use this ORM?](WHY.md)
 - [Why package-level schema variables?](WHY_PACKAGE_LEVEL_SCHEMA.md)
-- [Why ormc generates so much code (and why it's free)](WHY_GENERATED_CODE_IS_FREE.md)
+- [Why ormc generates so much code (and why it's free)](https://github.com/tinywasm/ormc/blob/main/docs/WHY_GENERATED_CODE_IS_FREE.md)
 
 
 ## 1. Primary Architectural Pattern: Inverted Declarative Workflow
@@ -22,7 +32,7 @@ Unlike traditional ORMs that use `reflect` or parse structs with tags to generat
 
 ## 2. Fundamental Components
 
-### 3.1. `model.Definition` (Source of Truth)
+### 2.1. `model.Definition` (Source of Truth)
 
 The application developer defines models as package-level variables ending in `Model`.
 
@@ -30,13 +40,13 @@ The application developer defines models as package-level variables ending in `M
 var UserModel = model.Definition{
     Name: "user",
     Fields: model.Fields{
-        {Name: "id", Type: model.FieldInt, DB: &model.FieldDB{PK: true}},
-        {Name: "name", Type: model.FieldText, NotNull: true},
+        {Name: "id", Type: model.Int(), DB: &model.FieldDB{PK: true}},
+        {Name: "name", Type: model.Text(), NotNull: true},
     },
 }
 ```
 
-### 3.2. `orm.Model` Interface
+### 2.2. `orm.Model` Interface
 
 The generated structs implement this interface, which embeds `fmt.Fielder` and adds `ModelName()`.
 
@@ -44,16 +54,19 @@ The generated structs implement this interface, which embeds `fmt.Fielder` and a
 type Model interface {
     fmt.Fielder
     ModelName() string
+    IsNil() bool
 }
 
 // fmt.Fielder provides:
 type Fielder interface {
     Schema() []model.Field   // column metadata
     Pointers() []any         // field pointers for DB scanning
+    EncodeFields(model.FieldWriter)
+    DecodeFields(model.FieldReader)
 }
 ```
 
-### 3.3. Typed Serialization Codec (`Encodable`/`Decodable`)
+### 2.3. Typed Serialization Codec (`Encodable`/`Decodable`)
 
 `ormc` generates reflection-free, 0-allocation methods for serialization (used by `tinywasm/json`):
 
@@ -71,42 +84,24 @@ func (m *User) DecodeFields(r model.FieldReader) {
 
 ---
 
-## 4. `ormc` Code Generator
+## 3. Code Generation (`ormc`)
 
-`ormc` parses `model.go` / `models.go` files and generates `*_orm.go`.
+See [tinywasm/ormc](https://github.com/tinywasm/ormc) for detailed documentation.
 
-### 4.1. Role Inference
+### 3.1. Role Inference
 
-`ormc` infers the role of each definition based on the presence of `DB` metadata or `Widget` bindings:
+`ormc` infers the role of each definition based on the presence of `DB` metadata or `Widget` bindings.
 
-- **DB Model**: If at least one field has a `DB` configuration. Generates CRUD helpers (`ReadOne`, `ReadAll`) and a `*List` type.
-- **Form**: If fields have `Widget` or validation rules. Generates a `Validate()` method.
-- **DTO**: If it's just a data structure. Generates the struct and basic codec.
+### 3.2. Relations
 
-### 4.2. Relations
-
-1.  **Composition**: When `Type` is `FieldStruct` or `FieldStructSlice`. The generated struct will embed the referenced type (or a slice of it).
+1.  **Composition**: When `Type` is `model.Struct()` or `model.StructSlice()`. The generated struct will embed the referenced type (or a slice of it).
 2.  **Scalar Foreign Key**: When `Type` is a scalar and `Ref` is non-nil. This generates `SchemaExt()` metadata for DDL constraints.
-
-### 4.3. Module Scanning & Schema Sync
-
-`ormc` provides `ScanModules(rootDir string)` for centralized startup schema reconciliation across the entire module graph.
-
-- **Writable Modules**: Regenerated in-place and synced.
-- **Read-only Modules**: Schema is recovered by parsing published `*_orm.go` files.
 
 ---
 
-## 5. Execution Pipeline
+## 4. Execution Pipeline
 
 `Model` → `Query` → `Compiler` → `Plan` → `Executor`
 
 1. **`Compiler`**: Translates agnostic ORM queries into engine-specific strings (SQL, etc.).
 2. **`Executor`**: Standardized interface for running queries and commands, compatible with `database/sql` but engine-independent.
-
----
-
-## 6. DDL Tooling
-
-- `ddlc`: CLI tool to generate SQL schemas from model definitions.
-- `ddl.TopologicalSort`: Orders tables based on foreign key dependencies for safe creation/deletion.

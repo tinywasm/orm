@@ -5,7 +5,6 @@ package tests
 import (
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
-	"github.com/tinywasm/ddlc"
 )
 
 type User struct {
@@ -164,12 +163,6 @@ func ReadAllOrder(qb *orm.QB) (OrderList, error) {
 	return results, err
 }
 
-func (m *Order) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
-		{Field: OrderModel.Fields[1], Ref: "user", RefColumn: "id", OnDelete: ""},
-	}
-}
-
 type ModelWithIgnored struct {
 	Id string
 	Name string
@@ -180,9 +173,9 @@ type ModelWithIgnored struct {
 func (m *ModelWithIgnored) ModelName() string { return "model_with_ignored" }
 
 var _schemaModelWithIgnored = []model.Field{
-		{Name: "id", Type: model.FieldText, DB: &model.FieldDB{PK: true}},
-		{Name: "name", Type: model.FieldText},
-		{Name: "score", Type: model.FieldFloat},
+		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
+		{Name: "name", Type: model.Text()},
+		{Name: "score", Type: model.Float()},
 	}
 
 func (m *ModelWithIgnored) Schema() []model.Field { return _schemaModelWithIgnored }
@@ -502,12 +495,6 @@ func ReadAllRefNoColumn(qb *orm.QB) (RefNoColumnList, error) {
 		func(m model.Model) { results = append(results, m.(*RefNoColumn)) },
 	)
 	return results, err
-}
-
-func (m *RefNoColumn) SchemaExt() []ddlc.FieldExt {
-	return []ddlc.FieldExt{
-		{Field: RefNoColumnModel.Fields[1], Ref: "multi_a", RefColumn: "", OnDelete: ""},
-	}
 }
 
 type PointerReceiver struct {

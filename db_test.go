@@ -53,7 +53,7 @@ func (m *mockTxExecutor) BeginTx() (TxBoundExecutor, error) {
 
 func TestSyncSchema_RegistersModel(t *testing.T) {
 	db := New(&mockTxExecutor{}, &mockCompiler{})
-	fields := []model.Field{{Name: "id", Type: model.FieldInt}}
+	fields := []model.Field{{Name: "id", Type: model.Int()}}
 
 	err := db.SyncSchema("logs", fields)
 	if err != nil {
