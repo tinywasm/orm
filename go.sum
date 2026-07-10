@@ -1,4 +1,4 @@
 github.com/tinywasm/fmt v0.25.1 h1:Ummug+ZSoxHjnlV4kx2+dFR0w+1YftWbKuWyg0EpFtw=
 github.com/tinywasm/fmt v0.25.1/go.mod h1:L2GCAi6asgytPV6TVvGrRq5Ml+DkUt1Ijo5i/2J1jOY=
-github.com/tinywasm/model v0.0.7 h1:v0Iv/xc840oYL+JevvEtAPAut5nu56t2Ywuf4bD9li0=
-github.com/tinywasm/model v0.0.7/go.mod h1:af3eNGmQA/BMVjMqMUXVgL0B8+NMTwlc6h7TpdEggTo=
+github.com/tinywasm/model v0.0.8 h1:ReyBYZraFVL55m8/TPOnv5YgGcWNEDquka0x9q9EyvQ=
+github.com/tinywasm/model v0.0.8/go.mod h1:af3eNGmQA/BMVjMqMUXVgL0B8+NMTwlc6h7TpdEggTo=
