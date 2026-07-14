@@ -10,7 +10,7 @@ This repository now contains the **runtime only**. Other components have been mo
 |---|---|---|
 | **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator and schema synchronization logic. |
 | **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and topological sorting. |
-| **ormcp** | [tinywasm/ormcp](https://github.com/tinywasm/ormcp) | MCP tool provider for LLM interaction. |
+| **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
 
 ## Background
 

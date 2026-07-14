@@ -19,7 +19,7 @@ This repository contains the **runtime only**. Other parts of the ecosystem:
 |---|---|---|
 | **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator. |
 | **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and utilities. |
-| **ormcp** | [tinywasm/ormcp](https://github.com/tinywasm/ormcp) | MCP tool provider for LLM interaction. |
+| **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
 
 ## Installation
 
