@@ -2,7 +2,6 @@ package orm
 
 import "github.com/tinywasm/model"
 
-
 // DB represents a database connection.
 // Consumers instantiate it via New().
 type DB struct {
@@ -95,9 +94,12 @@ func (db *DB) Update(m model.Model, cond Condition, rest ...Condition) error {
 // emptyModel is a private zero-value type used only for CreateDatabase.
 type emptyModel struct{}
 
-func (e emptyModel) ModelName() string { return "" }
-func (e emptyModel) Schema() []model.Field { return nil }
-func (e emptyModel) Pointers() []any   { return nil }
+func (e emptyModel) ModelName() string                { return "" }
+func (e emptyModel) Schema() []model.Field            { return nil }
+func (e emptyModel) Pointers() []any                  { return nil }
+func (e emptyModel) IsNil() bool                      { return true }
+func (e emptyModel) EncodeFields(w model.FieldWriter) {}
+func (e emptyModel) DecodeFields(r model.FieldReader) {}
 
 // CreateTable creates a new table for the given model.
 func (db *DB) CreateTable(m model.Model) error {

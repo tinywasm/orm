@@ -126,6 +126,12 @@ func (m MockModel) Pointers() []any {
 	return ptrs
 }
 
+// IsNil, EncodeFields, DecodeFields satisfy model.Model. This double only exercises
+// query-building (Pointers/Schema); it never travels over the wire.
+func (m MockModel) IsNil() bool                      { return false }
+func (m MockModel) EncodeFields(w model.FieldWriter) {}
+func (m MockModel) DecodeFields(r model.FieldReader) {}
+
 // MockTxExecutor ...
 type MockTxExecutor struct {
 	MockExecutor
