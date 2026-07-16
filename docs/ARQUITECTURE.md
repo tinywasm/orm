@@ -10,7 +10,20 @@ This repository now contains the **runtime only**. Other components have been mo
 |---|---|---|
 | **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator and schema synchronization logic. |
 | **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and topological sorting. |
+| **ddl** | [tinywasm/ddl](https://github.com/tinywasm/ddl) | Runtime DDL: `CreateTable`/`DropTable`/`Sync`/`SyncSchema` + `ddl/conformance`. |
 | **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
+
+## DML/DDL Split (2026-07-16)
+
+`orm` is now a **DML-only** runtime: `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)` against a table
+that already exists. Schema management — `CreateTable`/`DropTable`/`CreateDatabase`/`Sync`/`SyncSchema`,
+the DDL `Action`s (`AddColumn`/`RenameColumn`/`DropColumn`), and introspection
+(`TableIntrospector`/`SchemaInspector`) — moved to [`tinywasm/ddl`](https://github.com/tinywasm/ddl), a
+sibling runtime that depends on `orm.Executor` and `ddlc`. This lets backends that can't do dynamic
+`CREATE TABLE` (e.g. `indexdb`, which declares IndexedDB object stores up front) conform to `orm/conformance`
+without ever satisfying a DDL contract. `orm` itself gained no dependency on `ddl`/`ddlc` — the split is
+one-directional. This was a **breaking change**, applied directly (no deprecation window): consumers move
+their `db.CreateTable(m)`/`db.Sync(...)` calls to `ddl.New(exec, gen).CreateTable/Sync`.
 
 ## Background
 

@@ -425,54 +425,6 @@ func RunCoreTests(t *testing.T) {
 		}
 	})
 
-	// Test DDL Actions
-	t.Run("DDL", func(t *testing.T) {
-		mockCompiler := &mock.Compiler{}
-		mockExec := &mock.Executor{}
-		db := orm.New(mockExec, mockCompiler)
-
-		model := &mock.Model{Table: "user"}
-
-		// CreateTable
-		err := db.CreateTable(model)
-		if err != nil {
-			t.Fatalf("CreateTable failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionCreateTable {
-			t.Errorf("Expected ActionCreateTable, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Table != "user" {
-			t.Errorf("Expected table 'user', got '%s'", mockCompiler.LastQuery.Table)
-		}
-
-		// DropTable
-		err = db.DropTable(model)
-		if err != nil {
-			t.Fatalf("DropTable failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionDropTable {
-			t.Errorf("Expected ActionDropTable, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Table != "user" {
-			t.Errorf("Expected table 'user', got '%s'", mockCompiler.LastQuery.Table)
-		}
-
-		// CreateDatabase
-		err = db.CreateDatabase("testdb")
-		if err != nil {
-			t.Fatalf("CreateDatabase failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionCreateDatabase {
-			t.Errorf("Expected ActionCreateDatabase, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Database != "testdb" {
-			t.Errorf("Expected database 'testdb', got '%s'", mockCompiler.LastQuery.Database)
-		}
-		if mockCompiler.LastQuery.Table != "" {
-			t.Errorf("Expected empty table for CreateDatabase, got '%s'", mockCompiler.LastQuery.Table)
-		}
-	})
-
 	// 16. Errors coverage
 	t.Run("Errors", func(t *testing.T) {
 		model := &mock.Model{Table: "t", Sch: []mdl.Field{{Name: "a"}}, Vals: []any{1}}
@@ -504,33 +456,6 @@ func RunCoreTests(t *testing.T) {
 		}
 		// Delete Exec Error
 		if err := db2.Delete(model, orm.Eq("id", 1)); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
-		// CreateTable Plan Error
-		if err := db1.CreateTable(model); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// CreateTable Exec Error
-		if err := db2.CreateTable(model); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
-		// DropTable Plan Error
-		if err := db1.DropTable(model); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// DropTable Exec Error
-		if err := db2.DropTable(model); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
-		// CreateDatabase Plan Error
-		if err := db1.CreateDatabase("t"); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// CreateDatabase Exec Error
-		if err := db2.CreateDatabase("t"); err == nil || err.Error() != "exec err" {
 			t.Errorf("Expected exec err, got %v", err)
 		}
 

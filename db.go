@@ -8,7 +8,6 @@ type DB struct {
 	exec     Executor
 	compiler Compiler
 	log      func(messages ...any)
-	models   []model.Model
 }
 
 // New creates a new DB instance.
@@ -91,65 +90,6 @@ func (db *DB) Update(m model.Model, cond Condition, rest ...Condition) error {
 	return db.exec.Exec(plan.Query, plan.Args...)
 }
 
-// emptyModel is a private zero-value type used only for CreateDatabase.
-type emptyModel struct{}
-
-func (e emptyModel) ModelName() string                { return "" }
-func (e emptyModel) Schema() []model.Field            { return nil }
-func (e emptyModel) Pointers() []any                  { return nil }
-func (e emptyModel) IsNil() bool                      { return true }
-func (e emptyModel) EncodeFields(w model.FieldWriter) {}
-func (e emptyModel) DecodeFields(r model.FieldReader) {}
-
-// CreateTable creates a new table for the given model.
-func (db *DB) CreateTable(m model.Model) error {
-	if err := validateQuery(ActionCreateTable, m); err != nil {
-		return err
-	}
-	q := Query{
-		Action: ActionCreateTable,
-		Table:  m.ModelName(),
-	}
-	plan, err := db.compiler.Compile(q, m)
-	if err != nil {
-		return err
-	}
-	return db.exec.Exec(plan.Query, plan.Args...)
-}
-
-// DropTable drops the table for the given model.
-func (db *DB) DropTable(m model.Model) error {
-	if err := validateQuery(ActionDropTable, m); err != nil {
-		return err
-	}
-	q := Query{
-		Action: ActionDropTable,
-		Table:  m.ModelName(),
-	}
-	plan, err := db.compiler.Compile(q, m)
-	if err != nil {
-		return err
-	}
-	return db.exec.Exec(plan.Query, plan.Args...)
-}
-
-// CreateDatabase creates a new database.
-func (db *DB) CreateDatabase(name string) error {
-	m := emptyModel{}
-	if err := validateQuery(ActionCreateDatabase, m); err != nil {
-		return err
-	}
-	q := Query{
-		Action:   ActionCreateDatabase,
-		Database: name,
-	}
-	plan, err := db.compiler.Compile(q, m)
-	if err != nil {
-		return err
-	}
-	return db.exec.Exec(plan.Query, plan.Args...)
-}
-
 // Delete deletes a model from the database.
 // At least one Condition is required. Providing zero conditions is a compile-time
 // error, preventing accidental full-table DELETE statements.
@@ -187,16 +127,5 @@ func (db *DB) Close() error {
 func (db *DB) RawExecutor() Executor {
 	return db.exec
 }
-
-func (db *DB) registerModel(m model.Model) {
-	for _, existing := range db.models {
-		if existing.ModelName() == m.ModelName() {
-			return
-		}
-	}
-	db.models = append(db.models, m)
-}
-
-func (db *DB) RegisteredModels() []model.Model { return db.models }
 
 func (db *DB) Compiler() Compiler { return db.compiler }

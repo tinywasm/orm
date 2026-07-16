@@ -11,14 +11,64 @@ import (
 // leaf module uses to test round-trips without importing a real driver, and it proves
 // orm/conformance exactly like the real backends do.
 func NewDB() *orm.DB {
-	e := &engine{tables: map[string][]map[string]any{}}
+	e := &engine{}
 	return orm.New(e, e)
 }
 
+// dbCell is one column/value pair. Rows and tables are plain slices scanned linearly — no Go
+// map anywhere: TinyGo's map runtime is heavy and bloats the wasm binary, so it's prohibited
+// across tinywasm (see AGENTS.md). Table/row counts here are tiny (test fixtures), so a linear
+// scan costs nothing in practice.
+type dbCell struct {
+	col string
+	val any
+}
+
+// dbRow is an ordered set of cells. A dbRow value shares its backing array with whatever it
+// was copied from, so rows handed back by match() alias the stored data: set() mutates them
+// in place, giving Update/Delete the same "reference into storage" behavior a
+// map[string]any used to give for free.
+type dbRow []dbCell
+
+func (r dbRow) get(col string) (any, bool) {
+	for _, c := range r {
+		if c.col == col {
+			return c.val, true
+		}
+	}
+	return nil, false
+}
+
+// set overwrites an existing column in place. Callers only ever set columns that Create
+// already wrote, so every call takes the "found" branch — there is no append fallback.
+func (r dbRow) set(col string, val any) {
+	for i := range r {
+		if r[i].col == col {
+			r[i].val = val
+			return
+		}
+	}
+}
+
+// dbTable is one named table's rows.
+type dbTable struct {
+	name string
+	rows []dbRow
+}
+
 type engine struct {
-	tables map[string][]map[string]any // table -> rows (column -> value)
+	tables []dbTable
 	lastQ  orm.Query
 	lastM  model.Model
+}
+
+func (e *engine) tableIndex(name string) int {
+	for i := range e.tables {
+		if e.tables[i].name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 func (e *engine) Compile(q orm.Query, m model.Model) (orm.Plan, error) {
@@ -38,50 +88,47 @@ func (e *engine) Rollback() error { return nil }
 func (e *engine) Exec(query string, args ...any) error {
 	q := e.lastQ
 	switch q.Action {
-	case orm.ActionCreateTable:
-		if _, ok := e.tables[q.Table]; !ok {
-			e.tables[q.Table] = nil
-		}
-	case orm.ActionDropTable:
-		delete(e.tables, q.Table)
 	case orm.ActionCreate:
-		row := map[string]any{}
+		newRow := make(dbRow, 0, len(q.Columns))
 		for i, col := range q.Columns {
 			if i < len(q.Values) {
-				row[col] = q.Values[i]
+				newRow = append(newRow, dbCell{col: col, val: q.Values[i]})
 			}
 		}
-		// Auto-vivifies the table: append sets the map key even if CreateTable was never called.
-		// This is why the mock Factory in orm/conformance needs no DDL — it just returns NewDB().
-		e.tables[q.Table] = append(e.tables[q.Table], row)
+		idx := e.tableIndex(q.Table)
+		if idx == -1 {
+			// Auto-vivifies the table on first insert. This is why the mock Factory in
+			// orm/conformance needs no DDL — it just returns NewDB().
+			e.tables = append(e.tables, dbTable{name: q.Table})
+			idx = len(e.tables) - 1
+		}
+		e.tables[idx].rows = append(e.tables[idx].rows, newRow)
 	case orm.ActionUpdate:
-		isPK := map[string]bool{}
-		if e.lastM != nil {
-			for _, f := range e.lastM.Schema() {
-				if f.IsPK() {
-					isPK[f.Name] = true
-				}
-			}
-		}
-		for _, row := range e.match(q.Table, q.Conditions) { // match returns stored map refs
+		// db.Update builds q.Columns from m.Schema() in order (see orm/db.go), so
+		// q.Columns[i] and schema[i] always name the same field — no lookup needed.
+		schema := e.lastM.Schema()
+		for _, row := range e.match(q.Table, q.Conditions) { // match returns rows aliasing storage
 			for i, col := range q.Columns {
-				if isPK[col] {
+				if i < len(schema) && schema[i].IsPK() {
 					continue // do not overwrite PK on update
 				}
 				if i < len(q.Values) {
-					row[col] = q.Values[i]
+					row.set(col, q.Values[i])
 				}
 			}
 		}
 	case orm.ActionDelete:
-		kept := e.tables[q.Table][:0:0]
-		for _, row := range e.tables[q.Table] {
+		idx := e.tableIndex(q.Table)
+		if idx == -1 {
+			return nil
+		}
+		kept := e.tables[idx].rows[:0:0]
+		for _, row := range e.tables[idx].rows {
 			if !matchRow(row, q.Conditions) {
 				kept = append(kept, row)
 			}
 		}
-		e.tables[q.Table] = kept
-	default: // CreateDatabase / AddColumn / RenameColumn / DropColumn: no-op
+		e.tables[idx].rows = kept
 	}
 	return nil
 }
@@ -101,9 +148,13 @@ func (e *engine) Query(query string, args ...any) (orm.Rows, error) {
 	return &memRows{rows: rows, schema: e.lastM.Schema(), idx: -1}, nil
 }
 
-func (e *engine) match(table string, conds []orm.Condition) []map[string]any {
-	var out []map[string]any
-	for _, row := range e.tables[table] {
+func (e *engine) match(table string, conds []orm.Condition) []dbRow {
+	idx := e.tableIndex(table)
+	if idx == -1 {
+		return nil
+	}
+	var out []dbRow
+	for _, row := range e.tables[idx].rows {
 		if matchRow(row, conds) {
 			out = append(out, row)
 		}
@@ -112,7 +163,7 @@ func (e *engine) match(table string, conds []orm.Condition) []map[string]any {
 }
 
 // matchRow evaluates conds left-to-right; the first Logic() is ignored (mirrors real adapters).
-func matchRow(row map[string]any, conds []orm.Condition) bool {
+func matchRow(row dbRow, conds []orm.Condition) bool {
 	if len(conds) == 0 {
 		return true
 	}
@@ -127,8 +178,8 @@ func matchRow(row map[string]any, conds []orm.Condition) bool {
 	return res
 }
 
-func evalCond(row map[string]any, c orm.Condition) bool {
-	v, ok := row[c.Field()]
+func evalCond(row dbRow, c orm.Condition) bool {
+	v, ok := row.get(c.Field())
 	switch c.Operator() {
 	case "IS NOT NULL":
 		return ok && v != nil
@@ -195,12 +246,14 @@ func inSlice(v any, listVal any) bool {
 	return false
 }
 
-func applyOrder(rows []map[string]any, orders []orm.Order) []map[string]any {
+func applyOrder(rows []dbRow, orders []orm.Order) []dbRow {
 	for oi := len(orders) - 1; oi >= 0; oi-- { // stable, last key least significant
 		col, desc := orders[oi].Column(), orders[oi].Dir() == "DESC"
 		for i := 1; i < len(rows); i++ {
 			for j := i; j > 0; j-- {
-				cmp := compareAny(rows[j-1][col], rows[j][col])
+				lv, _ := rows[j-1].get(col)
+				rv, _ := rows[j].get(col)
+				cmp := compareAny(lv, rv)
 				if desc {
 					cmp = -cmp
 				}
@@ -214,7 +267,7 @@ func applyOrder(rows []map[string]any, orders []orm.Order) []map[string]any {
 	return rows
 }
 
-func applyOffsetLimit(rows []map[string]any, offset, limit int) []map[string]any {
+func applyOffsetLimit(rows []dbRow, offset, limit int) []dbRow {
 	if offset > 0 {
 		if offset >= len(rows) {
 			return nil
@@ -228,7 +281,7 @@ func applyOffsetLimit(rows []map[string]any, offset, limit int) []map[string]any
 }
 
 type memScanner struct {
-	row    map[string]any
+	row    dbRow
 	schema []model.Field
 	err    error
 }
@@ -241,12 +294,12 @@ func (s *memScanner) Scan(dest ...any) error {
 }
 
 type memRows struct {
-	rows   []map[string]any
+	rows   []dbRow
 	schema []model.Field
 	idx    int
 }
 
-func (r *memRows) Next() bool { r.idx++; return r.idx < len(r.rows) }
+func (r *memRows) Next() bool             { r.idx++; return r.idx < len(r.rows) }
 func (r *memRows) Scan(dest ...any) error { return scanInto(r.rows[r.idx], r.schema, dest) }
 func (r *memRows) Columns() ([]string, error) {
 	cols := make([]string, len(r.schema))
@@ -258,12 +311,12 @@ func (r *memRows) Columns() ([]string, error) {
 func (r *memRows) Close() error { return nil }
 func (r *memRows) Err() error   { return nil }
 
-func scanInto(row map[string]any, schema []model.Field, dest []any) error {
+func scanInto(row dbRow, schema []model.Field, dest []any) error {
 	for i, f := range schema {
 		if i >= len(dest) {
 			break
 		}
-		if v, ok := row[f.Name]; ok {
+		if v, ok := row.get(f.Name); ok {
 			if err := orm.ScanAny(v, dest[i]); err != nil {
 				return err
 			}

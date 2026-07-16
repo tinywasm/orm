@@ -210,15 +210,6 @@ func TestEngine_EdgeCasesCoverage(t *testing.T) {
 		t.Errorf("Rollback failed: %v", err)
 	}
 
-	// Create and Drop Table
-	w := &conformance.Widget{Id: "t1", Name: "test"}
-	if err := db.CreateTable(w); err != nil {
-		t.Errorf("CreateTable failed: %v", err)
-	}
-	if err := db.DropTable(w); err != nil {
-		t.Errorf("DropTable failed: %v", err)
-	}
-
 	// Columns and Scan with short dest
 	if err := db.Create(&conformance.Widget{Id: "t2", Name: "test2"}); err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -254,7 +245,7 @@ func TestEngine_EdgeCasesCoverage(t *testing.T) {
 	// Scan missing column
 	var missingDest string
 	schemaWithMissing := []model.Field{{Name: "nonexistent", Type: model.Text()}}
-	err = scanInto(map[string]any{}, schemaWithMissing, []any{&missingDest})
+	err = scanInto(dbRow{}, schemaWithMissing, []any{&missingDest})
 	if err != nil {
 		t.Errorf("expected nil error for missing scan, got %v", err)
 	}
@@ -349,7 +340,7 @@ func TestEngine_EdgeCasesCoverage(t *testing.T) {
 	}
 
 	// 5. IS NOT NULL evaluate condition
-	row := map[string]any{"col1": "val1", "col2": nil}
+	row := dbRow{{col: "col1", val: "val1"}, {col: "col2", val: nil}}
 	c1 := orm.IsNotNull("col1")
 	if !evalCond(row, c1) {
 		t.Error("expected col1 IS NOT NULL to be true")
@@ -399,16 +390,17 @@ func TestEngine_EdgeCasesCoverage(t *testing.T) {
 		t.Error("expected false for nil listVal")
 	}
 
+	// Delete on a table that was never Created is a no-op, not a panic.
+	freshDB := NewDB()
+	if err := freshDB.Delete(&conformance.Widget{}, orm.Eq("id", "nope")); err != nil {
+		t.Errorf("expected nil error deleting from nonexistent table, got %v", err)
+	}
+
 	// 7. offset >= len(rows) edge case
-	rowsSlice := []map[string]any{{"id": "1"}, {"id": "2"}}
+	rowsSlice := []dbRow{{{col: "id", val: "1"}}, {{col: "id", val: "2"}}}
 	resRows := applyOffsetLimit(rowsSlice, 5, 2)
 	if resRows != nil {
 		t.Errorf("expected nil rows for offset out of bounds, got %v", resRows)
-	}
-
-	// 8. Exec default Action CreateDatabase
-	if err := db.CreateDatabase("some_db"); err != nil {
-		t.Errorf("CreateDatabase failed: %v", err)
 	}
 
 	// extra helpers coverage
