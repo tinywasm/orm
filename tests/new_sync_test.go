@@ -8,6 +8,7 @@ import (
 
 	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/mock"
 )
 
 func TestOpen(t *testing.T) {
@@ -19,7 +20,7 @@ func TestOpen(t *testing.T) {
 			if dsn != "fake://connection" {
 				return nil, errors.New("unexpected dsn")
 			}
-			return orm.New(&MockExecutor{}, &MockCompiler{}), nil
+			return orm.New(&mock.Executor{}, &mock.Compiler{}), nil
 		})
 
 		db, err := orm.Open("fake://connection")
@@ -56,7 +57,7 @@ func TestSyncSchema(t *testing.T) {
 				return orm.Plan{Query: "MOCK"}, nil
 			},
 		}
-		mockExec := &MockExecutor{} // Not an introspector, fallback to additive
+		mockExec := &mock.Executor{} // Not an introspector, fallback to additive
 		db := orm.New(mockExec, mockCompiler)
 
 		fields := []model.Field{
@@ -86,7 +87,7 @@ func TestObservability(t *testing.T) {
 	// O5: failing AddColumn + SetLog(rec) -> error logged to rec, loop continues
 	t.Run("O5 - AddColumn error logged and continues", func(t *testing.T) {
 		var logs []string
-		mockCompiler := &MockCompiler{}
+		mockCompiler := &mock.Compiler{}
 		callCount := 0
 		addColErr := errors.New("duplicate column")
 		mockExec := &callCountingExecutor{
@@ -114,7 +115,7 @@ func TestObservability(t *testing.T) {
 			logs = append(logs, msg)
 		})
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []model.Field{{Name: "name"}, {Name: "age"}},
 		}
@@ -165,7 +166,7 @@ func TestObservability(t *testing.T) {
 			logs = append(logs, msg)
 		})
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []model.Field{{Name: "name"}},
 		}
@@ -189,7 +190,7 @@ func TestObservability(t *testing.T) {
 }
 
 type TxLoggingMockExecutor struct {
-	MockExecutor
+	mock.Executor
 	logs *[]string
 }
 
@@ -198,7 +199,7 @@ func (m *TxLoggingMockExecutor) BeginTx() (orm.TxBoundExecutor, error) {
 }
 
 type TxLoggingMockBoundExecutor struct {
-	MockTxBoundExecutor
+	mock.TxBoundExecutor
 	logs *[]string
 }
 
@@ -210,10 +211,10 @@ func (m *TxLoggingMockBoundExecutor) Exec(query string, args ...any) error {
 }
 
 func (m *TxLoggingMockBoundExecutor) Query(query string, args ...any) (orm.Rows, error) {
-	return &MockRows{}, nil
+	return &mock.Rows{}, nil
 }
 func (m *TxLoggingMockBoundExecutor) QueryRow(query string, args ...any) orm.Scanner {
-	return &MockScanner{}
+	return &mock.Scanner{}
 }
 func (m *TxLoggingMockBoundExecutor) Close() error {
 	return nil

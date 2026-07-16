@@ -9,13 +9,14 @@ import (
 	"testing"
 
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/mock"
 )
 
 // MockIntrospectingExecutor mocks TableIntrospector and standard query execution.
 type MockIntrospectingExecutor struct {
-	MockExecutor
+	mock.Executor
 	Cols           map[string][]string
-	QueryResponses map[string]*MockRows
+	QueryResponses map[string]*mock.Rows
 }
 
 func (m *MockIntrospectingExecutor) TableColumns(table string) ([]string, error) {
@@ -39,12 +40,12 @@ func (m *MockIntrospectingExecutor) Query(query string, args ...any) (orm.Rows, 
 			return resp, nil
 		}
 	}
-	return &MockRows{}, nil
+	return &mock.Rows{}, nil
 }
 
 // MockRenameModel is a mock Model that also implements RenameProvider.
 type MockRenameModel struct {
-	MockModel
+	mock.Model
 	Renames map[string]string
 }
 
@@ -55,11 +56,11 @@ func (m *MockRenameModel) OldNames() map[string]string {
 func RunSyncTests(t *testing.T) {
 	// S1: db.Sync new model -> a CreateTable Action is issued
 	t.Run("S1 - CreateTable issued on Sync", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}},
 		}
@@ -80,11 +81,11 @@ func RunSyncTests(t *testing.T) {
 
 	// S2: db.Sync model with N fields -> N AddColumn Actions issued (no introspector)
 	t.Run("S2 - N AddColumn actions on fallback", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 		}
@@ -95,14 +96,14 @@ func RunSyncTests(t *testing.T) {
 		}
 
 		// Fallback issues ActionCreateTable + 2 AddColumn actions
-		// In MockCompiler, let's verify compile actions compiled:
+		// In mock.Compiler, let's verify compile actions compiled:
 		// Since Compiler is mocked, we can inspect LastQuery or mock compiler to count Actions
 	})
 
 	// S3: db.Sync where AddColumn errors -> error ignored, loop continues.
 	// CreateTable must succeed; only the AddColumn calls return an error.
 	t.Run("S3 - AddColumn error ignored and continues", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
+		mockCompiler := &mock.Compiler{}
 
 		// callN-based executor: first Exec (CreateTable) succeeds, rest fail.
 		callCount := 0
@@ -118,7 +119,7 @@ func RunSyncTests(t *testing.T) {
 		}
 		db := orm.New(countingExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 		}
@@ -136,11 +137,11 @@ func RunSyncTests(t *testing.T) {
 
 	// S4: db.Sync where CreateTable errors -> returns ErrSyncFailed
 	t.Run("S4 - CreateTable error returns ErrSyncFailed", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{ReturnExecErr: errors.New("create table database error")}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{ReturnExecErr: errors.New("create table database error")}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}},
 		}
@@ -153,8 +154,8 @@ func RunSyncTests(t *testing.T) {
 
 	// S5: db.Sync empty model list -> no-op, nil error
 	t.Run("S5 - Empty model list is no-op", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
 		err := db.Sync()
@@ -168,12 +169,12 @@ func RunSyncTests(t *testing.T) {
 
 	// S6: db.Sync inside Tx when TxExecutor present
 	t.Run("S6 - Sync wrapped in Tx", func(t *testing.T) {
-		mockTxBound := &MockTxBoundExecutor{}
-		mockTxExec := &MockTxExecutor{Bound: mockTxBound}
-		mockCompiler := &MockCompiler{}
+		mockTxBound := &mock.TxBoundExecutor{}
+		mockTxExec := &mock.TxExecutor{Bound: mockTxBound}
+		mockCompiler := &mock.Compiler{}
 		db := orm.New(mockTxExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}},
 		}
@@ -190,7 +191,7 @@ func RunSyncTests(t *testing.T) {
 
 	// S11: db.Sync with rename provider -> ActionRenameColumn is issued
 	t.Run("S11 - RenameColumn issued with OldName", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
+		mockCompiler := &mock.Compiler{}
 		mockExec := &MockIntrospectingExecutor{
 			Cols: map[string][]string{
 				"user": {"id", "nick"}, // database has "nick", but model has "username"
@@ -199,7 +200,7 @@ func RunSyncTests(t *testing.T) {
 		db := orm.New(mockExec, mockCompiler)
 
 		model := &MockRenameModel{
-			MockModel: MockModel{
+			Model: mock.Model{
 				Table: "user",
 				Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 			},
@@ -251,8 +252,8 @@ func RunSyncTests(t *testing.T) {
 			Cols: map[string][]string{
 				"user": {"id", "username", "obsolete_col"},
 			},
-			QueryResponses: map[string]*MockRows{
-				"MOCK_QUERY": &MockRows{Count: 0}, // SELECT 1 returned 0 rows (no data)
+			QueryResponses: map[string]*mock.Rows{
+				"MOCK_QUERY": &mock.Rows{Count: 0}, // SELECT 1 returned 0 rows (no data)
 			},
 		}
 
@@ -268,7 +269,7 @@ func RunSyncTests(t *testing.T) {
 			},
 		})
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 		}
@@ -300,8 +301,8 @@ func RunSyncTests(t *testing.T) {
 			Cols: map[string][]string{
 				"user": {"id", "username", "obsolete_col"},
 			},
-			QueryResponses: map[string]*MockRows{
-				"MOCK_QUERY": &MockRows{Count: 1}, // SELECT 1 returned 1 row (has data!)
+			QueryResponses: map[string]*mock.Rows{
+				"MOCK_QUERY": &mock.Rows{Count: 1}, // SELECT 1 returned 1 row (has data!)
 			},
 		}
 
@@ -313,7 +314,7 @@ func RunSyncTests(t *testing.T) {
 			},
 		})
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "id"}, {Name: "username"}},
 		}
@@ -342,7 +343,7 @@ func (f *functionalCompiler) Compile(q orm.Query, model mdl.Model) (orm.Plan, er
 // callCountingExecutor is an Executor whose Exec behaviour is driven by an
 // injected function, making per-call error injection straightforward.
 type callCountingExecutor struct {
-	MockExecutor
+	mock.Executor
 	execFn func(query string, args ...any) error
 }
 

@@ -105,3 +105,18 @@ See [tinywasm/ormc](https://github.com/tinywasm/ormc) for detailed documentation
 
 1. **`Compiler`**: Translates agnostic ORM queries into engine-specific strings (SQL, etc.).
 2. **`Executor`**: Standardized interface for running queries and commands, compatible with `database/sql` but engine-independent.
+
+---
+
+## 5. Conformance Testing (`orm/conformance`)
+
+The `conformance` package provides an executable contract test suite for storage backends to guarantee consistent behavioral standards across different storage engines (such as SQL and IndexedDB/WASM) without compiling or parsing SQL directly.
+The suite runs 12 standard DML checks (CRUD, pagination, sorting, filters, logical operators, and comparison helpers) using a customized `Factory`.
+
+---
+
+## 6. Mocking and In-Memory Execution (`orm/mock`)
+
+The `mock` package exports:
+1. **Recorders**: Non-stuttering test doubles (`mock.Executor`, `mock.Compiler`, `mock.Scanner`, `mock.Rows`, `mock.Model`, `mock.TxExecutor`, and `mock.TxBoundExecutor`) that capture queries and arguments for asserting downstream delegation correctness.
+2. **In-Memory Storage Engine**: `mock.NewDB() *orm.DB` provides a complete, reflection-free in-memory storage engine. It interprets structured `orm.Query` metadata (Create, ReadOne, ReadAll, Update, Delete) and filters, stable sorting, limits, and offsets locally without external dependencies or importing SQL drivers, supporting rapid round-trip testing.
