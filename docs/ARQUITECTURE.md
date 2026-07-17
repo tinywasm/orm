@@ -13,17 +13,13 @@ This repository now contains the **runtime only**. Other components have been mo
 | **ddl** | [tinywasm/ddl](https://github.com/tinywasm/ddl) | Runtime DDL: `CreateTable`/`DropTable`/`Sync`/`SyncSchema` + `ddl/conformance`. |
 | **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
 
-## DML/DDL Split (2026-07-16)
+## Puerto de almacenamiento (2026-07-16, segunda pasada)
 
-`orm` is now a **DML-only** runtime: `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)` against a table
-that already exists. Schema management — `CreateTable`/`DropTable`/`CreateDatabase`/`Sync`/`SyncSchema`,
-the DDL `Action`s (`AddColumn`/`RenameColumn`/`DropColumn`), and introspection
-(`TableIntrospector`/`SchemaInspector`) — moved to [`tinywasm/ddl`](https://github.com/tinywasm/ddl), a
-sibling runtime that depends on `orm.Executor` and `ddlc`. This lets backends that can't do dynamic
-`CREATE TABLE` (e.g. `indexdb`, which declares IndexedDB object stores up front) conform to `orm/conformance`
-without ever satisfying a DDL contract. `orm` itself gained no dependency on `ddl`/`ddlc` — the split is
-one-directional. This was a **breaking change**, applied directly (no deprecation window): consumers move
-their `db.CreateTable(m)`/`db.Sync(...)` calls to `ddl.New(exec, gen).CreateTable/Sync`.
+`orm` ya no define el contrato de almacenamiento. `tinywasm/storage` es el puerto (interfaces, tipos de
+valor DML, conformance, mock, mem) — el equivalente de `database/sql/driver`. `orm` es la capa
+ergonómica opcional encima (`orm.DB`, query builder), el equivalente de `database/sql`. Un backend
+implementa `storage.Conn`; nunca importa `orm`. Ver `tinywasm/storage`'s AGENTS.md y
+[DB_PORT_PROPOSAL.md](https://github.com/tinywasm/app-releases/blob/main/docs/DB_PORT_PROPOSAL.md).
 
 ## Background
 
@@ -121,15 +117,12 @@ See [tinywasm/ormc](https://github.com/tinywasm/ormc) for detailed documentation
 
 ---
 
-## 5. Conformance Testing (`orm/conformance`)
+## 5. Conformance Testing (`tinywasm/storage/conformance`)
 
-The `conformance` package provides an executable contract test suite for storage backends to guarantee consistent behavioral standards across different storage engines (such as SQL and IndexedDB/WASM) without compiling or parsing SQL directly.
-The suite runs 12 standard DML checks (CRUD, pagination, sorting, filters, logical operators, and comparison helpers) using a customized `Factory`.
+The conformance testing suite has moved to `tinywasm/storage/conformance`. It provides an executable contract test suite for storage backends to guarantee consistent behavioral standards across different storage engines without compiling or parsing SQL directly.
 
 ---
 
-## 6. Mocking and In-Memory Execution (`orm/mock`)
+## 6. Mocking and In-Memory Execution (`tinywasm/storage/mock` & `tinywasm/storage/mem`)
 
-The `mock` package exports:
-1. **Recorders**: Non-stuttering test doubles (`mock.Executor`, `mock.Compiler`, `mock.Scanner`, `mock.Rows`, `mock.Model`, `mock.TxExecutor`, and `mock.TxBoundExecutor`) that capture queries and arguments for asserting downstream delegation correctness.
-2. **In-Memory Storage Engine**: `mock.NewDB() *orm.DB` provides a complete, reflection-free in-memory storage engine. It interprets structured `orm.Query` metadata (Create, ReadOne, ReadAll, Update, Delete) and filters, stable sorting, limits, and offsets locally without external dependencies or importing SQL drivers, supporting rapid round-trip testing.
+The mock recorders and the in-memory engine have moved to `tinywasm/storage/mock` and `tinywasm/storage/mem` respectively.

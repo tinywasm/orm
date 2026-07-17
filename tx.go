@@ -1,21 +1,12 @@
 package orm
 
-// TxBoundExecutor represents an executor bound to a transaction.
-type TxBoundExecutor interface {
-	Executor
-	Commit() error
-	Rollback() error
-}
+import "github.com/tinywasm/storage"
 
-// TxExecutor represents an executor that supports transactions.
-type TxExecutor interface {
-	Executor
-	BeginTx() (TxBoundExecutor, error)
-}
-
-// Tx executes a function within a transaction.
-func (db *DB) Tx(fn func(tx *DB) error) error {
-	txExec, ok := db.exec.(TxExecutor)
+// Tx executes a function within a transaction. The underlying storage.Conn must implement
+// storage.TxExecutor (type-asserted here) — most backends do; mem.New() also implements it as a
+// no-op so tests can exercise this path without a real transactional backend.
+func (d *DB) Tx(fn func(tx *DB) error) error {
+	txExec, ok := d.conn.(storage.TxExecutor)
 	if !ok {
 		return ErrNoTxSupport
 	}
@@ -25,16 +16,23 @@ func (db *DB) Tx(fn func(tx *DB) error) error {
 		return err
 	}
 
-	txDB := &DB{
-		exec:     bound,
-		compiler: db.compiler,
-		log:      db.log,
-	}
+	// bound is a storage.TxBoundExecutor: Executor + Commit/Rollback. It does NOT satisfy
+	// storage.Compiler on its own, so txDB.conn wraps it back together with the original
+	// compiler half via boundConn (below) — the same "conn = exec+compile" pairing New()
+	// enforces, kept intact across a transaction boundary.
+	txDB := &DB{conn: boundConn{TxBoundExecutor: bound, Compiler: d.conn}, log: d.log}
 
 	if err := fn(txDB); err != nil {
 		bound.Rollback()
 		return err
 	}
-
 	return bound.Commit()
+}
+
+// boundConn re-pairs a transaction-bound Executor with the original connection's Compiler
+// (compiling doesn't depend on being inside a transaction — only executing does), so the
+// nested *DB handed to fn still satisfies storage.Conn as a single value.
+type boundConn struct {
+	storage.TxBoundExecutor
+	storage.Compiler
 }
