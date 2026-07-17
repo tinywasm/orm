@@ -1,15 +1,17 @@
 package orm
 
-import "github.com/tinywasm/model"
-
+import (
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/storage"
+)
 
 // QB represents a query builder.
 // Consumers hold a *QB reference in variables for incremental building.
 type QB struct {
 	db      *DB
 	model   model.Model
-	conds   []Condition
-	orderBy []Order
+	conds   []storage.Condition
+	orderBy []storage.Order
 	groupBy []string
 	limit   int
 	offset  int
@@ -33,56 +35,23 @@ func (qb *QB) Or() *QB {
 	return qb
 }
 
-func (qb *QB) addCondition(c Condition) *QB {
+func (qb *QB) addCondition(c storage.Condition) *QB {
 	if qb.nextOr {
-		c.logic = "OR"
+		c = storage.Or(c)
 		qb.nextOr = false
-	} else {
-		c.logic = "AND"
 	}
 	qb.conds = append(qb.conds, c)
 	return qb
 }
 
-// Eq creates an equality condition.
-func (c *Clause) Eq(value any) *QB {
-	return c.qb.addCondition(Eq(c.field, value))
-}
-
-// Neq creates an inequality condition.
-func (c *Clause) Neq(value any) *QB {
-	return c.qb.addCondition(Neq(c.field, value))
-}
-
-// Gt creates a greater-than condition.
-func (c *Clause) Gt(value any) *QB {
-	return c.qb.addCondition(Gt(c.field, value))
-}
-
-// Gte creates a greater-than-or-equal condition.
-func (c *Clause) Gte(value any) *QB {
-	return c.qb.addCondition(Gte(c.field, value))
-}
-
-// Lt creates a less-than condition.
-func (c *Clause) Lt(value any) *QB {
-	return c.qb.addCondition(Lt(c.field, value))
-}
-
-// Lte creates a less-than-or-equal condition.
-func (c *Clause) Lte(value any) *QB {
-	return c.qb.addCondition(Lte(c.field, value))
-}
-
-// Like creates a LIKE condition.
-func (c *Clause) Like(value any) *QB {
-	return c.qb.addCondition(Like(c.field, value))
-}
-
-// In creates an IN condition.
-func (c *Clause) In(value any) *QB {
-	return c.qb.addCondition(In(c.field, value))
-}
+func (c *Clause) Eq(value any) *QB    { return c.qb.addCondition(storage.Eq(c.field, value)) }
+func (c *Clause) Neq(value any) *QB   { return c.qb.addCondition(storage.Neq(c.field, value)) }
+func (c *Clause) Gt(value any) *QB    { return c.qb.addCondition(storage.Gt(c.field, value)) }
+func (c *Clause) Gte(value any) *QB   { return c.qb.addCondition(storage.Gte(c.field, value)) }
+func (c *Clause) Lt(value any) *QB    { return c.qb.addCondition(storage.Lt(c.field, value)) }
+func (c *Clause) Lte(value any) *QB   { return c.qb.addCondition(storage.Lte(c.field, value)) }
+func (c *Clause) Like(value any) *QB  { return c.qb.addCondition(storage.Like(c.field, value)) }
+func (c *Clause) In(value any) *QB    { return c.qb.addCondition(storage.In(c.field, value)) }
 
 // Limit sets the limit for the query.
 func (qb *QB) Limit(limit int) *QB {
@@ -109,13 +78,13 @@ func (qb *QB) OrderBy(column string) *OrderClause {
 
 // Asc sets the order direction to ascending.
 func (o *OrderClause) Asc() *QB {
-	o.qb.orderBy = append(o.qb.orderBy, Order{column: o.field, dir: "ASC"})
+	o.qb.orderBy = append(o.qb.orderBy, storage.Asc(o.field))
 	return o.qb
 }
 
 // Desc sets the order direction to descending.
 func (o *OrderClause) Desc() *QB {
-	o.qb.orderBy = append(o.qb.orderBy, Order{column: o.field, dir: "DESC"})
+	o.qb.orderBy = append(o.qb.orderBy, storage.Desc(o.field))
 	return o.qb
 }
 
@@ -127,11 +96,11 @@ func (qb *QB) GroupBy(columns ...string) *QB {
 
 // ReadOne executes the query and returns a single result.
 func (qb *QB) ReadOne() error {
-	if err := validateQuery(ActionReadOne, qb.model); err != nil {
+	if err := validateQuery(storage.ActionReadOne, qb.model); err != nil {
 		return err
 	}
-	q := Query{
-		Action:     ActionReadOne,
+	q := storage.Query{
+		Action:     storage.ActionReadOne,
 		Table:      qb.model.ModelName(),
 		Conditions: qb.conds,
 		OrderBy:    qb.orderBy,
@@ -139,14 +108,14 @@ func (qb *QB) ReadOne() error {
 		Limit:      1, // Force limit 1
 		Offset:     qb.offset,
 	}
-	plan, err := qb.db.compiler.Compile(q, qb.model)
+	plan, err := qb.db.conn.Compile(q, qb.model)
 	if err != nil {
 		return err
 	}
 
-	row := qb.db.exec.QueryRow(plan.Query, plan.Args...)
+	row := qb.db.conn.QueryRow(plan.Query, plan.Args...)
 	if err := row.Scan(qb.model.Pointers()...); err != nil {
-		if err == ErrNoRows {
+		if err == storage.ErrNoRows {
 			return ErrNotFound
 		}
 		return err
@@ -156,11 +125,11 @@ func (qb *QB) ReadOne() error {
 
 // ReadAll executes the query and returns all results.
 func (qb *QB) ReadAll(new func() model.Model, onRow func(model.Model)) error {
-	if err := validateQuery(ActionReadAll, qb.model); err != nil {
+	if err := validateQuery(storage.ActionReadAll, qb.model); err != nil {
 		return err
 	}
-	q := Query{
-		Action:     ActionReadAll,
+	q := storage.Query{
+		Action:     storage.ActionReadAll,
 		Table:      qb.model.ModelName(),
 		Conditions: qb.conds,
 		OrderBy:    qb.orderBy,
@@ -168,12 +137,12 @@ func (qb *QB) ReadAll(new func() model.Model, onRow func(model.Model)) error {
 		Limit:      qb.limit,
 		Offset:     qb.offset,
 	}
-	plan, err := qb.db.compiler.Compile(q, qb.model)
+	plan, err := qb.db.conn.Compile(q, qb.model)
 	if err != nil {
 		return err
 	}
 
-	rows, err := qb.db.exec.Query(plan.Query, plan.Args...)
+	rows, err := qb.db.conn.Query(plan.Query, plan.Args...)
 	if err != nil {
 		return err
 	}

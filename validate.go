@@ -1,19 +1,19 @@
 package orm
 
-import "github.com/tinywasm/model"
+import (
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/storage"
+)
 
-import "github.com/tinywasm/fmt"
-
-func validateQuery(action Action, m model.Model) error {
+func validateQuery(action storage.Action, m model.Model) error {
 	if m.ModelName() == "" {
 		return ErrEmptyTable
 	}
-
-	if action == ActionCreate || action == ActionUpdate {
+	if action == storage.ActionCreate || action == storage.ActionUpdate {
 		if len(m.Schema()) != len(m.Pointers()) {
 			return fmt.Err(ErrValidation, "schema and pointers length mismatch")
 		}
 	}
-
 	return nil
 }

@@ -6,14 +6,9 @@ Working notes for AI agents operating in this library. For end-user docs see [RE
 
 `tinywasm/orm` provides:
 
-1. **A runtime DML ORM** (`db.go`, `tx.go`, `query.go`, `executor.go`, `qb.go`, `conditions.go`) — `*orm.DB`, query builder, `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)`. Isomorphic: compiles for Go and WASM.
+1. **An ergonomic optional layer over `tinywasm/storage`** (`db.go`, `tx.go`, `qb.go`, `reexport.go`) — `*orm.DB`, query builder, `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)`. Isomorphic: compiles for Go and WASM.
 
 The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt`) is the only contract. All struct introspection happens at codegen time.
-
-**DML/DDL split (2026-07-16).** `orm` is DML-only. Schema management (`CreateTable`/`DropTable`/
-`CreateDatabase`/`Sync`/`SyncSchema`, `SchemaInspector`, `TableIntrospector`) lives in the sibling repo
-[`tinywasm/ddl`](https://github.com/tinywasm/ddl). Do not add DDL surface back to this package — `orm`
-never depends on `ddl`/`ddlc` (one-directional). See `docs/ARQUITECTURE.md`.
 
 ## Architectural rules (do not violate)
 
@@ -27,8 +22,8 @@ anymore: the map has to not exist at all, not just be excluded from one build ta
 
 - For a **string→string** pair, use `github.com/tinywasm/fmt.KeyValue{Key, Value string}`.
 - For anything else (typed values, non-string keys, or an in-memory "table" of rows), use a small
-  local slice-of-structs and scan it linearly — see `mock/memdb.go`'s `dbCell`/`dbRow`/`dbTable` and
-  `open.go`'s `factoryEntry`/`registry` for the pattern. These collections are always small (a handful
+  local slice-of-structs and scan it linearly — see `storage/mem`'s `dbCell`/`dbRow`/`dbTable`
+  for the pattern. These collections are always small (a handful
   of registered adapters, a handful of schema columns), so a linear scan costs nothing in practice and
   it's what the whole ecosystem already does (e.g. `tinywasm/fmt.TagPairs` returns `[]KeyValue`, not a
   map).
@@ -49,14 +44,13 @@ anymore: the map has to not exist at all, not just be excluded from one build ta
 | File / Dir | Role |
 |------------|------|
 | `db.go`, `tx.go` | `*orm.DB`, `*orm.Tx` — DML runtime entry points (`Create`/`Update`/`Delete`/`Query`) |
-| `query.go`, `qb.go`, `conditions.go` | Query builder (`Where`, `Like`, `Limit`, ...) |
-| `executor.go`, `execution_plan.go` | Query execution; `Rows` interface includes `Columns() ([]string, error)` |
+| `qb.go` | Query builder (`Where`, `Limit`, ...) |
 | `validate.go` | Runtime validation glue (delegates to `fmt.ValidateFields`) |
-| `open.go` | `Register`/`Open` — DSN-scheme → `Factory` registry (slice-based, no map) |
-| `conformance/` | Executable DML contract (`Run(t, Factory)`) every backend proves itself against |
-| `mock/` | Recorders (`mock.Executor`, etc.) + `mock.NewDB()` in-memory engine — no driver, no map |
-| `tests/` | Test fixtures + `_test.go` files (separate module with `replace ../`) |
+| `reexport.go` | Aliases and value-type re-exports from `storage` |
+| `tests/` | Test fixtures + `_test.go` files |
 | `docs/` | Architecture, design rationale, tag reference |
+
+> **Nota:** El contrato de almacenamiento vive en `github.com/tinywasm/storage` — este repo no lo redefine.
 
 ## Testing
 

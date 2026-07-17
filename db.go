@@ -1,38 +1,40 @@
 package orm
 
-import "github.com/tinywasm/model"
+import (
+	"github.com/tinywasm/model"
+	"github.com/tinywasm/storage"
+)
 
-// DB represents a database connection.
-// Consumers instantiate it via New().
+// DB represents an ergonomic handle over a storage backend (a storage.Conn). Consumers instantiate
+// it via New(). This type owns no contract — storage.Conn is the contract; DB is the fluent layer
+// on top of it (see docs/ARQUITECTURE.md).
 type DB struct {
-	exec     Executor
-	compiler Compiler
-	log      func(messages ...any)
+	conn storage.Conn
+	log  func(messages ...any)
 }
 
-// New creates a new DB instance.
-func New(exec Executor, compiler Compiler) *DB {
-	return &DB{
-		exec:     exec,
-		compiler: compiler,
-	}
+// New wraps a storage.Conn (a backend's Executor+Compiler pair, e.g. sqlt.Open(dsn) or mem.New())
+// in the ergonomic DB handle. One argument, not two: storage.Conn already unifies Executor+Compiler
+// so an Executor from one backend can never be paired with a Compiler from another.
+func New(conn storage.Conn) *DB {
+	return &DB{conn: conn}
 }
 
 // SetLog sets the log function for warnings and informational messages.
 // If not set, messages are silently discarded.
-func (db *DB) SetLog(fn func(messages ...any)) {
-	db.log = fn
+func (d *DB) SetLog(fn func(messages ...any)) {
+	d.log = fn
 }
 
-func (db *DB) logw(messages ...any) {
-	if db.log != nil {
-		db.log(messages...)
+func (d *DB) logw(messages ...any) {
+	if d.log != nil {
+		d.log(messages...)
 	}
 }
 
 // Create inserts a new model into the database.
-func (db *DB) Create(m model.Model) error {
-	if err := validateQuery(ActionCreate, m); err != nil {
+func (d *DB) Create(m model.Model) error {
+	if err := validateQuery(storage.ActionCreate, m); err != nil {
 		return err
 	}
 	schema := m.Schema()
@@ -50,82 +52,78 @@ func (db *DB) Create(m model.Model) error {
 		columns = append(columns, f.Name)
 		values = append(values, allValues[i])
 	}
-	q := Query{
-		Action:  ActionCreate,
+	q := storage.Query{
+		Action:  storage.ActionCreate,
 		Table:   m.ModelName(),
 		Columns: columns,
 		Values:  values,
 	}
-	plan, err := db.compiler.Compile(q, m)
+	plan, err := d.conn.Compile(q, m)
 	if err != nil {
 		return err
 	}
-	return db.exec.Exec(plan.Query, plan.Args...)
+	return d.conn.Exec(plan.Query, plan.Args...)
 }
 
 // Update modifies an existing row. At least one Condition is required.
 // Providing zero conditions is a compile-time error — there is no variadic
 // fallback — preventing accidental full-table UPDATE statements.
-func (db *DB) Update(m model.Model, cond Condition, rest ...Condition) error {
-	if err := validateQuery(ActionUpdate, m); err != nil {
+func (d *DB) Update(m model.Model, cond storage.Condition, rest ...storage.Condition) error {
+	if err := validateQuery(storage.ActionUpdate, m); err != nil {
 		return err
 	}
-	conds := append([]Condition{cond}, rest...)
+	conds := append([]storage.Condition{cond}, rest...)
 	schema := m.Schema()
 	columns := make([]string, len(schema))
 	for i, f := range schema {
 		columns[i] = f.Name
 	}
-	q := Query{
-		Action:     ActionUpdate,
+	q := storage.Query{
+		Action:     storage.ActionUpdate,
 		Table:      m.ModelName(),
 		Columns:    columns,
 		Values:     model.ReadValues(schema, m.Pointers()),
 		Conditions: conds,
 	}
-	plan, err := db.compiler.Compile(q, m)
+	plan, err := d.conn.Compile(q, m)
 	if err != nil {
 		return err
 	}
-	return db.exec.Exec(plan.Query, plan.Args...)
+	return d.conn.Exec(plan.Query, plan.Args...)
 }
 
 // Delete deletes a model from the database.
 // At least one Condition is required. Providing zero conditions is a compile-time
 // error, preventing accidental full-table DELETE statements.
-func (db *DB) Delete(m model.Model, cond Condition, rest ...Condition) error {
-	if err := validateQuery(ActionDelete, m); err != nil {
+func (d *DB) Delete(m model.Model, cond storage.Condition, rest ...storage.Condition) error {
+	if err := validateQuery(storage.ActionDelete, m); err != nil {
 		return err
 	}
-	conds := append([]Condition{cond}, rest...)
-	q := Query{
-		Action:     ActionDelete,
+	conds := append([]storage.Condition{cond}, rest...)
+	q := storage.Query{
+		Action:     storage.ActionDelete,
 		Table:      m.ModelName(),
 		Conditions: conds,
 	}
-	plan, err := db.compiler.Compile(q, m)
+	plan, err := d.conn.Compile(q, m)
 	if err != nil {
 		return err
 	}
-	return db.exec.Exec(plan.Query, plan.Args...)
+	return d.conn.Exec(plan.Query, plan.Args...)
 }
 
 // Query creates a new QB instance.
-func (db *DB) Query(m model.Model) *QB {
-	return &QB{
-		db:    db,
-		model: m,
-	}
+func (d *DB) Query(m model.Model) *QB {
+	return &QB{db: d, model: m}
 }
 
-// Close closes the underlying executor if it supports it.
-func (db *DB) Close() error {
-	return db.exec.Close()
+// Close closes the underlying connection.
+func (d *DB) Close() error {
+	return d.conn.Close()
 }
 
-// RawExecutor returns the underlying executor instance.
-func (db *DB) RawExecutor() Executor {
-	return db.exec
+// RawConn returns the underlying storage.Conn. Renamed from RawExecutor: what's underneath is a
+// full Conn (Executor+Compiler), not just an Executor.
+func (d *DB) RawConn() storage.Conn {
+	return d.conn
 }
-
-func (db *DB) Compiler() Compiler { return db.compiler }
