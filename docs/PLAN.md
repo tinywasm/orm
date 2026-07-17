@@ -1,619 +1,723 @@
 ---
-PLAN: "feat: conformance (contrato ejecutable de backend) + subpaquete mock (recorders + *orm.DB en memoria)"
-TAG: v0.10.0
+PLAN: "refactor!: orm pasa a ser capa ergonómica sobre tinywasm/storage (contrato movido al puerto)"
+TAG: v0.11.0
 ---
 
-# PLAN — `tinywasm/orm`: `conformance/` (solo DML) + `mock/`
-
-Orquestado por [`DDL_DML_SPLIT_MASTER_PLAN.md`](https://github.com/tinywasm/app-releases/blob/main/docs/DDL_DML_SPLIT_MASTER_PLAN.md)
-— **pieza #1, Ola A**. Autocontenido, en español. Eres un agente **sin contexto previo** y **solo tienes
-este repo** (`github.com/tinywasm/orm`). Todo el contrato y el código exacto van inline.
-
-> **Alcance DDL/DML.** `orm` es el runtime de **DML** (operar datos con la tabla ya lista). Todo lo de
-> **DDL** (CreateTable/DropTable/Sync/esquema) vive en el repo hermano `tinywasm/ddl` y tiene su propio
-> `ddl/conformance`. Esta fase **NO** toca los métodos DDL actuales de `orm.DB` (siguen ahí, deprecados,
-> hasta la Ola C del master) — solo crea un `orm/conformance` que prueba **exclusivamente DML**, para que
-> `indexdb` (cuyo esquema no es DDL SQL) conforme igual que los demás.
+Orquestado por
+[`DB_PORT_MASTER_PLAN.md`](https://github.com/tinywasm/app/blob/main/docs/DB_PORT_MASTER_PLAN.md)
+— **pieza #2**. Autocontenido, en español. Eres un agente **sin contexto previo** y **solo tienes este
+repo** (`github.com/tinywasm/orm`). Todo el contrato y el código exacto van inline.
 
 > **Prerequisito (entorno del agente):**
 > ```bash
 > go install github.com/tinywasm/devflow/cmd/gotest@latest
 > ```
-> Corre tests SIEMPRE con `gotest` (no `go test`). Publica SIEMPRE con `gopush 'mensaje'` (no
-> `git commit`/`git push`). El tag lo pone `gopush`.
+> Tests SIEMPRE con `gotest` (no `go test`). Publica SIEMPRE con `gopush 'mensaje'`. El tag lo pone
+> `gopush`. Este plan **requiere `github.com/tinywasm/storage@v0.0.1` ya publicado** — si no existe, para y
+> repórtalo, no lo repliques localmente.
 
-## 1. Qué se hace y por qué
+## 0. Qué cambia y por qué
 
-Dos entregables en este repo, uno habilita al otro:
+`orm` definía hoy el contrato de almacenamiento (`Executor`/`Compiler`/`Query`/`Condition`/`Order`/
+`Plan`, `ErrNoRows`, `ScanAny`) **y** la API ergonómica (`orm.DB`, query builder). Ese contrato se
+extrajo a un puerto nuevo, `tinywasm/storage` — el equivalente de `database/sql/driver`. `orm` pasa a ser
+el equivalente de `database/sql`: una capa ergonómica **opcional** sobre `storage`, sin definir ninguna
+interfaz que un backend deba implementar.
 
-### A. `orm/conformance/` — el contrato ejecutable de un backend de almacenamiento
+Razonamiento completo: [`DB_PORT_PROPOSAL.md`](https://github.com/tinywasm/app-releases/blob/main/docs/DB_PORT_PROPOSAL.md).
+No lo necesitas para ejecutar este plan (es autocontenido), pero si algo aquí te resulta arbitrario,
+ahí está el porqué.
 
-La interfaz `orm.Executor`+`orm.Compiler` dice las **firmas**; no dice el **comportamiento**. Dos
-backends pueden satisfacer la interfaz (compilar sin queja) y discrepar en todo lo que importa: uno
-filtra bien un `WHERE tenant_id = ? AND is_active = ?`, otro ignora la segunda condición; uno respeta
-`ORDER BY ... DESC`, otro no; uno mapea "sin filas" a `ErrNoRows`, otro devuelve basura. El compilador
-no puede atrapar "estos dos backends se comportan distinto" — ambos satisfacen la interfaz. Así que el
-contrato tiene que volverse algo que **se pone en rojo**. Eso es `conformance`.
+**Alcance: SOLO `tinywasm/orm`.** No toques `tinywasm/storage`, `tinywasm/ddl`, ni ningún backend — deben
+estar publicados/planificados por separado. Si `github.com/tinywasm/storage` no resuelve en `go get`, el
+plan no es ejecutable todavía; repórtalo.
 
-Es el mismo patrón que `github.com/tinywasm/router/conformance` (y que la stdlib usa para lo mismo:
-`testing/fstest.TestFS`, `golang.org/x/net/nettest.TestConn`): un paquete **no-`_test`** que importa
-`testing` a propósito (un `_test.go` no puede importarse desde otro repo), expone `Run(t, Factory)`, y
-cada cláusula de comportamiento es un `t.Run`. Cada backend prueba conformidad desde su propio paquete
-de test:
+## 1. Qué se mueve a `storage` (ya no vive en `orm` tras este plan)
+
+| Símbolo | Antes (`orm`) | Ahora |
+|---|---|---|
+| `Executor`, `Scanner`, `Rows` | `executor.go` | `storage.Executor`, `storage.Scanner`, `storage.Rows` |
+| `Compiler` | `compiler.go` | `storage.Compiler` |
+| `TxExecutor`, `TxBoundExecutor` (interfaces) | `tx.go` | `storage.TxExecutor`, `storage.TxBoundExecutor` |
+| `Query`, `Action`, `Order` | `query.go` | `storage.Query`, `storage.Action`, `storage.Order` |
+| `Condition` + `Eq/Neq/Gt/Gte/Lt/Lte/Like/In/Or/IsNotNull` | `conditions.go` | `storage.Condition` + mismas funciones en `storage` |
+| `Plan` | `execution_plan.go` | `storage.Plan` |
+| `ErrNoRows` | `errors.go` | `storage.ErrNoRows` |
+| `ScanAny` | `scan.go` | `storage.ScanAny` |
+| `Factory`, `Register`, `Open`, `registry` | `open.go` | **Eliminado, no trasladado** (ver §2) |
+| Recorders (`mock.Executor`, etc.) | `mock/recorders.go` | `storage/mock` |
+| Motor en memoria (`mock.NewDB`) | `mock/memdb.go` | `storage/mem` (`mem.New() storage.Conn`) |
+| `conformance.Widget`, `conformance.Run` | `conformance/` | `storage/conformance` (reescrito sobre `Query` cruda, sin builder) |
+
+Estos 9 archivos/paquetes **se borran** de `orm` en este plan: `executor.go`, `compiler.go`,
+`query.go`, `conditions.go`, `execution_plan.go`, `scan.go`, `open.go`, `mock/`, `conformance/`.
+`tx.go` se **recorta** (las interfaces se van, el método `Tx` se queda). `errors.go` se recorta
+(`ErrNoRows` se va).
+
+## 2. Qué se elimina del todo (no se traslada a ningún lado)
+
+- **El registro DSN (`Register`/`Open`/`Factory`).** Un lookup por string que falla en runtime viola
+  el harness. Se reemplaza por construcción explícita: `conn, err := sqlt.Open(dsn); d := orm.New(conn,
+  err-handled)`. No repliques este mecanismo en `storage` ni en `orm` — si un consumidor lo echa de menos,
+  es una fase posterior (consumidores, #7 del master), no este plan.
+
+## 3. Qué se queda en `orm` (y por qué)
+
+Todo lo que es **glue invariante escrito una vez** — no varía por backend, así que no es contrato,
+es ergonomía (ver DB_PORT_PROPOSAL.md §6.8):
+
+- `orm.DB`: `New(conn storage.Conn) *DB`, `Create`/`Update`/`Delete`/`Query(m) *QB`/`Close`/`RawConn`/
+  `SetLog`.
+- `orm.QB`/`Clause`/`OrderClause`: `Where/Or/Limit/Offset/OrderBy/GroupBy/ReadOne/ReadAll`.
+- `orm.Tx`: el método `(d *DB) Tx(fn func(tx *DB) error) error`, con rollback automático.
+- `orm.ErrNotFound`, `orm.ErrValidation`, `orm.ErrEmptyTable`, `orm.ErrNoTxSupport`: errores del
+  concepto ergonómico ("no hubo fila para tu `ReadOne`", "tu modelo no cuadra"), no del contrato
+  crudo.
+- **Re-exports de conveniencia** (`Condition`, `Order`, `Eq`, `Neq`, `Gt`, `Gte`, `Lt`, `Lte`, `Like`,
+  `In`, `Or`, `IsNotNull`, `Asc`, `Desc`) — ver §5.2. `Update`/`Delete` toman `storage.Condition` como
+  argumento explícito (`Update(m, cond storage.Condition, ...)`); sin un re-export, cada consumidor
+  tendría que importar `storage` **solo** para llamar `orm.Eq(...)` al hacer un `Update`/`Delete` — mala
+  ergonomía y una fuga de la costura hacia el consumidor. Un `type Condition = storage.Condition` (alias,
+  no un tipo nuevo) más `var Eq = storage.Eq` no duplica nada: es exactamente el mismo tipo/función con otro
+  nombre, cero conversión, cero mantenimiento doble.
+
+## 4. Diseño de archivos
+
+### 4.1 `go.mod`
+
+```
+go get github.com/tinywasm/storage@v0.0.1
+go mod tidy   # esto debe QUITAR cualquier dependencia que orm tuviera solo para el contrato
+```
+
+`go.mod` final: `github.com/tinywasm/storage`, `github.com/tinywasm/model`, `github.com/tinywasm/fmt`.
+
+### 4.2 `db.go`
 
 ```go
-func TestSqliteConformance(t *testing.T) {
-    conformance.Run(t, conformance.Factory{Name: "sqlite", New: func(t *testing.T, models ...model.Model) *orm.DB {
-        db, err := sqlite.Open(":memory:"); if err != nil { t.Fatal(err) }
-        return db
-    }})
+package orm
+
+import (
+	"github.com/tinywasm/storage"
+	"github.com/tinywasm/model"
+)
+
+// DB represents an ergonomic handle over a storage backend (a storage.Conn). Consumers instantiate
+// it via New(). This type owns no contract — storage.Conn is the contract; DB is the fluent layer
+// on top of it (see docs/ARQUITECTURE.md).
+type DB struct {
+	conn storage.Conn
+	log  func(messages ...any)
+}
+
+// New wraps a storage.Conn (a backend's Executor+Compiler pair, e.g. sqlt.Open(dsn) or mem.New())
+// in the ergonomic DB handle. One argument, not two: storage.Conn already unifies Executor+Compiler
+// so an Executor from one backend can never be paired with a Compiler from another.
+func New(conn storage.Conn) *DB {
+	return &DB{conn: conn}
+}
+
+// SetLog sets the log function for warnings and informational messages.
+// If not set, messages are silently discarded.
+func (d *DB) SetLog(fn func(messages ...any)) {
+	d.log = fn
+}
+
+func (d *DB) logw(messages ...any) {
+	if d.log != nil {
+		d.log(messages...)
+	}
+}
+
+// Create inserts a new model into the database.
+func (d *DB) Create(m model.Model) error {
+	if err := validateQuery(storage.ActionCreate, m); err != nil {
+		return err
+	}
+	schema := m.Schema()
+	ptrs := m.Pointers()
+	allValues := model.ReadValues(schema, ptrs)
+	var columns []string
+	var values []any
+	for i, f := range schema {
+		// Skip autoincrement PK fields with zero value — let the DB assign them.
+		if f.IsPK() && f.IsAutoInc() {
+			if v, ok := allValues[i].(int); ok && v == 0 {
+				continue
+			}
+		}
+		columns = append(columns, f.Name)
+		values = append(values, allValues[i])
+	}
+	q := storage.Query{
+		Action:  storage.ActionCreate,
+		Table:   m.ModelName(),
+		Columns: columns,
+		Values:  values,
+	}
+	plan, err := d.conn.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return d.conn.Exec(plan.Query, plan.Args...)
+}
+
+// Update modifies an existing row. At least one Condition is required.
+// Providing zero conditions is a compile-time error — there is no variadic
+// fallback — preventing accidental full-table UPDATE statements.
+func (d *DB) Update(m model.Model, cond storage.Condition, rest ...storage.Condition) error {
+	if err := validateQuery(storage.ActionUpdate, m); err != nil {
+		return err
+	}
+	conds := append([]storage.Condition{cond}, rest...)
+	schema := m.Schema()
+	columns := make([]string, len(schema))
+	for i, f := range schema {
+		columns[i] = f.Name
+	}
+	q := storage.Query{
+		Action:     storage.ActionUpdate,
+		Table:      m.ModelName(),
+		Columns:    columns,
+		Values:     model.ReadValues(schema, m.Pointers()),
+		Conditions: conds,
+	}
+	plan, err := d.conn.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return d.conn.Exec(plan.Query, plan.Args...)
+}
+
+// Delete deletes a model from the database.
+// At least one Condition is required. Providing zero conditions is a compile-time
+// error, preventing accidental full-table DELETE statements.
+func (d *DB) Delete(m model.Model, cond storage.Condition, rest ...storage.Condition) error {
+	if err := validateQuery(storage.ActionDelete, m); err != nil {
+		return err
+	}
+	conds := append([]storage.Condition{cond}, rest...)
+	q := storage.Query{
+		Action:     storage.ActionDelete,
+		Table:      m.ModelName(),
+		Conditions: conds,
+	}
+	plan, err := d.conn.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return d.conn.Exec(plan.Query, plan.Args...)
+}
+
+// Query creates a new QB instance.
+func (d *DB) Query(m model.Model) *QB {
+	return &QB{db: d, model: m}
+}
+
+// Close closes the underlying connection.
+func (d *DB) Close() error {
+	return d.conn.Close()
+}
+
+// RawConn returns the underlying storage.Conn. Renamed from RawExecutor: what's underneath is a
+// full Conn (Executor+Compiler), not just an Executor.
+func (d *DB) RawConn() storage.Conn {
+	return d.conn
 }
 ```
 
-Este repo (orm) es el dueño del contrato. Los backends que lo prueban en fases hermanas:
-`tinywasm/mock` (aquí mismo, §5), `tinywasm/sqlt`, `tinywasm/postgres`, `tinywasm/indexdb`.
+> **Nota sobre `RawExecutor` → `RawConn`.** Es un rename deliberado, no un descuido: el campo
+> subyacente ya no es un `Executor` suelto, es un `storage.Conn`. Si algún test interno todavía necesita
+> "solo la mitad Executor", haz `d.RawConn()` (que ya satisface `storage.Executor` por composición) — no
+> añadas un segundo accessor.
+>
+> **`Compiler()` accessor eliminado.** Ya no hay un `compiler` separado que exponer — está fundido en
+> `conn`. Si algo lo necesitaba, usa `d.RawConn()` (satisface `storage.Compiler` también).
 
-### B. `orm/mock/` — dobles de test reutilizables
-
-Hoy los dobles viven **duplicados y privados** dentro de los tests: `tests/setup_test.go`
-(`package tests`) define `MockExecutor`/`MockCompiler`/`MockScanner`/`MockRows`/`MockModel`/
-`MockTxExecutor`/`MockTxBoundExecutor` (recorders: capturan la llamada, no almacenan datos), y
-`db_test.go` (`package orm`) redeclara sus propios `mockCompiler`/`mockTxExecutor` privados. Ningún
-consumidor externo puede reusarlos. Un módulo hoja (p. ej. `veltylabs/item_catalog`) que quiere probar
-su lógica contra un `*orm.DB` **sin importar un driver real** (`tinywasm/sqlite`) no tiene con qué:
-se acopla a `sqlite` solo en sus tests, contradiciendo el diseño (orm desacopla el motor).
-
-`orm/mock` expone:
-1. **Recorders** (se **trasladan** desde `tests/setup_test.go`, exportados sin *stutter*):
-   `mock.Executor`, `mock.Compiler`, `mock.Scanner`, `mock.Rows`, `mock.Model`, `mock.TxExecutor`,
-   `mock.TxBoundExecutor`. Verifican **delegación** (que orm arma el `Query`/`Plan` correcto).
-2. **Motor en memoria funcional**: `mock.NewDB() *orm.DB` — almacena filas e interpreta el `orm.Query`
-   estructurado (Create/ReadOne/ReadAll/Update/Delete + Conditions/OrderBy/Limit/Offset). **No parsea
-   SQL.** Es lo que permite a un módulo hoja probar round-trips sin driver real. **Y prueba el contrato
-   de §A**: `mock.NewDB` es un backend más que corre `conformance.Run`.
-
-> **Fuera de alcance.** No se modifica `item_catalog` ni ningún consumidor; solo se publica orm.
-> La migración de `item_catalog` (borrar `tinywasm/sqlite`, usar `mock.NewDB()`) es un cambio posterior
-> en ese repo.
-
-## 2. Contratos verificados en este repo (no supuestos)
-
-- `orm.Executor` (`executor.go`): `Exec(q string, args ...any) error`; `QueryRow(q string, args ...any)
-  orm.Scanner`; `Query(q string, args ...any) (orm.Rows, error)`; `Close() error`.
-- `orm.Scanner`: `Scan(dest ...any) error`. `orm.Rows`: `Next() bool`; `Scan(...) error`;
-  `Columns() ([]string, error)`; `Close() error`; `Err() error`.
-- `orm.Compiler` (`compiler.go`): `Compile(q orm.Query, m model.Model) (orm.Plan, error)`.
-- `orm.TxExecutor`/`orm.TxBoundExecutor` (`tx.go`).
-- `orm.New(exec, compiler) *orm.DB` (`db.go`). Métodos públicos de `*orm.DB`: `Create`, `Update(m, cond,
-  ...)`, `Delete(m, cond, ...)`, `CreateTable`, `DropTable`, `CreateDatabase`, `Query(m) *QB`, `Close`,
-  `Tx(fn)`.
-- `orm.QB` (`qb.go`): `Where(col).Eq/Neq/Gt/Gte/Lt/Lte/Like/In(v)`, `Or()`, `Limit`, `Offset`,
-  `OrderBy(col).Asc()/.Desc()`, `ReadOne()`, `ReadAll(new, onRow)`. `ReadOne` mapea `ErrNoRows`→`ErrNotFound`.
-- `orm.Query` (`query.go`): `Action`, `Table`, `Columns []string`, `Values []any`, `Conditions
-  []orm.Condition`, `OrderBy []orm.Order`, `Limit`, `Offset`, `Database`.
-- `orm.Action`: `ActionCreate/ReadOne/Update/Delete/ReadAll/CreateTable/DropTable/CreateDatabase/
-  AddColumn/RenameColumn/DropColumn`.
-- `orm.Condition` (`conditions.go`): `Field()/Operator()/Value()/Logic()`. Operadores: `=`, `!=`, `>`,
-  `>=`, `<`, `<=`, `LIKE`, `IN`, `IS NOT NULL`. Lógica `"AND"`/`"OR"`; el `Logic()` de la **primera**
-  condición se ignora (ver `sqlt/translate.go:buildConditions`, la condición 0 no antepone lógica).
-- `orm.Order`: `Column()/Dir()` (`"ASC"`/`"DESC"`). `orm.Plan` (`execution_plan.go`): `Mode/Query/Args`.
-- `orm.ErrNoRows`, `orm.ErrNotFound` (`errors.go`). `orm.ScanAny(v any, dest any) error` (`scan.go`) —
-  reusar para copiar valor→puntero (`*string/*int/*int64/*float64/*bool/*[]byte/*any`).
-- `model.Model` (`interface.go`): `Schema() []model.Field` + `Pointers() []any` + `ModelName() string` +
-  `EncodeFields(FieldWriter)`/`DecodeFields(FieldReader)` + `IsNil() bool`.
-- `model.Definition{Name string; Fields model.Fields}`, `model.Field{Name, Type Kind, NotNull, DB
-  *FieldDB}`, `model.FieldDB{PK bool}`, kinds `model.Text()/Int()/Bool()/Float()`. `FieldWriter`:
-  `String/Int/Bool/Float(name, v)`. `FieldReader`: `String/Int/Bool/Float(name) (v, ok)`.
-- `model.ReadValues(schema, ptrs) []any` — cómo orm obtiene valores tipados
-  (`string/int64/float64/bool/[]byte`).
-
-## 3. `orm/conformance/` — el contrato
-
-`package conformance`, importa `testing` + `orm` + `model`. Solo esos (todos wasm-safe, para que
-`indexdb` pueda importarlo bajo `//go:build wasm`).
-
-### 3.1 Modelo canónico (fixture con schema real, para que el DDL funcione en backends SQL)
+### 4.3 `tx.go`
 
 ```go
-package conformance
+package orm
+
+import "github.com/tinywasm/storage"
+
+// Tx executes a function within a transaction. The underlying storage.Conn must implement
+// storage.TxExecutor (type-asserted here) — most backends do; mem.New() also implements it as a
+// no-op so tests can exercise this path without a real transactional backend.
+func (d *DB) Tx(fn func(tx *DB) error) error {
+	txExec, ok := d.conn.(storage.TxExecutor)
+	if !ok {
+		return ErrNoTxSupport
+	}
+
+	bound, err := txExec.BeginTx()
+	if err != nil {
+		return err
+	}
+
+	// bound is a storage.TxBoundExecutor: Executor + Commit/Rollback. It does NOT satisfy
+	// storage.Compiler on its own, so txDB.conn wraps it back together with the original
+	// compiler half via boundConn (below) — the same "conn = exec+compile" pairing New()
+	// enforces, kept intact across a transaction boundary.
+	txDB := &DB{conn: boundConn{TxBoundExecutor: bound, Compiler: d.conn}, log: d.log}
+
+	if err := fn(txDB); err != nil {
+		bound.Rollback()
+		return err
+	}
+	return bound.Commit()
+}
+
+// boundConn re-pairs a transaction-bound Executor with the original connection's Compiler
+// (compiling doesn't depend on being inside a transaction — only executing does), so the
+// nested *DB handed to fn still satisfies storage.Conn as a single value.
+type boundConn struct {
+	storage.TxBoundExecutor
+	storage.Compiler
+}
+```
+
+> **Corrección de diseño respecto al `orm` viejo.** El `orm.DB` anterior guardaba `exec`+`compiler`
+> como dos campos separados, así que re-envolver una transacción era trivial (`&DB{exec: bound,
+> compiler: db.compiler}`). Ahora `DB` guarda un único `conn storage.Conn`, y `storage.TxBoundExecutor` (lo que
+> devuelve `BeginTx`) **no** trae consigo un `Compiler` — normal, el compilador no cambia dentro de
+> una transacción, solo el executor. `boundConn` (arriba) resuelve esto componiendo el
+> `TxBoundExecutor` de la transacción con el `Compiler` de la conexión original en un solo valor que
+> vuelve a satisfacer `storage.Conn`. Sin este tipo, `Tx` no compila con la firma `New(conn storage.Conn)` de un
+> solo argumento — no lo omitas ni vuelvas a partir `DB` en dos campos para evitarlo.
+
+### 4.4 `qb.go`
+
+```go
+package orm
 
 import (
+	"github.com/tinywasm/storage"
 	"github.com/tinywasm/model"
+)
+
+// QB represents a query builder.
+// Consumers hold a *QB reference in variables for incremental building.
+type QB struct {
+	db      *DB
+	model   model.Model
+	conds   []storage.Condition
+	orderBy []storage.Order
+	groupBy []string
+	limit   int
+	offset  int
+	nextOr  bool
+}
+
+// Clause represents an intermediate state for building a query condition.
+type Clause struct {
+	qb    *QB
+	field string
+}
+
+// Where starts a new condition clause for the given column.
+func (qb *QB) Where(column string) *Clause {
+	return &Clause{qb: qb, field: column}
+}
+
+// Or sets the next condition to use OR logic instead of AND.
+func (qb *QB) Or() *QB {
+	qb.nextOr = true
+	return qb
+}
+
+func (qb *QB) addCondition(c storage.Condition) *QB {
+	if qb.nextOr {
+		c = storage.Or(c)
+		qb.nextOr = false
+	}
+	qb.conds = append(qb.conds, c)
+	return qb
+}
+
+func (c *Clause) Eq(value any) *QB    { return c.qb.addCondition(storage.Eq(c.field, value)) }
+func (c *Clause) Neq(value any) *QB   { return c.qb.addCondition(storage.Neq(c.field, value)) }
+func (c *Clause) Gt(value any) *QB    { return c.qb.addCondition(storage.Gt(c.field, value)) }
+func (c *Clause) Gte(value any) *QB   { return c.qb.addCondition(storage.Gte(c.field, value)) }
+func (c *Clause) Lt(value any) *QB    { return c.qb.addCondition(storage.Lt(c.field, value)) }
+func (c *Clause) Lte(value any) *QB   { return c.qb.addCondition(storage.Lte(c.field, value)) }
+func (c *Clause) Like(value any) *QB  { return c.qb.addCondition(storage.Like(c.field, value)) }
+func (c *Clause) In(value any) *QB    { return c.qb.addCondition(storage.In(c.field, value)) }
+
+// Limit sets the limit for the query.
+func (qb *QB) Limit(limit int) *QB {
+	qb.limit = limit
+	return qb
+}
+
+// Offset sets the offset for the query.
+func (qb *QB) Offset(offset int) *QB {
+	qb.offset = offset
+	return qb
+}
+
+// OrderClause represents an intermediate state for building an order by clause.
+type OrderClause struct {
+	qb    *QB
+	field string
+}
+
+// OrderBy starts a new order clause for the given column.
+func (qb *QB) OrderBy(column string) *OrderClause {
+	return &OrderClause{qb: qb, field: column}
+}
+
+// Asc sets the order direction to ascending.
+func (o *OrderClause) Asc() *QB {
+	o.qb.orderBy = append(o.qb.orderBy, storage.Asc(o.field))
+	return o.qb
+}
+
+// Desc sets the order direction to descending.
+func (o *OrderClause) Desc() *QB {
+	o.qb.orderBy = append(o.qb.orderBy, storage.Desc(o.field))
+	return o.qb
+}
+
+// GroupBy adds a group by clause to the query.
+func (qb *QB) GroupBy(columns ...string) *QB {
+	qb.groupBy = append(qb.groupBy, columns...)
+	return qb
+}
+
+// ReadOne executes the query and returns a single result.
+func (qb *QB) ReadOne() error {
+	if err := validateQuery(storage.ActionReadOne, qb.model); err != nil {
+		return err
+	}
+	q := storage.Query{
+		Action:     storage.ActionReadOne,
+		Table:      qb.model.ModelName(),
+		Conditions: qb.conds,
+		OrderBy:    qb.orderBy,
+		GroupBy:    qb.groupBy,
+		Limit:      1, // Force limit 1
+		Offset:     qb.offset,
+	}
+	plan, err := qb.db.conn.Compile(q, qb.model)
+	if err != nil {
+		return err
+	}
+
+	row := qb.db.conn.QueryRow(plan.Query, plan.Args...)
+	if err := row.Scan(qb.model.Pointers()...); err != nil {
+		if err == storage.ErrNoRows {
+			return ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// ReadAll executes the query and returns all results.
+func (qb *QB) ReadAll(new func() model.Model, onRow func(model.Model)) error {
+	if err := validateQuery(storage.ActionReadAll, qb.model); err != nil {
+		return err
+	}
+	q := storage.Query{
+		Action:     storage.ActionReadAll,
+		Table:      qb.model.ModelName(),
+		Conditions: qb.conds,
+		OrderBy:    qb.orderBy,
+		GroupBy:    qb.groupBy,
+		Limit:      qb.limit,
+		Offset:     qb.offset,
+	}
+	plan, err := qb.db.conn.Compile(q, qb.model)
+	if err != nil {
+		return err
+	}
+
+	rows, err := qb.db.conn.Query(plan.Query, plan.Args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		m := new()
+		if err := rows.Scan(m.Pointers()...); err != nil {
+			return err
+		}
+		onRow(m)
+	}
+	return rows.Err()
+}
+```
+
+> **Cambio de comportamiento en `addCondition`.** Antes fijaba `c.logic = "AND"` explícitamente en la
+> rama sin `Or()` porque `Eq`/`Gt`/etc. ya ponían `"AND"` por defecto — ese `else` era redundante (lo
+> quité: `storage.Eq(...)` etc. ya devuelven `Logic()=="AND"`). La rama `Or()` ahora usa `storage.Or(c)` (la
+> función pública) en vez de mutar un campo privado — `Condition` es un tipo de `storage`, `qb.go` ya no
+> puede tocar sus campos no exportados directamente. Verifica con un test que el comportamiento
+> observable no cambió (mismo resultado en `readAllOrsConditions`-style).
+
+### 4.5 `validate.go`
+
+```go
+package orm
+
+import (
+	"github.com/tinywasm/storage"
+	"github.com/tinywasm/fmt"
+	"github.com/tinywasm/model"
+)
+
+func validateQuery(action storage.Action, m model.Model) error {
+	if m.ModelName() == "" {
+		return ErrEmptyTable
+	}
+	if action == storage.ActionCreate || action == storage.ActionUpdate {
+		if len(m.Schema()) != len(m.Pointers()) {
+			return fmt.Err(ErrValidation, "schema and pointers length mismatch")
+		}
+	}
+	return nil
+}
+```
+
+### 4.6 `errors.go`
+
+```go
+package orm
+
+import "github.com/tinywasm/fmt"
+
+// ErrNotFound is returned when ReadOne() finds no matching row. Translates storage.ErrNoRows —
+// storage itself has no concept of "not found", only "no rows" (see qb.go's ReadOne).
+var ErrNotFound = fmt.Err("record", "not", "found")
+
+// ErrValidation is returned when validate() finds a mismatch.
+var ErrValidation = fmt.Err("error", "validation")
+
+// ErrEmptyTable is returned when ModelName() returns an empty string.
+var ErrEmptyTable = fmt.Err("name", "table", "empty")
+
+// ErrNoTxSupport is returned by DB.Tx() when the underlying storage.Conn does not implement
+// storage.TxExecutor.
+var ErrNoTxSupport = fmt.Err("transaction", "not", "supported")
+```
+
+### 4.7 `reexport.go` — **nuevo archivo**, los alias de conveniencia de §3
+
+```go
+package orm
+
+import "github.com/tinywasm/storage"
+
+// Re-exports of storage's DML value types and condition/order constructors, so that a consumer
+// calling Update/Delete (which take a storage.Condition explicitly) doesn't need a second import
+// just for Eq/Gt/etc. These are aliases, not new types/wrappers — orm.Condition IS storage.Condition,
+// orm.Eq IS storage.Eq. Zero duplication, zero conversion. See docs/PLAN.md §3.
+type Condition = storage.Condition
+type Order = storage.Order
+
+var (
+	Eq        = storage.Eq
+	Neq       = storage.Neq
+	Gt        = storage.Gt
+	Gte       = storage.Gte
+	Lt        = storage.Lt
+	Lte       = storage.Lte
+	Like      = storage.Like
+	In        = storage.In
+	Or        = storage.Or
+	IsNotNull = storage.IsNotNull
+	Asc       = storage.Asc
+	Desc      = storage.Desc
+)
+```
+
+### 4.8 Archivos que se borran
+
+```
+executor.go
+compiler.go
+query.go
+conditions.go
+execution_plan.go
+scan.go
+open.go
+mock/           (todo el directorio)
+conformance/    (todo el directorio)
+```
+
+## 5. Tests — reescritura completa de `tests/`
+
+`orm/tests/` importaba `github.com/tinywasm/orm/mock`. Ahora importa `github.com/tinywasm/storage/mock` (los
+recorders) y, para el round-trip real, `github.com/tinywasm/storage/mem`.
+
+### 5.1 `tests/core_test.go` — reescribe imports y tipos, quita lo que ya no es de `orm`
+
+- Cambia `"github.com/tinywasm/orm/mock"` → `"github.com/tinywasm/storage/mock"`; `mock.Compiler`,
+  `mock.Executor`, etc. ahora capturan `storage.Query`/`storage.Plan` (mismos nombres de campo,
+  `mockCompiler.LastQuery.Action != storage.ActionCreate` en vez de `orm.ActionCreate`).
+- **Quita** los subtests "13. Condition Helpers" y la mitad de "14. Getters" que prueba
+  `Condition`/`Order` directamente (`c.Field()`, `c.Operator()`, `o.Column()`, `o.Dir()`) — esos tipos
+  ya no son de `orm`, se prueban en `storage` (`storage/tests/storage_helpers_test.go`, ya existe). Deja solo la parte de "Getters" que
+  ejercita el builder (`d.Query(model).OrderBy("col").Asc().ReadOne()` y verifica
+  `mockCompiler.LastQuery.OrderBy`) — **esa** sí es comportamiento de `orm`.
+- El resto (Create/Update/Delete/ReadOne/ReadAll/Tx/Errors/Close) se queda igual en estructura,
+  solo con los tipos calificados a `storage.` donde correspondía a `orm.` antes (`storage.Eq(...)` en vez de
+  `orm.Eq(...)` si usas los recorders directos de `storage/mock`; si usas los re-exports de §4.7,
+  `orm.Eq(...)` sigue funcionando igual que antes — usa lo que ya usaba el test, no fuerces el cambio
+  a `storage.` donde `orm.` re-exportado ya compila).
+
+### 5.2 `tests/new_sync_test.go`
+
+`TestOpen` (el único test que quedaba en este archivo tras el split DDL/DML) **se borra entero**: era
+la prueba de `orm.Register`/`orm.Open`, eliminados en este plan (§2). Si el archivo queda vacío,
+bórralo.
+
+### 5.3 `tests/scan_test.go`
+
+`TestScanAny` **se borra**: `ScanAny` ya no es de `orm`, se prueba en `storage` (`storage/tests/storage_helpers_test.go`, ya existe).
+Si el archivo queda vacío, bórralo.
+
+### 5.4 `tests/orm_stlib_test.go` / `tests/orm_wasm_test.go`
+
+Sin cambios de fondo — siguen llamando `RunCoreTests(t)`.
+
+### 5.5 **Nuevo — `tests/roundtrip_test.go`**: la prueba *consumer-shaped* que exige el harness
+
+CONSTRUCTION_HARNESS.md §127: *"An API is not published until a consumer-shaped test, inside the
+library itself, proves it."* `storage/mock` prueba que el builder arma la `Query` correcta; esto prueba que
+la `Query` correcta, ejecutada de verdad contra un backend real (`storage/mem`), da el resultado correcto —
+el camino completo que un consumidor real recorre.
+
+```go
+package tests
+
+import (
+	"testing"
+
+	"github.com/tinywasm/storage/conformance" // reusa el fixture Widget, no lo dupliques
+	"github.com/tinywasm/storage/mem"
 	"github.com/tinywasm/orm"
 )
 
-// Widget is the canonical record every backend is driven with. Its schema carries real DB
-// metadata (types + PK) so SQL backends can CREATE TABLE it; the mock ignores the metadata
-// and stores by column name. Hand-written (conformance depends only on model, not ormc).
-var WidgetModel = model.Definition{
-	Name: "conformance_widget",
-	Fields: model.Fields{
-		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
-		{Name: "name", Type: model.Text(), NotNull: true},
-		{Name: "qty", Type: model.Int(), NotNull: true},
-		{Name: "active", Type: model.Bool(), NotNull: true},
-	},
-}
+func TestBuilderRoundTripAgainstMem(t *testing.T) {
+	d := orm.New(mem.New())
 
-type Widget struct {
-	Id     string
-	Name   string
-	Qty    int64
-	Active bool
-}
-
-func (w *Widget) ModelName() string     { return WidgetModel.Name }
-func (w *Widget) Schema() []model.Field  { return WidgetModel.Fields }
-func (w *Widget) Pointers() []any        { return []any{&w.Id, &w.Name, &w.Qty, &w.Active} }
-func (w *Widget) IsNil() bool            { return w == nil }
-func (w *Widget) EncodeFields(wr model.FieldWriter) {
-	wr.String("id", w.Id); wr.String("name", w.Name); wr.Int("qty", w.Qty); wr.Bool("active", w.Active)
-}
-func (w *Widget) DecodeFields(r model.FieldReader) {
-	if v, ok := r.String("id"); ok { w.Id = v }
-	if v, ok := r.String("name"); ok { w.Name = v }
-	if v, ok := r.Int("qty"); ok { w.Qty = v }
-	if v, ok := r.Bool("active"); ok { w.Active = v }
-}
-
-var _ model.Model = (*Widget)(nil)
-```
-
-> Verifica las firmas exactas de `model.Text()/Int()/Bool()` y `FieldWriter`/`FieldReader` con
-> `go doc github.com/tinywasm/model` antes de compilar — usa las reales si difieren de arriba. La columna
-> `qty` mapea a `int64` (storage de `FieldInt`); `Pointers()` debe apuntar a un `int64`, no `int`.
-
-### 3.2 Factory + Run
-
-```go
-// Factory builds, for ONE clause, a fresh *orm.DB whose Widget table already exists and is EMPTY.
-// Schema setup is the backend's job, DONE OUTSIDE orm's DML contract (this suite never calls DDL):
-//   - mock:     the in-memory engine auto-creates the table on first Create — New just returns NewDB().
-//   - sqlite/postgres: New runs the dialect's ddlc.ExportDDL(models) (DROP+CREATE) before returning.
-//   - indexdb:  New declares `models` as IndexedDB object stores (structTables) up front.
-// models are the record types the suite will exercise. Called once per clause → no cross-clause bleed.
-type Factory struct {
-	Name string
-	New  func(t *testing.T, models ...model.Model) *orm.DB
-}
-
-func Run(t *testing.T, f Factory) {
-	if f.New == nil {
-		t.Fatal("conformance: Factory.New is required")
+	w := &conformance.Widget{Id: "w1", Name: "alpha", Qty: 3, Active: true}
+	if err := d.Create(w); err != nil {
+		t.Fatalf("Create: %v", err)
 	}
-	t.Run("create_then_read_one_by_pk", func(t *testing.T) { createThenReadOneByPK(t, f) })
-	t.Run("read_one_no_match_is_not_found", func(t *testing.T) { readOneNoMatchIsNotFound(t, f) })
-	t.Run("read_all_returns_every_row", func(t *testing.T) { readAllReturnsEveryRow(t, f) })
-	t.Run("read_all_filters_by_eq", func(t *testing.T) { readAllFiltersByEq(t, f) })
-	t.Run("read_all_ands_two_conditions", func(t *testing.T) { readAllAndsTwoConditions(t, f) })
-	t.Run("read_all_ors_conditions", func(t *testing.T) { readAllOrsConditions(t, f) })
-	t.Run("read_all_orders_asc_and_desc", func(t *testing.T) { readAllOrdersAscDesc(t, f) })
-	t.Run("read_all_applies_limit_and_offset", func(t *testing.T) { readAllLimitOffset(t, f) })
-	t.Run("comparison_operators_filter", func(t *testing.T) { comparisonOperatorsFilter(t, f) }) // > >= < <= !=
-	t.Run("in_operator_filters", func(t *testing.T) { inOperatorFilters(t, f) })
-	t.Run("update_changes_matched_rows_only", func(t *testing.T) { updateChangesMatchedOnly(t, f) })
-	t.Run("delete_removes_matched_rows_only", func(t *testing.T) { deleteRemovesMatchedOnly(t, f) })
-}
-```
 
-> **Sin DDL en la suite.** No hay cláusula `create_table`/`drop_table` — eso lo prueba
-> `ddl/conformance` (repo `tinywasm/ddl`), solo para backends SQL. Aquí `orm` es puro DML: la tabla
-> llega lista del `Factory`. El aislamiento entre cláusulas lo da que `New` se llama una vez por cláusula
-> y devuelve una BD/tabla fresca (mock: `NewDB()` nuevo; sqlite: `:memory:` nuevo; postgres: DROP+CREATE;
-> indexdb: `dbName` único).
-
-### 3.3 Setup por-cláusula + 2 cláusulas de ejemplo
-
-`setup` **no hace DDL**: pide al `Factory` una BD con la tabla ya lista y solo siembra filas vía `Create`
-(que es DML):
-
-```go
-func setup(t *testing.T, f Factory, seed ...*Widget) *orm.DB {
-	t.Helper()
-	db := f.New(t, &Widget{}) // table already exists & empty — backend set it up, not this suite
-	for _, w := range seed {
-		if err := db.Create(w); err != nil {
-			t.Fatalf("seed Create(%+v): %v", w, err)
-		}
+	var got conformance.Widget
+	if err := d.Query(&got).Where("id").Eq("w1").ReadOne(); err != nil {
+		t.Fatalf("ReadOne: %v", err)
 	}
-	return db
-}
+	if got.Name != "alpha" || got.Qty != 3 || !got.Active {
+		t.Errorf("round-trip mismatch: got %+v", got)
+	}
 
-func readAll(t *testing.T, qb *orm.QB) []*Widget {
-	t.Helper()
-	var out []*Widget
-	err := qb.ReadAll(func() model.Model { return &Widget{} }, func(m model.Model) {
-		out = append(out, m.(*Widget))
-	})
+	if err := d.Update(&conformance.Widget{Name: "beta", Qty: 9, Active: false}, orm.Eq("id", "w1")); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	var updated conformance.Widget
+	if err := d.Query(&updated).Where("id").Eq("w1").ReadOne(); err != nil {
+		t.Fatalf("ReadOne after update: %v", err)
+	}
+	if updated.Name != "beta" || updated.Qty != 9 || updated.Active {
+		t.Errorf("update mismatch: got %+v", updated)
+	}
+
+	if err := d.Delete(&conformance.Widget{}, orm.Eq("id", "w1")); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	err := d.Query(&conformance.Widget{}).Where("id").Eq("w1").ReadOne()
+	if err == nil {
+		t.Fatal("expected ErrNotFound after delete")
+	}
+	if err != orm.ErrNotFound {
+		t.Errorf("expected orm.ErrNotFound, got %v", err)
+	}
+
+	// ReadAll + Where + OrderBy + Limit, para cubrir la otra mitad del builder.
+	_ = d.Create(&conformance.Widget{Id: "a", Name: "x", Qty: 1, Active: true})
+	_ = d.Create(&conformance.Widget{Id: "b", Name: "x", Qty: 2, Active: true})
+	var all []*conformance.Widget
+	err = d.Query(&conformance.Widget{}).Where("name").Eq("x").OrderBy("qty").Desc().Limit(1).
+		ReadAll(func() any { return &conformance.Widget{} }, nil) // ajusta la firma real de ReadAll (model.Model, no any)
+	// ^ NOTA: pseudo-código de forma — usa la firma real de QB.ReadAll (func() model.Model, func(model.Model))
+	// tal como está en qb.go §4.4. No copies este bloque literal sin corregirlo.
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
-	return out
-}
-
-func createThenReadOneByPK(t *testing.T, f Factory) {
-	db := setup(t, f, &Widget{Id: "w1", Name: "alpha", Qty: 3, Active: true})
-	var got Widget
-	err := db.Query(&got).Where("id").Eq("w1").ReadOne()
-	if err != nil {
-		t.Fatalf("ReadOne: %v", err)
-	}
-	if got.Name != "alpha" || got.Qty != 3 || got.Active != true {
-		t.Errorf("round-trip mismatch: got %+v", got)
-	}
-}
-
-func readAllAndsTwoConditions(t *testing.T, f Factory) {
-	db := setup(t, f,
-		&Widget{Id: "a", Name: "x", Qty: 1, Active: true},
-		&Widget{Id: "b", Name: "x", Qty: 1, Active: false},
-		&Widget{Id: "c", Name: "y", Qty: 1, Active: true},
-	)
-	got := readAll(t, db.Query(&Widget{}).Where("name").Eq("x").Where("active").Eq(true))
-	if len(got) != 1 || got[0].Id != "a" {
-		t.Errorf("AND of two conditions must return only {a}; got %+v", got)
+	if len(all) != 1 || all[0].Id != "b" {
+		t.Errorf("expected only b (qty desc, limit 1); got %+v", all)
 	}
 }
 ```
 
-**Resto de cláusulas** (misma forma: `setup` con seed, ejerce el `QB`/método, asevera el conjunto
-resultante):
+> El último bloque (`ReadAll`) está deliberadamente marcado como pseudo-código de forma — la firma
+> real de `QB.ReadAll` es `func(new func() model.Model, onRow func(model.Model)) error` (ver §4.4).
+> Escríbelo con esa firma exacta, acumulando en `all` dentro del callback `onRow`, igual que ya hace
+> `readAll` en `storage/conformance` (`storage/conformance/conformance.go`) — es el mismo patrón, no lo reinventes.
 
-| Cláusula | Qué prueba |
-|---|---|
-| `readOneNoMatchIsNotFound` | `ReadOne` sin match ⇒ `err == orm.ErrNotFound` (mapea `ErrNoRows`). |
-| `readAllReturnsEveryRow` | sin `Where` ⇒ todas las filas sembradas. |
-| `readAllFiltersByEq` | un `Where().Eq()` ⇒ solo las que igualan. |
-| `readAllOrsConditions` | `Where(a).Eq(x).Or().Where(b).Eq(y)` ⇒ unión. |
-| `readAllOrdersAscDesc` | `OrderBy("qty").Asc()`/`.Desc()` ⇒ orden correcto. |
-| `readAllLimitOffset` | `Limit(2).Offset(1)` sobre orden estable ⇒ ventana correcta. |
-| `comparisonOperatorsFilter` | `Gt/Gte/Lt/Lte/Neq` sobre `qty` ⇒ subconjunto correcto. |
-| `inOperatorFilters` | `Where("id").In([]any{"a","c"})` ⇒ {a,c}. |
-| `updateChangesMatchedOnly` | `Update` con cond ⇒ solo filas que matchean cambian; verifica con `ReadOne`. |
-| `deleteRemovesMatchedOnly` | `Delete` con cond ⇒ solo filas que matchean desaparecen. |
+## 6. `docs/ARQUITECTURE.md` — actualízalo, no lo dupliques
 
-> **Nota `In`:** `QB.In(value any)` recibe el valor tal cual; los adapters SQL esperan `[]any` (ver
-> `sqlt/translate.go`). La cláusula pasa `[]any{...}` para ser fiel a todos los backends.
+Reemplaza la sección "DML/DDL Split (2026-07-16)" (la que dice que `orm` sigue teniendo
+`Executor`/`Compiler`/etc.) por una nueva sección corta:
 
-## 4. `orm/mock/` — recorders + motor en memoria
+```markdown
+## Puerto de almacenamiento (2026-07-16, segunda pasada)
 
-Estructura:
-```
-mock/
-  recorders.go   // dobles que capturan llamadas (trasladados desde tests/setup_test.go)
-  memdb.go       // motor en memoria funcional + NewDB()
-  mock_test.go   // 100% cobertura + conformance.Run(t, {New: mock.NewDB adapter})
-```
-`package mock`, importa `orm` + `model` (+ `fmt` de tinywasm). Sin ciclo: orm no importa mock.
-
-### 4.1 `recorders.go` — traslado + destutter
-
-Copia las 7 definiciones de `tests/setup_test.go` a `mock/recorders.go`, renombrando para no tartamudear
-(`mock.MockExecutor` → `mock.Executor`). El cuerpo de cada método es **idéntico** al actual (mismos
-campos, misma lógica); solo cambia el nombre del tipo y el paquete:
-
-| En `tests/setup_test.go` | En `mock/recorders.go` |
-|---|---|
-| `MockExecutor` | `Executor` |
-| `MockCompiler` | `Compiler` |
-| `MockScanner` | `Scanner` |
-| `MockRows` | `Rows` |
-| `MockModel` | `Model` |
-| `MockTxExecutor` | `TxExecutor` |
-| `MockTxBoundExecutor` | `TxBoundExecutor` |
-
-No cambies los *receivers* de `Model` (value vs pointer) — solo el nombre. Añade al final:
-
-```go
-var (
-	_ orm.Executor        = (*Executor)(nil)
-	_ orm.Compiler        = (*Compiler)(nil)
-	_ orm.Scanner         = (*Scanner)(nil)
-	_ orm.Rows            = (*Rows)(nil)
-	_ model.Model         = (*Model)(nil)
-	_ orm.TxExecutor      = (*TxExecutor)(nil)
-	_ orm.TxBoundExecutor = (*TxBoundExecutor)(nil)
-)
+`orm` ya no define el contrato de almacenamiento. `tinywasm/storage` es el puerto (interfaces, tipos de
+valor DML, conformance, mock, mem) — el equivalente de `database/sql/driver`. `orm` es la capa
+ergonómica opcional encima (`orm.DB`, query builder), el equivalente de `database/sql`. Un backend
+implementa `storage.Conn`; nunca importa `orm`. Ver `tinywasm/storage`'s AGENTS.md y
+[DB_PORT_PROPOSAL.md](https://github.com/tinywasm/app-releases/blob/main/docs/DB_PORT_PROPOSAL.md).
 ```
 
-### 4.2 `memdb.go` — motor en memoria funcional
+## 7. `AGENTS.md` — actualízalo
 
-Un único tipo `engine` implementa **a la vez** `orm.Compiler` y `orm.Executor`. Funciona porque orm
-siempre llama `compiler.Compile(q, m)` **inmediatamente antes** de `exec.Exec/QueryRow/Query(...)` sobre
-el mismo `*orm.DB` en la misma goroutine (`db.go`/`qb.go`): `Compile` guarda el `Query`+`model`; el
-`Exec/Query` lo consume. Cero SQL.
+- Sección "Mission of this package": ya no dice "runtime DML ORM" con contrato propio — di "capa
+  ergonómica opcional sobre `tinywasm/storage`".
+- Sección "No Go `map` anywhere in this ecosystem": la regla se hereda de `storage` (que es más estricto
+  todavía, por ser isomórfico puro) — mantenla, pero corrige los ejemplos (`mock/memdb.go` ya no
+  existe en este repo, ahora vive en `storage/mem`).
+- Tabla "Code layout": quita las filas de `conformance/`, `mock/`, `open.go`, `executor.go`,
+  `compiler.go`, `query.go`, `conditions.go`, `execution_plan.go`, `scan.go`. Añade una nota: "El
+  contrato vive en `github.com/tinywasm/storage` — este repo no lo redefine."
 
-```go
-package mock
+## 8. Criterios de aceptación
 
-import (
-	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-)
+- `orm.DB` tiene `New(conn storage.Conn) *DB`, `Create`/`Update`/`Delete`/`Query`/`Close`/`RawConn`/`Tx`/
+  `SetLog`. **No** tiene `Executor`/`Compiler`/`Query`/`Condition`/`Order`/`Plan`/`ErrNoRows`/
+  `ScanAny`/`Register`/`Open`/`Factory` propios — todos vienen de `storage` (algunos re-exportados, §4.7).
+  `go.mod` no depende de nada más que `storage`+`model`+`fmt`.
+- `tests/` compila e importa `github.com/tinywasm/storage/mock` (recorders) y
+  `github.com/tinywasm/storage/mem` (round-trip real) — cero referencias a `orm/mock` o `orm/conformance`
+  (ya no existen).
+- `tests/roundtrip_test.go` existe y ejercita `Create`/`ReadOne`/`Update`/`Delete`/`ReadAll` contra
+  `mem.New()` de principio a fin (la prueba *consumer-shaped* del harness).
+- `gotest` verde en todo el módulo (incluye `gotest -tinygo`); `GOOS=js GOARCH=wasm go build ./...`
+  limpio.
+- `docs/ARQUITECTURE.md` y `AGENTS.md` actualizados (§6, §7).
+- Publicado con `gopush` (breaking, minor bump — `v0.11.0` o el que corresponda tras el actual).
 
-// NewDB returns a functional in-memory *orm.DB. It interprets the structured orm.Query
-// (Create/ReadOne/ReadAll/Update/Delete + Conditions/OrderBy/Limit/Offset). It is THE double a
-// leaf module uses to test round-trips without importing a real driver, and it proves
-// orm/conformance exactly like the real backends do.
-func NewDB() *orm.DB {
-	e := &engine{tables: map[string][]map[string]any{}}
-	return orm.New(e, e)
-}
-
-type engine struct {
-	tables map[string][]map[string]any // table -> rows (column -> value)
-	lastQ  orm.Query
-	lastM  model.Model
-}
-
-func (e *engine) Compile(q orm.Query, m model.Model) (orm.Plan, error) {
-	e.lastQ, e.lastM = q, m
-	return orm.Plan{Mode: q.Action, Query: "mock", Args: q.Values}, nil
-}
-func (e *engine) Close() error { return nil }
-
-func (e *engine) Exec(query string, args ...any) error {
-	q := e.lastQ
-	switch q.Action {
-	case orm.ActionCreateTable:
-		if _, ok := e.tables[q.Table]; !ok { e.tables[q.Table] = nil }
-	case orm.ActionDropTable:
-		delete(e.tables, q.Table)
-	case orm.ActionCreate:
-		row := map[string]any{}
-		for i, col := range q.Columns {
-			if i < len(q.Values) { row[col] = q.Values[i] }
-		}
-		// Auto-vivifies the table: append sets the map key even if CreateTable was never called.
-		// This is why the mock Factory in orm/conformance needs no DDL — it just returns NewDB().
-		e.tables[q.Table] = append(e.tables[q.Table], row)
-	case orm.ActionUpdate:
-		for _, row := range e.match(q.Table, q.Conditions) { // match returns stored map refs
-			for i, col := range q.Columns {
-				if i < len(q.Values) { row[col] = q.Values[i] }
-			}
-		}
-	case orm.ActionDelete:
-		kept := e.tables[q.Table][:0:0]
-		for _, row := range e.tables[q.Table] {
-			if !matchRow(row, q.Conditions) { kept = append(kept, row) }
-		}
-		e.tables[q.Table] = kept
-	default: // CreateDatabase / AddColumn / RenameColumn / DropColumn: no-op
-	}
-	return nil
-}
-
-func (e *engine) QueryRow(query string, args ...any) orm.Scanner {
-	q := e.lastQ
-	rows := applyOffsetLimit(applyOrder(e.match(q.Table, q.Conditions), q.OrderBy), q.Offset, 1)
-	if len(rows) == 0 { return &memScanner{err: orm.ErrNoRows} }
-	return &memScanner{row: rows[0], schema: e.lastM.Schema()}
-}
-
-func (e *engine) Query(query string, args ...any) (orm.Rows, error) {
-	q := e.lastQ
-	rows := applyOffsetLimit(applyOrder(e.match(q.Table, q.Conditions), q.OrderBy), q.Offset, q.Limit)
-	return &memRows{rows: rows, schema: e.lastM.Schema(), idx: -1}, nil
-}
-
-func (e *engine) match(table string, conds []orm.Condition) []map[string]any {
-	var out []map[string]any
-	for _, row := range e.tables[table] {
-		if matchRow(row, conds) { out = append(out, row) }
-	}
-	return out
-}
-
-// matchRow evaluates conds left-to-right; the first Logic() is ignored (mirrors real adapters).
-func matchRow(row map[string]any, conds []orm.Condition) bool {
-	if len(conds) == 0 { return true }
-	res := evalCond(row, conds[0])
-	for _, c := range conds[1:] {
-		if c.Logic() == "OR" { res = res || evalCond(row, c) } else { res = res && evalCond(row, c) }
-	}
-	return res
-}
-
-func evalCond(row map[string]any, c orm.Condition) bool {
-	v, ok := row[c.Field()]
-	switch c.Operator() {
-	case "IS NOT NULL": return ok && v != nil
-	case "IN":
-		list, _ := c.Value().([]any)
-		for _, it := range list { if equalAny(v, it) { return true } }
-		return false
-	case "LIKE": return likeMatch(toStr(v), toStr(c.Value()))
-	case "=":  return equalAny(v, c.Value())
-	case "!=": return !equalAny(v, c.Value())
-	case ">":  return compareAny(v, c.Value()) > 0
-	case ">=": return compareAny(v, c.Value()) >= 0
-	case "<":  return compareAny(v, c.Value()) < 0
-	case "<=": return compareAny(v, c.Value()) <= 0
-	}
-	return false
-}
-
-func applyOrder(rows []map[string]any, orders []orm.Order) []map[string]any {
-	for oi := len(orders) - 1; oi >= 0; oi-- { // stable, last key least significant
-		col, desc := orders[oi].Column(), orders[oi].Dir() == "DESC"
-		for i := 1; i < len(rows); i++ {
-			for j := i; j > 0; j-- {
-				cmp := compareAny(rows[j-1][col], rows[j][col])
-				if desc { cmp = -cmp }
-				if cmp <= 0 { break }
-				rows[j-1], rows[j] = rows[j], rows[j-1]
-			}
-		}
-	}
-	return rows
-}
-
-func applyOffsetLimit(rows []map[string]any, offset, limit int) []map[string]any {
-	if offset > 0 {
-		if offset >= len(rows) { return nil }
-		rows = rows[offset:]
-	}
-	if limit > 0 && limit < len(rows) { rows = rows[:limit] }
-	return rows
-}
-
-type memScanner struct {
-	row    map[string]any
-	schema []model.Field
-	err    error
-}
-func (s *memScanner) Scan(dest ...any) error {
-	if s.err != nil { return s.err }
-	return scanInto(s.row, s.schema, dest)
-}
-
-type memRows struct {
-	rows   []map[string]any
-	schema []model.Field
-	idx    int
-}
-func (r *memRows) Next() bool { r.idx++; return r.idx < len(r.rows) }
-func (r *memRows) Scan(dest ...any) error { return scanInto(r.rows[r.idx], r.schema, dest) }
-func (r *memRows) Columns() ([]string, error) {
-	cols := make([]string, len(r.schema))
-	for i, f := range r.schema { cols[i] = f.Name }
-	return cols, nil
-}
-func (r *memRows) Close() error { return nil }
-func (r *memRows) Err() error   { return nil }
-
-func scanInto(row map[string]any, schema []model.Field, dest []any) error {
-	for i, f := range schema {
-		if i >= len(dest) { break }
-		if v, ok := row[f.Name]; ok {
-			if err := orm.ScanAny(v, dest[i]); err != nil { return err }
-		}
-	}
-	return nil
-}
-
-var (
-	_ orm.Executor = (*engine)(nil)
-	_ orm.Compiler = (*engine)(nil)
-	_ orm.Scanner  = (*memScanner)(nil)
-	_ orm.Rows     = (*memRows)(nil)
-)
-```
-
-Helpers de comparación (mismo archivo) — cubren los tipos que `model.ReadValues` produce
-(`string/int64/float64/bool/[]byte`) y los literales de las condiciones:
-
-```go
-func toStr(v any) string {
-	switch x := v.(type) {
-	case string: return x
-	case []byte: return string(x)
-	default:     return fmt.Convert(x).String()
-	}
-}
-func toFloat(v any) (float64, bool) {
-	switch x := v.(type) {
-	case int:     return float64(x), true
-	case int64:   return float64(x), true
-	case float64: return x, true
-	}
-	return 0, false
-}
-func equalAny(a, b any) bool {
-	if as, ok := a.(string); ok { return as == toStr(b) }
-	if ab, ok := a.(bool); ok { bb, _ := b.(bool); return ab == bb }
-	if af, aok := toFloat(a); aok { if bf, bok := toFloat(b); bok { return af == bf } }
-	return false
-}
-func compareAny(a, b any) int {
-	if af, aok := toFloat(a); aok {
-		if bf, bok := toFloat(b); bok {
-			switch { case af < bf: return -1; case af > bf: return 1; default: return 0 }
-		}
-	}
-	sa, sb := toStr(a), toStr(b)
-	switch { case sa < sb: return -1; case sa > sb: return 1; default: return 0 }
-}
-// likeMatch supports SQL LIKE with '%' wildcards. Implement with tinywasm/fmt string ops
-// (Split on "%", check ordered literal segments, honor leading/trailing '%'). If tinywasm/fmt
-// lacks an index/suffix helper, write a trivial private []byte loop — do NOT import stdlib "strings".
-func likeMatch(s, pattern string) bool { /* ver §4.2 nota */ return false }
-```
-
-> **`fmt`/strings.** Este repo usa `github.com/tinywasm/fmt`, no stdlib. Usa `fmt.Convert(x).String()`,
-> `fmt.Convert(p).Split("%")`, etc. Verifica su API con `go doc github.com/tinywasm/fmt`; si falta un
-> helper (índice/sufijo), impleméntalo a mano con bucles `[]byte`. Prohibido importar stdlib
-> `strings`/`fmt` o cualquier driver.
-
-## 5. `mock_test.go` — 100% cobertura + prueba de conformidad
-
-`package mock`. Debe dejar **`gotest` con 100% de cobertura del paquete `mock`** y correr la suite:
-
-```go
-func TestMockConformance(t *testing.T) {
-	conformance.Run(t, conformance.Factory{
-		Name: "mock",
-		New:  func(t *testing.T, models ...model.Model) *orm.DB { return NewDB() },
-	})
-}
-```
-
-Además, tests directos hasta 100% (la conformance cubre el motor, pero **no** los recorders):
-- **Recorders**: `Executor.Exec/QueryRow/Query/Close` (ramas `ReturnQueryRow==nil`, `ReturnQueryRows==nil`,
-  y con valores inyectados); `Compiler.Compile` (rama `ReturnPlan.Query==""` y con plan puesto);
-  `Scanner.Scan` (con/sin `ScanErr`); `Rows.Next/Scan/Columns/Close/Err`; `Model.*` (incl. `Validate`
-  con/sin `ValidErr`); `TxExecutor.BeginTx` (ramas `BeginTxErr`, `Bound==nil`, `Bound` preexistente);
-  `TxBoundExecutor.Commit/Rollback`.
-- **Motor**: ramas que la conformance no toque — `LIKE` (patrón con `%` al inicio/medio/fin y literal
-  exacto), `IS NOT NULL`, `compareAny`/`equalAny` con bool y con string, `toFloat` con `int`, `offset >=
-  len(rows)` ⇒ nil, `default` de `Exec` (`db.CreateDatabase("x")` no-op), `Close()`.
-
-> Comprueba con `gotest` + cobertura; añade casos hasta 100% del paquete `mock`. Los tests de
-> `tests/`/`orm_test` no cuentan para ese 100%.
-
-## 6. Reusar los recorders en los tests de orm (sin duplicados)
-
-- **`tests/setup_test.go`**: borra las 7 definiciones (viven ahora en `mock/`). Añade
-  `import "github.com/tinywasm/orm/mock"`. En `tests/*.go` reemplaza usos: `&MockExecutor{}` →
-  `&mock.Executor{}`, `&MockModel{...}` → `&mock.Model{...}`, etc. Los **campos** no cambian, solo el
-  tipo. Si `setup_test.go` queda vacío, elimínalo.
-- **`db_test.go`** (`package orm`): no puede importar `orm/mock` (ciclo). Si solo ejercita la API pública
-  (`New/Create/Update/Delete/Tx/Query`), conviértelo a `package orm_test` (test externo, mismo
-  directorio) e importa `orm/mock`; borra sus `mockCompiler`/`mockTxExecutor` privados. Si toca internals
-  no exportados, mantenlo en `package orm` con un doble mínimo local **solo** para ese internal — sin
-  redeclarar los recorders. No debe quedar copia de recorders fuera de `mock/`.
-
-## 7. Criterios de aceptación
-
-- `github.com/tinywasm/orm/conformance` existe: `Run(t, Factory)`, `Factory{Name, New}`, modelo `Widget`
-  exportado, **12 cláusulas solo-DML** (cero DDL — la suite nunca llama `CreateTable`/`DropTable`; la
-  tabla llega lista del `Factory`). Importa **solo** `testing`+`orm`+`model` (compila bajo `//go:build wasm`).
-- `github.com/tinywasm/orm/mock` existe: recorders exportados sin *stutter* (`var _ orm.X` asserts) +
-  `mock.NewDB() *orm.DB` funcional. No importa ningún driver ni stdlib `strings`/`fmt`/`database/sql`.
-- `mock_test.go` corre `conformance.Run` verde y deja **100% de cobertura** del paquete `mock`.
-- `tests/setup_test.go` ya no define dobles; `db_test.go` no redeclara recorders. `grep -rn
-  "MockExecutor\|MockCompiler\|MockModel\|MockScanner\|MockRows\|MockTxExecutor" .` fuera de `mock/`:
-  vacío o solo `mock.*`.
-- `gotest` verde en todo el módulo; `orm` compila y sus tests existentes pasan.
-- Publicado con `gopush`. (Backends hermanos —sqlt/postgres/indexdb— consumen `orm@v0.10.0`+ en sus
-  propias fases.)
-
-## 8. Etapas
+## 9. Etapas
 
 | # | Etapa | Archivo(s) | Criterio |
 |---|---|---|---|
-| 1 | Modelo canónico | `conformance/model.go` | `Widget`+`WidgetModel`, `var _ model.Model` |
-| 2 | Factory + Run + cláusulas | `conformance/conformance.go` | `Run`/`Factory`/`setup`/12 `t.Run` DML |
-| 3 | Recorders (traslado+destutter) | `mock/recorders.go` | 7 tipos + asserts |
-| 4 | Motor en memoria | `mock/memdb.go` | `NewDB()`+`engine`+helpers |
-| 5 | Test mock + conformance | `mock/mock_test.go` | conformance verde, cobertura 100% |
-| 6 | Reusar en tests de orm | `tests/*.go`, `db_test.go` | sin duplicados |
-| 7 | Verificar + publicar | — | `gotest` verde; `gopush 'feat: conformance + mock'` |
+| 1 | Dependencia | `go.mod` | `storage@v0.0.1` añadido, `go mod tidy` limpio |
+| 2 | `DB` + `Tx` sobre `storage.Conn` | `db.go`, `tx.go` | `New(conn storage.Conn)`, `boundConn` (§4.3) |
+| 3 | Query builder | `qb.go` | tipos calificados a `storage.`, `Or` vía `storage.Or` (§4.4) |
+| 4 | Validación + errores | `validate.go`, `errors.go` | `ErrNoRows` fuera, resto igual |
+| 5 | Re-exports | `reexport.go` (nuevo) | `Condition`/`Order`/`Eq`/.../`Desc` (§4.7) |
+| 6 | Borrar contrato viejo | (§4.8) | `executor.go`…`conformance/` fuera del repo |
+| 7 | Tests | `tests/*.go` | §5 completo, incl. `roundtrip_test.go` |
+| 8 | Docs | `docs/ARQUITECTURE.md`, `AGENTS.md` | §6, §7 |
+| 9 | Verificar + publicar | — | `gotest`+`gotest -tinygo` verdes; `gopush` |
 
-## 9. Cierre (ciclo de vida del plan)
+## 10. Cierre
 
-Tras `gopush`, **borra** este `docs/PLAN.md`. La parte duradera del diseño (qué es `conformance` y por
-qué, el motor en memoria de `mock`, cómo un módulo hoja usa `mock.NewDB()` en vez de un driver) se
-traslada como sección corta a `docs/ARQUITECTURE.md`. No dejes `PLAN.md` en el repo publicado.
+Tras `gopush`, **borra** `docs/PLAN.md`; el diseño duradero ya vive en `docs/ARQUITECTURE.md` (§6 lo
+actualiza in situ, no hace falta un traslado adicional).

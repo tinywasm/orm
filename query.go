@@ -1,8 +1,5 @@
 package orm
 
-import "github.com/tinywasm/model"
-
-
 // Action represents the type of database operation.
 type Action int
 
@@ -12,12 +9,6 @@ const (
 	ActionUpdate
 	ActionDelete
 	ActionReadAll
-	ActionCreateTable
-	ActionDropTable
-	ActionCreateDatabase
-	ActionAddColumn
-	ActionRenameColumn
-	ActionDropColumn
 )
 
 // Order represents a sort order for a query.
@@ -35,10 +26,7 @@ func (o Order) Dir() string    { return o.dir }
 type Query struct {
 	Action     Action
 	Table      string
-	Database   string
 	Columns    []string
-	Column     *model.Field
-	OldName    string
 	Values     []any
 	Conditions []Condition
 	OrderBy    []Order

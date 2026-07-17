@@ -7,16 +7,17 @@ import (
 
 	mdl "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
+	"github.com/tinywasm/orm/mock"
 )
 
 func RunCoreTests(t *testing.T) {
 	// 1. Test Create
 	t.Run("Create", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "name"}, {Name: "age"}},
 			Vals:  []any{"Alice", 30},
@@ -40,11 +41,11 @@ func RunCoreTests(t *testing.T) {
 
 	// 2. Test Update with Conditions
 	t.Run("Update", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{
+		model := &mock.Model{
 			Table: "user",
 			Sch:   []mdl.Field{{Name: "age"}},
 			Vals:  []any{31},
@@ -68,11 +69,11 @@ func RunCoreTests(t *testing.T) {
 
 	// 3. Test Delete
 	t.Run("Delete", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{Table: "user"}
+		model := &mock.Model{Table: "user"}
 
 		err := db.Delete(model, orm.Gt("age", 100))
 		if err != nil {
@@ -89,14 +90,14 @@ func RunCoreTests(t *testing.T) {
 
 	// 4. Test Query Chain (ReadOne)
 	t.Run("ReadOne", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{Table: "user"}
+		model := &mock.Model{Table: "user"}
 
-		// Setup MockExecutor to return a scanner that succeeds
-		mockExec.ReturnQueryRow = &MockScanner{}
+		// Setup mock.Executor to return a scanner that succeeds
+		mockExec.ReturnQueryRow = &mock.Scanner{}
 
 		err := db.Query(model).
 			Where("id").Eq(1).
@@ -120,10 +121,10 @@ func RunCoreTests(t *testing.T) {
 
 	// Test ReadOne Validation Error
 	t.Run("ReadOne Validation Error", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
-		model := &MockModel{Table: ""} // Empty table
+		model := &mock.Model{Table: ""} // Empty table
 
 		err := db.Query(model).ReadOne()
 		if !errors.Is(err, orm.ErrEmptyTable) {
@@ -133,21 +134,21 @@ func RunCoreTests(t *testing.T) {
 
 	// 5. Test ReadAll
 	t.Run("ReadAll", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
 
-		model := &MockModel{Table: "user"}
+		model := &mock.Model{Table: "user"}
 
 		// Simulate 2 rows
-		mockRows := &MockRows{Count: 2}
+		mockRows := &mock.Rows{Count: 2}
 		mockExec.ReturnQueryRows = mockRows
 
 		newCalled := 0
 		onRowCalled := 0
 		newFunc := func() mdl.Model {
 			newCalled++
-			return &MockModel{}
+			return &mock.Model{}
 		}
 		onRow := func(m mdl.Model) {
 			onRowCalled++
@@ -171,10 +172,10 @@ func RunCoreTests(t *testing.T) {
 
 	// Test ReadAll Validation Error
 	t.Run("ReadAll Validation Error", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
-		model := &MockModel{Table: ""} // Empty table
+		model := &mock.Model{Table: ""} // Empty table
 
 		err := db.Query(model).ReadAll(nil, nil)
 		if !errors.Is(err, orm.ErrEmptyTable) {
@@ -184,8 +185,8 @@ func RunCoreTests(t *testing.T) {
 
 	// 6. Test Validation (Verify db.Create no longer calls Validate)
 	t.Run("Create No Longer Calls Validate", func(t *testing.T) {
-		db := orm.New(&MockExecutor{}, &MockCompiler{})
-		model := &MockModel{
+		db := orm.New(&mock.Executor{}, &mock.Compiler{})
+		model := &mock.Model{
 			Table:    "user",
 			Sch:      []mdl.Field{{Name: "col1"}},
 			Vals:     []any{1},
@@ -200,8 +201,8 @@ func RunCoreTests(t *testing.T) {
 
 	// 7. Test Validation (Verify db.Update no longer calls Validate)
 	t.Run("Update No Longer Calls Validate", func(t *testing.T) {
-		db := orm.New(&MockExecutor{}, &MockCompiler{})
-		model := &MockModel{
+		db := orm.New(&mock.Executor{}, &mock.Compiler{})
+		model := &mock.Model{
 			Table:    "user",
 			Sch:      []mdl.Field{{Name: "col1"}},
 			Vals:     []any{1},
@@ -216,8 +217,8 @@ func RunCoreTests(t *testing.T) {
 
 	// Test Validation Error (Delete)
 	t.Run("Validation Error Delete", func(t *testing.T) {
-		db := orm.New(&MockExecutor{}, &MockCompiler{})
-		model := &MockModel{Table: ""} // Empty table
+		db := orm.New(&mock.Executor{}, &mock.Compiler{})
+		model := &mock.Model{Table: ""} // Empty table
 
 		err := db.Delete(model, orm.Eq("id", 1))
 		if !errors.Is(err, orm.ErrEmptyTable) {
@@ -231,8 +232,8 @@ func RunCoreTests(t *testing.T) {
 
 	// 8. Test Empty Table Error
 	t.Run("Empty Table Error", func(t *testing.T) {
-		db := orm.New(&MockExecutor{}, &MockCompiler{})
-		model := &MockModel{Table: ""}
+		db := orm.New(&mock.Executor{}, &mock.Compiler{})
+		model := &mock.Model{Table: ""}
 
 		err := db.Create(model)
 		if !errors.Is(err, orm.ErrEmptyTable) {
@@ -252,9 +253,9 @@ func RunCoreTests(t *testing.T) {
 
 	// 10. Test Transaction Support
 	t.Run("Transaction", func(t *testing.T) {
-		mockTxBound := &MockTxBoundExecutor{}
-		mockTxExec := &MockTxExecutor{Bound: mockTxBound}
-		mockCompiler := &MockCompiler{}
+		mockTxBound := &mock.TxBoundExecutor{}
+		mockTxExec := &mock.TxExecutor{Bound: mockTxBound}
+		mockCompiler := &mock.Compiler{}
 		db := orm.New(mockTxExec, mockCompiler)
 
 		err := db.Tx(func(tx *orm.DB) error {
@@ -276,9 +277,9 @@ func RunCoreTests(t *testing.T) {
 
 	// 11. Test Transaction Rollback
 	t.Run("Transaction Rollback", func(t *testing.T) {
-		mockTxBound := &MockTxBoundExecutor{}
-		mockTxExec := &MockTxExecutor{Bound: mockTxBound}
-		mockCompiler := &MockCompiler{}
+		mockTxBound := &mock.TxBoundExecutor{}
+		mockTxExec := &mock.TxExecutor{Bound: mockTxBound}
+		mockCompiler := &mock.Compiler{}
 		db := orm.New(mockTxExec, mockCompiler)
 
 		expectedErr := errors.New("oops")
@@ -300,8 +301,8 @@ func RunCoreTests(t *testing.T) {
 
 	// Test Transaction Begin Error
 	t.Run("Transaction Begin Error", func(t *testing.T) {
-		mockTxExec := &MockTxExecutor{BeginTxErr: errors.New("begin error")}
-		db := orm.New(mockTxExec, &MockCompiler{})
+		mockTxExec := &mock.TxExecutor{BeginTxErr: errors.New("begin error")}
+		db := orm.New(mockTxExec, &mock.Compiler{})
 
 		err := db.Tx(func(tx *orm.DB) error {
 			return nil
@@ -314,7 +315,7 @@ func RunCoreTests(t *testing.T) {
 
 	// 12. Test No Transaction Support
 	t.Run("No Tx Support", func(t *testing.T) {
-		db := orm.New(&MockExecutor{}, &MockCompiler{}) // Not a TxExecutor
+		db := orm.New(&mock.Executor{}, &mock.Compiler{}) // Not a TxExecutor
 		err := db.Tx(func(tx *orm.DB) error { return nil })
 		if !errors.Is(err, orm.ErrNoTxSupport) {
 			t.Errorf("Expected ErrNoTxSupport, got %v", err)
@@ -371,11 +372,11 @@ func RunCoreTests(t *testing.T) {
 		}
 
 		// Order Getters
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
-		model := &MockModel{Table: "user"}
-		mockExec.ReturnQueryRow = &MockScanner{}
+		model := &mock.Model{Table: "user"}
+		mockExec.ReturnQueryRow = &mock.Scanner{}
 
 		db.Query(model).OrderBy("col").Asc().ReadOne()
 
@@ -394,11 +395,11 @@ func RunCoreTests(t *testing.T) {
 
 	// 15. Test Builder Chain (Offset, GroupBy, Limit)
 	t.Run("Builder Chain", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
+		mockCompiler := &mock.Compiler{}
+		mockExec := &mock.Executor{}
 		db := orm.New(mockExec, mockCompiler)
-		model := &MockModel{Table: "user"}
-		mockExec.ReturnQueryRow = &MockScanner{}
+		model := &mock.Model{Table: "user"}
+		mockExec.ReturnQueryRow = &mock.Scanner{}
 
 		// Test Offset and GroupBy
 		db.Query(model).
@@ -414,7 +415,7 @@ func RunCoreTests(t *testing.T) {
 		}
 
 		// Test Limit with ReadAll
-		mockExec.ReturnQueryRows = &MockRows{Count: 0}
+		mockExec.ReturnQueryRows = &mock.Rows{Count: 0}
 		db.Query(model).
 			Limit(5).
 			ReadAll(func() mdl.Model { return nil }, func(mdl.Model) {})
@@ -424,66 +425,18 @@ func RunCoreTests(t *testing.T) {
 		}
 	})
 
-	// Test DDL Actions
-	t.Run("DDL", func(t *testing.T) {
-		mockCompiler := &MockCompiler{}
-		mockExec := &MockExecutor{}
-		db := orm.New(mockExec, mockCompiler)
-
-		model := &MockModel{Table: "user"}
-
-		// CreateTable
-		err := db.CreateTable(model)
-		if err != nil {
-			t.Fatalf("CreateTable failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionCreateTable {
-			t.Errorf("Expected ActionCreateTable, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Table != "user" {
-			t.Errorf("Expected table 'user', got '%s'", mockCompiler.LastQuery.Table)
-		}
-
-		// DropTable
-		err = db.DropTable(model)
-		if err != nil {
-			t.Fatalf("DropTable failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionDropTable {
-			t.Errorf("Expected ActionDropTable, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Table != "user" {
-			t.Errorf("Expected table 'user', got '%s'", mockCompiler.LastQuery.Table)
-		}
-
-		// CreateDatabase
-		err = db.CreateDatabase("testdb")
-		if err != nil {
-			t.Fatalf("CreateDatabase failed: %v", err)
-		}
-		if mockCompiler.LastQuery.Action != orm.ActionCreateDatabase {
-			t.Errorf("Expected ActionCreateDatabase, got %v", mockCompiler.LastQuery.Action)
-		}
-		if mockCompiler.LastQuery.Database != "testdb" {
-			t.Errorf("Expected database 'testdb', got '%s'", mockCompiler.LastQuery.Database)
-		}
-		if mockCompiler.LastQuery.Table != "" {
-			t.Errorf("Expected empty table for CreateDatabase, got '%s'", mockCompiler.LastQuery.Table)
-		}
-	})
-
 	// 16. Errors coverage
 	t.Run("Errors", func(t *testing.T) {
-		model := &MockModel{Table: "t", Sch: []mdl.Field{{Name: "a"}}, Vals: []any{1}}
+		model := &mock.Model{Table: "t", Sch: []mdl.Field{{Name: "a"}}, Vals: []any{1}}
 
 		// Create Plan Error
-		db1 := orm.New(&MockExecutor{}, &MockCompiler{ReturnErr: errors.New("plan err")})
+		db1 := orm.New(&mock.Executor{}, &mock.Compiler{ReturnErr: errors.New("plan err")})
 		if err := db1.Create(model); err == nil || err.Error() != "plan err" {
 			t.Errorf("Expected plan err, got %v", err)
 		}
 
 		// Create Exec Error
-		db2 := orm.New(&MockExecutor{ReturnExecErr: errors.New("exec err")}, &MockCompiler{})
+		db2 := orm.New(&mock.Executor{ReturnExecErr: errors.New("exec err")}, &mock.Compiler{})
 		if err := db2.Create(model); err == nil || err.Error() != "exec err" {
 			t.Errorf("Expected exec err, got %v", err)
 		}
@@ -506,39 +459,12 @@ func RunCoreTests(t *testing.T) {
 			t.Errorf("Expected exec err, got %v", err)
 		}
 
-		// CreateTable Plan Error
-		if err := db1.CreateTable(model); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// CreateTable Exec Error
-		if err := db2.CreateTable(model); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
-		// DropTable Plan Error
-		if err := db1.DropTable(model); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// DropTable Exec Error
-		if err := db2.DropTable(model); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
-		// CreateDatabase Plan Error
-		if err := db1.CreateDatabase("t"); err == nil || err.Error() != "plan err" {
-			t.Errorf("Expected plan err, got %v", err)
-		}
-		// CreateDatabase Exec Error
-		if err := db2.CreateDatabase("t"); err == nil || err.Error() != "exec err" {
-			t.Errorf("Expected exec err, got %v", err)
-		}
-
 		// ReadOne Plan Error
 		if err := db1.Query(model).ReadOne(); err == nil || err.Error() != "plan err" {
 			t.Errorf("Expected plan err, got %v", err)
 		}
 		// ReadOne Scan Error
-		db3 := orm.New(&MockExecutor{ReturnQueryRow: &MockScanner{ScanErr: errors.New("scan err")}}, &MockCompiler{})
+		db3 := orm.New(&mock.Executor{ReturnQueryRow: &mock.Scanner{ScanErr: errors.New("scan err")}}, &mock.Compiler{})
 		if err := db3.Query(model).ReadOne(); err == nil || err.Error() != "scan err" {
 			t.Errorf("Expected scan err, got %v", err)
 		}
@@ -548,19 +474,19 @@ func RunCoreTests(t *testing.T) {
 			t.Errorf("Expected plan err, got %v", err)
 		}
 		// ReadAll Query Error
-		db4 := orm.New(&MockExecutor{ReturnQueryErr: errors.New("query err")}, &MockCompiler{})
+		db4 := orm.New(&mock.Executor{ReturnQueryErr: errors.New("query err")}, &mock.Compiler{})
 		if err := db4.Query(model).ReadAll(nil, nil); err == nil || err.Error() != "query err" {
 			t.Errorf("Expected query err, got %v", err)
 		}
 		// ReadAll Scan Error
-		db5 := orm.New(&MockExecutor{ReturnQueryRows: &MockRows{Count: 1, ScanErr: errors.New("scan err")}}, &MockCompiler{})
-		f := func() mdl.Model { return &MockModel{} }
+		db5 := orm.New(&mock.Executor{ReturnQueryRows: &mock.Rows{Count: 1, ScanErr: errors.New("scan err")}}, &mock.Compiler{})
+		f := func() mdl.Model { return &mock.Model{} }
 		e := func(m mdl.Model) {}
 		if err := db5.Query(model).ReadAll(f, e); err == nil || err.Error() != "scan err" {
 			t.Errorf("Expected scan err, got %v", err)
 		}
 		// ReadAll Rows Err
-		db6 := orm.New(&MockExecutor{ReturnQueryRows: &MockRows{Count: 0, ErrVal: errors.New("rows err")}}, &MockCompiler{})
+		db6 := orm.New(&mock.Executor{ReturnQueryRows: &mock.Rows{Count: 0, ErrVal: errors.New("rows err")}}, &mock.Compiler{})
 		if err := db6.Query(model).ReadAll(f, e); err == nil || err.Error() != "rows err" {
 			t.Errorf("Expected rows err, got %v", err)
 		}
@@ -568,8 +494,8 @@ func RunCoreTests(t *testing.T) {
 
 	// 17. Test Close and RawExecutor
 	t.Run("Close and RawExecutor", func(t *testing.T) {
-		mockExec := &MockExecutor{ReturnCloseErr: errors.New("close err")}
-		db := orm.New(mockExec, &MockCompiler{})
+		mockExec := &mock.Executor{ReturnCloseErr: errors.New("close err")}
+		db := orm.New(mockExec, &mock.Compiler{})
 
 		// Test RawExecutor
 		if db.RawExecutor() != mockExec {
