@@ -33,9 +33,9 @@ anymore: the map has to not exist at all, not just be excluded from one build ta
 ### Root package (`orm`) — isomorphic, zero dialect
 
 - **No `database/sql` import in the root package.** The root `orm` package compiles for both Go and WASM. Never import `database/sql`, `database/sql/driver`, or any DB driver. Use only `github.com/tinywasm/fmt` and the stdlib.
-- **Agnostic API only.** `query.go`, `qb.go`, `db.go`, `executor.go` must never contain dialect-specific SQL, driver types, or engine-specific error values (e.g. `sql.ErrNoRows`).
-- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrNoRows`, `ErrNoTxSupport`. `qb.go` compares against these. **Executor adapters** (`tinywasm/postgres`, `tinywasm/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `orm.ErrNoRows` inside their `Scanner` implementation.
-- **Executor contract.** Adapters implementing `orm.Executor` must: (1) wrap `sql.ErrNoRows` → `orm.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
+- **Agnostic API only.** `qb.go`, `db.go` must never contain dialect-specific SQL, driver types, or engine-specific error values (e.g. `sql.ErrNoRows`).
+- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrValidation`, `ErrEmptyTable`, `ErrNoTxSupport`. `qb.go` compares `storage.ErrNoRows` (returned by a backend's `Scanner`) and translates it to `ErrNotFound`. **Executor adapters** (`tinywasm/postgres`, `tinywasm/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `storage.ErrNoRows` inside their `Scanner` implementation.
+- **Executor contract.** Adapters implement `storage.Executor` (defined in `tinywasm/storage`, not this package): (1) wrap `sql.ErrNoRows` → `storage.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
 - **Do not use `tinygo` as a build tag** — it is not a standard Go constraint recognized by the Go toolchain. Use `GOOS=js GOARCH=wasm` to build for wasm, and `gotest -tinygo` to test against the TinyGo compiler specifically.
 - **Struct tags are processed at build-time, not runtime.** `fmt.Field` has no `Tag` field. If you ever feel you need to inspect a tag in WASM code, you are wrong — push the work into `ormc`.
 

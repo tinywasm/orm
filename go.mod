@@ -7,4 +7,4 @@ require (
 	github.com/tinywasm/model v0.0.15
 )
 
-require github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f // indirect
+require github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f

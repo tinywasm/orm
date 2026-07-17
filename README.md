@@ -10,13 +10,15 @@
 - **Isomorphic**: Same generated code works in Go (backend) and WASM (frontend).
 - **0-alloc Codec**: Symmetric, reflection-free serialization/deserialization methods generated for every model.
 - **Query Builder**: Reflection-free, type-safe query building.
+- **Backend-Agnostic**: `orm.DB` wraps a `storage.Conn` — no storage contract is defined here, so any backend implementing `tinywasm/storage` (Postgres, SQLite, in-memory, IndexedDB, ...) works unchanged.
 
 ## Ecosystem
 
-This repository contains the **runtime only**. Other parts of the ecosystem:
+This repository is the **ergonomic layer only** — the equivalent of `database/sql`. It defines no storage contract of its own. Other parts of the ecosystem:
 
 | Component | Repository | Role |
 |---|---|---|
+| **storage** | [tinywasm/storage](https://github.com/tinywasm/storage) | Storage port (`Executor`/`Compiler`/`Query`/`Condition`/`Plan`, `mock`, `mem`) — the equivalent of `database/sql/driver`. A backend implements `storage.Conn`; `orm.New(conn)` takes one. |
 | **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator. |
 | **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and utilities. |
 | **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
