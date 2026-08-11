@@ -100,7 +100,7 @@ func GetUser(db *orm.DB, id int64) (*user.User, error) {
 | `NotNull` | `NOT NULL` constraint in DB. |
 | `OmitEmpty` | Skips field if zero-value in codecs. |
 | `Exclude` | Field exists in generated struct but is skipped in `Schema()`, `Pointers()`, and codecs (e.g. for `password_hash`). |
-| `Widget` | Binding for UI rendering (see `tinywasm/form/input`). |
+| `Widget` | Binding for UI rendering (see `tinywasm/tinywasm/input`). |
 | `DB` | Database-specific metadata (`PK`, `Unique`, `AutoInc`, `RefColumn`, `OnDelete`). |
 | `Ref` | Points to another `*model.Definition`. Used for composition or scalar Foreign Keys. |
 | `Permitted` | Validation rules (Minimum, Maximum, Letters, Numbers, etc.). |
