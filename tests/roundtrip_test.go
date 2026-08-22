@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/storage/conformance"
 	"github.com/tinywasm/storage/mem"
@@ -50,13 +51,13 @@ func TestBuilderRoundTripAgainstMem(t *testing.T) {
 	_ = d.Create(&conformance.Widget{Id: "a", Name: "x", Qty: 1, Active: true})
 	_ = d.Create(&conformance.Widget{Id: "b", Name: "x", Qty: 2, Active: true})
 	var all []*conformance.Widget
-	err = orm.ReadAll(
-		d.Query(&conformance.Widget{}).Where("name").Eq("x").OrderBy("qty").Desc().Limit(1),
-		func() *conformance.Widget { return &conformance.Widget{} },
-		func(m *conformance.Widget) {
-			all = append(all, m)
-		},
-	)
+	err = d.Query(&conformance.Widget{}).Where("name").Eq("x").OrderBy("qty").Desc().Limit(1).
+		ReadAll(
+			func() model.Model { return &conformance.Widget{} },
+			func(m model.Model) {
+				all = append(all, m.(*conformance.Widget))
+			},
+		)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
