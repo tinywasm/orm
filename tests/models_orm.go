@@ -88,9 +88,9 @@ func ReadOneUser(qb *orm.QB, model *User) (*User, error) {
 
 func ReadAllUser(qb *orm.QB) (UserList, error) {
 	var results UserList
-	err := qb.ReadAll(
-		func() model.Model { return &User{} },
-		func(m model.Model) { results = append(results, m.(*User)) },
+	err := orm.ReadAll(qb,
+		func() *User { return &User{} },
+		func(m *User) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -156,9 +156,9 @@ func ReadOneOrder(qb *orm.QB, model *Order) (*Order, error) {
 
 func ReadAllOrder(qb *orm.QB) (OrderList, error) {
 	var results OrderList
-	err := qb.ReadAll(
-		func() model.Model { return &Order{} },
-		func(m model.Model) { results = append(results, m.(*Order)) },
+	err := orm.ReadAll(qb,
+		func() *Order { return &Order{} },
+		func(m *Order) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -233,9 +233,9 @@ func ReadOneModelWithIgnored(qb *orm.QB, model *ModelWithIgnored) (*ModelWithIgn
 
 func ReadAllModelWithIgnored(qb *orm.QB) (ModelWithIgnoredList, error) {
 	var results ModelWithIgnoredList
-	err := qb.ReadAll(
-		func() model.Model { return &ModelWithIgnored{} },
-		func(m model.Model) { results = append(results, m.(*ModelWithIgnored)) },
+	err := orm.ReadAll(qb,
+		func() *ModelWithIgnored { return &ModelWithIgnored{} },
+		func(m *ModelWithIgnored) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -296,9 +296,9 @@ func ReadOneMultiA(qb *orm.QB, model *MultiA) (*MultiA, error) {
 
 func ReadAllMultiA(qb *orm.QB) (MultiAList, error) {
 	var results MultiAList
-	err := qb.ReadAll(
-		func() model.Model { return &MultiA{} },
-		func(m model.Model) { results = append(results, m.(*MultiA)) },
+	err := orm.ReadAll(qb,
+		func() *MultiA { return &MultiA{} },
+		func(m *MultiA) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -359,9 +359,9 @@ func ReadOneMultiB(qb *orm.QB, model *MultiB) (*MultiB, error) {
 
 func ReadAllMultiB(qb *orm.QB) (MultiBList, error) {
 	var results MultiBList
-	err := qb.ReadAll(
-		func() model.Model { return &MultiB{} },
-		func(m model.Model) { results = append(results, m.(*MultiB)) },
+	err := orm.ReadAll(qb,
+		func() *MultiB { return &MultiB{} },
+		func(m *MultiB) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -427,9 +427,9 @@ func ReadOneNumericTypes(qb *orm.QB, model *NumericTypes) (*NumericTypes, error)
 
 func ReadAllNumericTypes(qb *orm.QB) (NumericTypesList, error) {
 	var results NumericTypesList
-	err := qb.ReadAll(
-		func() model.Model { return &NumericTypes{} },
-		func(m model.Model) { results = append(results, m.(*NumericTypes)) },
+	err := orm.ReadAll(qb,
+		func() *NumericTypes { return &NumericTypes{} },
+		func(m *NumericTypes) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -490,9 +490,9 @@ func ReadOneRefNoColumn(qb *orm.QB, model *RefNoColumn) (*RefNoColumn, error) {
 
 func ReadAllRefNoColumn(qb *orm.QB) (RefNoColumnList, error) {
 	var results RefNoColumnList
-	err := qb.ReadAll(
-		func() model.Model { return &RefNoColumn{} },
-		func(m model.Model) { results = append(results, m.(*RefNoColumn)) },
+	err := orm.ReadAll(qb,
+		func() *RefNoColumn { return &RefNoColumn{} },
+		func(m *RefNoColumn) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -553,9 +553,9 @@ func ReadOnePointerReceiver(qb *orm.QB, model *PointerReceiver) (*PointerReceive
 
 func ReadAllPointerReceiver(qb *orm.QB) (PointerReceiverList, error) {
 	var results PointerReceiverList
-	err := qb.ReadAll(
-		func() model.Model { return &PointerReceiver{} },
-		func(m model.Model) { results = append(results, m.(*PointerReceiver)) },
+	err := orm.ReadAll(qb,
+		func() *PointerReceiver { return &PointerReceiver{} },
+		func(m *PointerReceiver) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -636,9 +636,9 @@ func ReadOneUserForm(qb *orm.QB, model *UserForm) (*UserForm, error) {
 
 func ReadAllUserForm(qb *orm.QB) (UserFormList, error) {
 	var results UserFormList
-	err := qb.ReadAll(
-		func() model.Model { return &UserForm{} },
-		func(m model.Model) { results = append(results, m.(*UserForm)) },
+	err := orm.ReadAll(qb,
+		func() *UserForm { return &UserForm{} },
+		func(m *UserForm) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -780,9 +780,9 @@ func ReadOneUserWithComposition(qb *orm.QB, model *UserWithComposition) (*UserWi
 
 func ReadAllUserWithComposition(qb *orm.QB) (UserWithCompositionList, error) {
 	var results UserWithCompositionList
-	err := qb.ReadAll(
-		func() model.Model { return &UserWithComposition{} },
-		func(m model.Model) { results = append(results, m.(*UserWithComposition)) },
+	err := orm.ReadAll(qb,
+		func() *UserWithComposition { return &UserWithComposition{} },
+		func(m *UserWithComposition) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -843,9 +843,9 @@ func ReadOneUserWithNoTilde(qb *orm.QB, model *UserWithNoTilde) (*UserWithNoTild
 
 func ReadAllUserWithNoTilde(qb *orm.QB) (UserWithNoTildeList, error) {
 	var results UserWithNoTildeList
-	err := qb.ReadAll(
-		func() model.Model { return &UserWithNoTilde{} },
-		func(m model.Model) { results = append(results, m.(*UserWithNoTilde)) },
+	err := orm.ReadAll(qb,
+		func() *UserWithNoTilde { return &UserWithNoTilde{} },
+		func(m *UserWithNoTilde) { results = append(results, m) },
 	)
 	return results, err
 }
@@ -906,9 +906,9 @@ func ReadOneShortAutoInc(qb *orm.QB, model *ShortAutoInc) (*ShortAutoInc, error)
 
 func ReadAllShortAutoInc(qb *orm.QB) (ShortAutoIncList, error) {
 	var results ShortAutoIncList
-	err := qb.ReadAll(
-		func() model.Model { return &ShortAutoInc{} },
-		func(m model.Model) { results = append(results, m.(*ShortAutoInc)) },
+	err := orm.ReadAll(qb,
+		func() *ShortAutoInc { return &ShortAutoInc{} },
+		func(m *ShortAutoInc) { results = append(results, m) },
 	)
 	return results, err
 }

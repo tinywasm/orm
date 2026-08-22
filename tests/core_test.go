@@ -164,7 +164,7 @@ func RunCoreTests(t *testing.T) {
 			onRowCalled++
 		}
 
-		err := db.Query(model).ReadAll(newFunc, onRow)
+		err := orm.ReadAll(db.Query(model), newFunc, onRow)
 		if err != nil {
 			t.Fatalf("ReadAll failed: %v", err)
 		}
@@ -187,7 +187,7 @@ func RunCoreTests(t *testing.T) {
 		db := orm.New(mockConn{Executor: mockExec, Compiler: mockCompiler})
 		model := &mock.Model{Table: ""} // Empty table
 
-		err := db.Query(model).ReadAll(nil, nil)
+		err := orm.ReadAll[mdl.Model](db.Query(model), nil, nil)
 		if !errors.Is(err, orm.ErrEmptyTable) {
 			t.Errorf("Expected ErrEmptyTable, got %v", err)
 		}
@@ -377,9 +377,7 @@ func RunCoreTests(t *testing.T) {
 
 		// Test Limit with ReadAll
 		mockExec.ReturnQueryRows = &mock.Rows{Count: 0}
-		db.Query(model).
-			Limit(5).
-			ReadAll(func() mdl.Model { return nil }, func(mdl.Model) {})
+		orm.ReadAll(db.Query(model).Limit(5), func() mdl.Model { return nil }, func(mdl.Model) {})
 
 		if mockCompiler.LastQuery.Limit != 5 {
 			t.Errorf("Expected Limit 5, got %d", mockCompiler.LastQuery.Limit)
@@ -431,24 +429,24 @@ func RunCoreTests(t *testing.T) {
 		}
 
 		// ReadAll Plan Error
-		if err := db1.Query(model).ReadAll(nil, nil); err == nil || err.Error() != "plan err" {
+		if err := orm.ReadAll[mdl.Model](db1.Query(model), nil, nil); err == nil || err.Error() != "plan err" {
 			t.Errorf("Expected plan err, got %v", err)
 		}
 		// ReadAll Query Error
 		db4 := orm.New(mockConn{Executor: &mock.Executor{ReturnQueryErr: errors.New("query err")}, Compiler: &mock.Compiler{}})
-		if err := db4.Query(model).ReadAll(nil, nil); err == nil || err.Error() != "query err" {
+		if err := orm.ReadAll[mdl.Model](db4.Query(model), nil, nil); err == nil || err.Error() != "query err" {
 			t.Errorf("Expected query err, got %v", err)
 		}
 		// ReadAll Scan Error
 		db5 := orm.New(mockConn{Executor: &mock.Executor{ReturnQueryRows: &mock.Rows{Count: 1, ScanErr: errors.New("scan err")}}, Compiler: &mock.Compiler{}})
 		f := func() mdl.Model { return &mock.Model{} }
 		e := func(m mdl.Model) {}
-		if err := db5.Query(model).ReadAll(f, e); err == nil || err.Error() != "scan err" {
+		if err := orm.ReadAll(db5.Query(model), f, e); err == nil || err.Error() != "scan err" {
 			t.Errorf("Expected scan err, got %v", err)
 		}
 		// ReadAll Rows Err
 		db6 := orm.New(mockConn{Executor: &mock.Executor{ReturnQueryRows: &mock.Rows{Count: 0, ErrVal: errors.New("rows err")}}, Compiler: &mock.Compiler{}})
-		if err := db6.Query(model).ReadAll(f, e); err == nil || err.Error() != "rows err" {
+		if err := orm.ReadAll(db6.Query(model), f, e); err == nil || err.Error() != "rows err" {
 			t.Errorf("Expected rows err, got %v", err)
 		}
 	})

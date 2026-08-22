@@ -124,7 +124,12 @@ func (qb *QB) ReadOne() error {
 }
 
 // ReadAll executes the query and returns all results.
-func (qb *QB) ReadAll(new func() model.Model, onRow func(model.Model)) error {
+//
+// It is a free function, not a QB method, because Go forbids type parameters
+// on methods: T flows through new/onRow at the concrete model type instead of
+// being boxed into model.Model, so a program with many models does not pay a
+// per-model interface-dispatch thunk just for reading rows.
+func ReadAll[T model.Model](qb *QB, new func() T, onRow func(T)) error {
 	if err := validateQuery(storage.ActionReadAll, qb.model); err != nil {
 		return err
 	}
