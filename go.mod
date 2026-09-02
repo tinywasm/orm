@@ -7,4 +7,4 @@ require (
 	github.com/tinywasm/model v0.1.7
 )
 
-require github.com/tinywasm/storage v0.0.5
+require github.com/tinywasm/storage v0.0.6

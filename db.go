@@ -1,9 +1,7 @@
 package orm
 
 import (
-	"errors"
-	"fmt"
-
+	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/storage"
 )
@@ -87,48 +85,48 @@ func (d *DB) UpdateFields(m model.Model, fields []string, cond storage.Condition
 		return err
 	}
 	if len(fields) == 0 {
-		return errors.New("orm: UpdateFields requires at least one field")
+		return fmt.Err("orm: UpdateFields requires at least one field")
 	}
-	for i := 0; i < len(fields); i++ {
-		for j := i + 1; j < len(fields); j++ {
-			if fields[i] == fields[j] {
-				return fmt.Errorf("orm: UpdateFields: duplicate field %q", fields[i])
-			}
-		}
-	}
+
 	schema := m.Schema()
-	allValues := model.ReadValues(schema, m.Pointers())
-	var columns []string
-	var values []any
-	matchedCount := 0
-	for i, f := range schema {
-		matched := false
-		for _, name := range fields {
+
+	// Validate the caller's field list first, in one pass per name: every name
+	// must exist in the schema and must not repeat. Nested loops rather than a
+	// set — a map would pull TinyGo's hashing machinery in, and a schema holds
+	// tens of fields, so the scan is free.
+	for i, name := range fields {
+		known := false
+		for _, f := range schema {
 			if f.Name == name {
-				matched = true
+				known = true
 				break
 			}
 		}
-		if matched {
-			columns = append(columns, f.Name)
-			values = append(values, allValues[i])
-			matchedCount++
+		if !known {
+			return fmt.Errf("orm: UpdateFields: unknown field %q", name)
+		}
+		for _, prev := range fields[:i] {
+			if prev == name {
+				return fmt.Errf("orm: UpdateFields: duplicate field %q", name)
+			}
 		}
 	}
-	if matchedCount < len(fields) {
+
+	// Build in SCHEMA order, not in the caller's order, so columns and values
+	// line up with what Update would have produced for the same row.
+	allValues := model.ReadValues(schema, m.Pointers())
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields))
+	for i, f := range schema {
 		for _, name := range fields {
-			found := false
-			for _, f := range schema {
-				if f.Name == name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("orm: UpdateFields: unknown field %q", name)
+			if f.Name == name {
+				columns = append(columns, f.Name)
+				values = append(values, allValues[i])
+				break
 			}
 		}
 	}
+
 	conds := append([]storage.Condition{cond}, rest...)
 	q := storage.Query{
 		Action:     storage.ActionUpdate,
