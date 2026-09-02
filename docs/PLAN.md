@@ -3,6 +3,8 @@ PLAN: "feat: UpdateFields writes a column subset (PATCH semantics)"
 TAG: v0.12.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 17202710894724034611
 ---
 
 > Este plan se despacha con el flujo CodeJob. Ver skill: agents-workflow.
