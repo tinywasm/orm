@@ -1,6 +1,9 @@
 package orm
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/storage"
 )
@@ -57,6 +60,82 @@ func (d *DB) Create(m model.Model) error {
 		Table:   m.ModelName(),
 		Columns: columns,
 		Values:  values,
+	}
+	plan, err := d.conn.Compile(q, m)
+	if err != nil {
+		return err
+	}
+	return d.conn.Exec(plan.Query, plan.Args...)
+}
+
+// UpdateFields updates ONLY the named columns, leaving every other column of
+// the matched rows untouched. It is the PATCH counterpart of Update, which
+// writes the whole schema and therefore overwrites columns the caller never
+// meant to touch — a lost update whenever anyone else changed one of them in
+// the meantime.
+//
+// fields holds Schema() field names. Order is irrelevant; duplicates are
+// rejected. An empty fields slice is an error, not a silent no-op: a caller
+// that computed an empty change set has a bug, and a no-op UPDATE would hide
+// it.
+//
+// At least one Condition is required, same as Update — there is no variadic
+// fallback, which is what makes an accidental whole-table UPDATE a
+// compile-time error rather than a production incident.
+func (d *DB) UpdateFields(m model.Model, fields []string, cond storage.Condition, rest ...storage.Condition) error {
+	if err := validateQuery(storage.ActionUpdate, m); err != nil {
+		return err
+	}
+	if len(fields) == 0 {
+		return errors.New("orm: UpdateFields requires at least one field")
+	}
+	for i := 0; i < len(fields); i++ {
+		for j := i + 1; j < len(fields); j++ {
+			if fields[i] == fields[j] {
+				return fmt.Errorf("orm: UpdateFields: duplicate field %q", fields[i])
+			}
+		}
+	}
+	schema := m.Schema()
+	allValues := model.ReadValues(schema, m.Pointers())
+	var columns []string
+	var values []any
+	matchedCount := 0
+	for i, f := range schema {
+		matched := false
+		for _, name := range fields {
+			if f.Name == name {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			columns = append(columns, f.Name)
+			values = append(values, allValues[i])
+			matchedCount++
+		}
+	}
+	if matchedCount < len(fields) {
+		for _, name := range fields {
+			found := false
+			for _, f := range schema {
+				if f.Name == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("orm: UpdateFields: unknown field %q", name)
+			}
+		}
+	}
+	conds := append([]storage.Condition{cond}, rest...)
+	q := storage.Query{
+		Action:     storage.ActionUpdate,
+		Table:      m.ModelName(),
+		Columns:    columns,
+		Values:     values,
+		Conditions: conds,
 	}
 	plan, err := d.conn.Compile(q, m)
 	if err != nil {
