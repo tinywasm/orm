@@ -1,6 +1,6 @@
 # ORM Architecture
 
-The `tinywasm/orm` package is an ultra-lightweight, strongly-typed, zero-magic (no `reflect`), and isomorphic (WASM/Backend) ORM, strictly following the architectural mandates of the `tinywasm` ecosystem.
+The `webtyp/orm` package is an ultra-lightweight, strongly-typed, zero-magic (no `reflect`), and isomorphic (WASM/Backend) ORM, strictly following the architectural mandates of the `webtyp` ecosystem.
 
 ## Repository Split (2026-07-10)
 
@@ -8,29 +8,29 @@ This repository now contains the **runtime only**. Other components have been mo
 
 | Component | Repository | Role |
 |---|---|---|
-| **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator and schema synchronization logic. |
-| **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and topological sorting. |
-| **ddl** | [tinywasm/ddl](https://github.com/tinywasm/ddl) | Runtime DDL: `CreateTable`/`DropTable`/`Sync`/`SyncSchema` + `ddl/conformance`. |
-| **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
+| **ormc** | [webtyp/ormc](https://github.com/webtyp/ormc) | Build-time code generator and schema synchronization logic. |
+| **ddlc** | [webtyp/ddlc](https://github.com/webtyp/ddlc) | SQL Schema (DDL) exporter and topological sorting. |
+| **ddl** | [webtyp/ddl](https://github.com/webtyp/ddl) | Runtime DDL: `CreateTable`/`DropTable`/`Sync`/`SyncSchema` + `ddl/conformance`. |
+| **sqlmcp** | [webtyp/sqlmcp](https://github.com/webtyp/sqlmcp) | MCP tool provider for LLM interaction. |
 
 ## Puerto de almacenamiento (2026-07-16, segunda pasada)
 
-`orm` ya no define el contrato de almacenamiento. `tinywasm/storage` es el puerto (interfaces, tipos de
+`orm` ya no define el contrato de almacenamiento. `webtyp/storage` es el puerto (interfaces, tipos de
 valor DML, conformance, mock, mem) — el equivalente de `database/sql/driver`. `orm` es la capa
 ergonómica opcional encima (`orm.DB`, query builder), el equivalente de `database/sql`. Un backend
-implementa `storage.Conn`; nunca importa `orm`. Ver `tinywasm/storage`'s AGENTS.md y
-[DB_PORT_PROPOSAL.md](https://github.com/tinywasm/app-releases/blob/main/docs/DB_PORT_PROPOSAL.md).
+implementa `storage.Conn`; nunca importa `orm`. Ver `webtyp/storage`'s AGENTS.md y
+[DB_PORT_PROPOSAL.md](https://github.com/webtyp/app-releases/blob/main/docs/DB_PORT_PROPOSAL.md).
 
 ## Background
 
 - [Why use this ORM?](WHY.md)
 - [Why package-level schema variables?](WHY_PACKAGE_LEVEL_SCHEMA.md)
-- [Why ormc generates so much code (and why it's free)](https://github.com/tinywasm/ormc/blob/main/docs/WHY_GENERATED_CODE_IS_FREE.md)
+- [Why ormc generates so much code (and why it's free)](https://github.com/webtyp/ormc/blob/main/docs/WHY_GENERATED_CODE_IS_FREE.md)
 
 
 ## 1. Primary Architectural Pattern: Inverted Declarative Workflow
 
-Unlike traditional ORMs that use `reflect` or parse structs with tags to generate metadata, `tinywasm/orm` inverts the flow. The developer writes a **typed definition** (`model.Definition`), and the generator (`ormc`) produces the **concrete Go struct** and all required interface implementations.
+Unlike traditional ORMs that use `reflect` or parse structs with tags to generate metadata, `webtyp/orm` inverts the flow. The developer writes a **typed definition** (`model.Definition`), and the generator (`ormc`) produces the **concrete Go struct** and all required interface implementations.
 
 1. **Zero Runtime Reflection:** All metadata is available at compile-time.
 2. **O(1) Performance in WASM:** No reflective processing overhead.
@@ -77,7 +77,7 @@ type Fielder interface {
 
 ### 2.3. Typed Serialization Codec (`Encodable`/`Decodable`)
 
-`ormc` generates reflection-free, 0-allocation methods for serialization (used by `tinywasm/json`):
+`ormc` generates reflection-free, 0-allocation methods for serialization (used by `webtyp/json`):
 
 ```go
 func (m *User) EncodeFields(w model.FieldWriter) {
@@ -95,7 +95,7 @@ func (m *User) DecodeFields(r model.FieldReader) {
 
 ## 3. Code Generation (`ormc`)
 
-See [tinywasm/ormc](https://github.com/tinywasm/ormc) for detailed documentation.
+See [webtyp/ormc](https://github.com/webtyp/ormc) for detailed documentation.
 
 ### 3.1. Role Inference
 
@@ -117,12 +117,12 @@ See [tinywasm/ormc](https://github.com/tinywasm/ormc) for detailed documentation
 
 ---
 
-## 5. Conformance Testing (`tinywasm/storage/conformance`)
+## 5. Conformance Testing (`webtyp/storage/conformance`)
 
-The conformance testing suite has moved to `tinywasm/storage/conformance`. It provides an executable contract test suite for storage backends to guarantee consistent behavioral standards across different storage engines without compiling or parsing SQL directly.
+The conformance testing suite has moved to `webtyp/storage/conformance`. It provides an executable contract test suite for storage backends to guarantee consistent behavioral standards across different storage engines without compiling or parsing SQL directly.
 
 ---
 
-## 6. Mocking and In-Memory Execution (`tinywasm/storage/mock` & `tinywasm/storage/mem`)
+## 6. Mocking and In-Memory Execution (`webtyp/storage/mock` & `webtyp/storage/mem`)
 
-The mock recorders and the in-memory engine have moved to `tinywasm/storage/mock` and `tinywasm/storage/mem` respectively.
+The mock recorders and the in-memory engine have moved to `webtyp/storage/mock` and `webtyp/storage/mem` respectively.

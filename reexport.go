@@ -1,6 +1,6 @@
 package orm
 
-import "github.com/tinywasm/storage"
+import "webtyp.com/storage"
 
 // Re-exports of storage's DML value types and condition/order constructors, so that a consumer
 // calling Update/Delete (which take a storage.Condition explicitly) doesn't need a second import

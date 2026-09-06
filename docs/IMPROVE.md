@@ -20,7 +20,7 @@ Deferred. Future plan will cover versioned, file-based migrations for production
 
 ## 5. Zero-per-row scan via reused pointer buffer
 `Pointers()` allocates one `[]any` per row scanned — measured at 1 alloc/op once the slice escapes the
-opaque `Scanner.Scan(dest ...any)` boundary (see [tinywasm/ormc docs](https://github.com/tinywasm/ormc/blob/main/docs/WHY_GENERATED_CODE_IS_FREE.md)).
+opaque `Scanner.Scan(dest ...any)` boundary (see [webtyp/ormc docs](https://github.com/webtyp/ormc/blob/main/docs/WHY_GENERATED_CODE_IS_FREE.md)).
 A query over N rows pays N allocations.
 
 Plan: generate an `AppendPointers(dst []any) []any` method alongside `Pointers()`, and have the scan loop

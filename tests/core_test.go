@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	mdl "github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-	"github.com/tinywasm/storage"
-	"github.com/tinywasm/storage/mock"
+	mdl "webtyp.com/model"
+	"webtyp.com/orm"
+	"webtyp.com/storage"
+	"webtyp.com/storage/mock"
 )
 
 type mockConn struct {

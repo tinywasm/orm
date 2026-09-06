@@ -49,7 +49,7 @@ flowchart TD
     Dispatch -- ReadAll --> QueryMany["conn.Query(plan.Query, plan.Args...)<br/>loop: rows.Next() -> m := new() -> rows.Scan(m.Pointers()...) -> onRow(m)"]
 
     %% 7. Backend (any storage.Conn implementation)
-    Exec --> Engine["storage.Conn backend<br/>e.g. tinywasm/sqlt (Postgres/SQLite) or storage/mem"]
+    Exec --> Engine["storage.Conn backend<br/>e.g. webtyp/sqlt (Postgres/SQLite) or storage/mem"]
     QueryRow --> Engine
     QueryMany --> Engine
 

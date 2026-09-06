@@ -1,4 +1,4 @@
-# tinywasm/orm
+# webtyp/orm
 <img src="docs/img/badges.svg">
 
 **Ultra-lightweight, strongly-typed ORM engineered for WebAssembly and backend environments.**
@@ -6,11 +6,11 @@
 ## Features
 
 - **Declarative Source of Truth**: Hand-written `model.Definition` literals as the source for code generation.
-- **Zero Reflection**: Interface-driven schema via `github.com/tinywasm/model` with generated code.
+- **Zero Reflection**: Interface-driven schema via `webtyp.com/model` with generated code.
 - **Isomorphic**: Same generated code works in Go (backend) and WASM (frontend).
 - **0-alloc Codec**: Symmetric, reflection-free serialization/deserialization methods generated for every model.
 - **Query Builder**: Reflection-free, type-safe query building.
-- **Backend-Agnostic**: `orm.DB` wraps a `storage.Conn` — no storage contract is defined here, so any backend implementing `tinywasm/storage` (Postgres, SQLite, in-memory, IndexedDB, ...) works unchanged.
+- **Backend-Agnostic**: `orm.DB` wraps a `storage.Conn` — no storage contract is defined here, so any backend implementing `webtyp/storage` (Postgres, SQLite, in-memory, IndexedDB, ...) works unchanged.
 
 ## Ecosystem
 
@@ -18,21 +18,21 @@ This repository is the **ergonomic layer only** — the equivalent of `database/
 
 | Component | Repository | Role |
 |---|---|---|
-| **storage** | [tinywasm/storage](https://github.com/tinywasm/storage) | Storage port (`Executor`/`Compiler`/`Query`/`Condition`/`Plan`, `mock`, `mem`) — the equivalent of `database/sql/driver`. A backend implements `storage.Conn`; `orm.New(conn)` takes one. |
-| **ormc** | [tinywasm/ormc](https://github.com/tinywasm/ormc) | Build-time code generator. |
-| **ddlc** | [tinywasm/ddlc](https://github.com/tinywasm/ddlc) | SQL Schema (DDL) exporter and utilities. |
-| **sqlmcp** | [tinywasm/sqlmcp](https://github.com/tinywasm/sqlmcp) | MCP tool provider for LLM interaction. |
+| **storage** | [webtyp/storage](https://github.com/webtyp/storage) | Storage port (`Executor`/`Compiler`/`Query`/`Condition`/`Plan`, `mock`, `mem`) — the equivalent of `database/sql/driver`. A backend implements `storage.Conn`; `orm.New(conn)` takes one. |
+| **ormc** | [webtyp/ormc](https://github.com/webtyp/ormc) | Build-time code generator. |
+| **ddlc** | [webtyp/ddlc](https://github.com/webtyp/ddlc) | SQL Schema (DDL) exporter and utilities. |
+| **sqlmcp** | [webtyp/sqlmcp](https://github.com/webtyp/sqlmcp) | MCP tool provider for LLM interaction. |
 
 ## Installation
 
 ```bash
-go get github.com/tinywasm/orm
+go get webtyp.com/orm
 ```
 
 To install the code generator:
 
 ```bash
-go install github.com/tinywasm/ormc/cmd/ormc@latest
+go install webtyp.com/ormc/cmd/ormc@latest
 ```
 
 ## Declarative Workflow
@@ -47,7 +47,7 @@ Create a `model.go` or `models.go` file. Define your models as `model.Definition
 package user
 
 import (
-    "github.com/tinywasm/model"
+    "webtyp.com/model"
 )
 
 var UserModel = model.Definition{
@@ -100,7 +100,7 @@ func GetUser(db *orm.DB, id int64) (*user.User, error) {
 | `NotNull` | `NOT NULL` constraint in DB. |
 | `OmitEmpty` | Skips field if zero-value in codecs. |
 | `Exclude` | Field exists in generated struct but is skipped in `Schema()`, `Pointers()`, and codecs (e.g. for `password_hash`). |
-| `Widget` | Binding for UI rendering (see `tinywasm/tinywasm/input`). |
+| `Widget` | Binding for UI rendering (see `webtyp/webtyp/input`). |
 | `DB` | Database-specific metadata (`PK`, `Unique`, `AutoInc`, `RefColumn`, `OnDelete`). |
 | `Ref` | Points to another `*model.Definition`. Used for composition or scalar Foreign Keys. |
 | `Permitted` | Validation rules (Minimum, Maximum, Letters, Numbers, etc.). |
@@ -138,7 +138,7 @@ The `ormc` generator produces:
 - `Validate(action byte) error` (calling `model.ValidateFields`). Always generated.
 - `ModelName() string`.
 - `ReadOneT()`, `ReadAllT()`, `TList` type (for DB models).
-- `SchemaExt() []ddlc.FieldExt` (requires [tinywasm/ddlc](https://github.com/tinywasm/ddlc)).
+- `SchemaExt() []ddlc.FieldExt` (requires [webtyp/ddlc](https://github.com/webtyp/ddlc)).
 
 ## More Documentation
 

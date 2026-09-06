@@ -1,6 +1,6 @@
 package orm
 
-import "github.com/tinywasm/storage"
+import "webtyp.com/storage"
 
 // Tx executes a function within a transaction. The underlying storage.Conn must implement
 // storage.TxExecutor (type-asserted here) — most backends do; mem.New() also implements it as a

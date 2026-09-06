@@ -1,6 +1,6 @@
 package orm
 
-import "github.com/tinywasm/fmt"
+import "webtyp.com/fmt"
 
 // ErrNotFound is returned when ReadOne() finds no matching row. Translates storage.ErrNoRows —
 // storage itself has no concept of "not found", only "no rows" (see qb.go's ReadOne).

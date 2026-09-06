@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-	"github.com/tinywasm/storage/conformance"
-	"github.com/tinywasm/storage/mem"
+	"webtyp.com/model"
+	"webtyp.com/orm"
+	"webtyp.com/storage/conformance"
+	"webtyp.com/storage/mem"
 )
 
 func TestUpdateFieldsWritesOnlyTheNamedColumns(t *testing.T) {

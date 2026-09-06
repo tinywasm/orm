@@ -1,8 +1,8 @@
 package orm
 
 import (
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/storage"
+	"webtyp.com/model"
+	"webtyp.com/storage"
 )
 
 // QB represents a query builder.

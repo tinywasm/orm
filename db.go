@@ -1,9 +1,9 @@
 package orm
 
 import (
-	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/storage"
+	"webtyp.com/fmt"
+	"webtyp.com/model"
+	"webtyp.com/storage"
 )
 
 // DB represents an ergonomic handle over a storage backend (a storage.Conn). Consumers instantiate

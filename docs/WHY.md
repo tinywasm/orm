@@ -1,10 +1,10 @@
-# Why tinywasm/orm?
+# Why webtyp/orm?
 
 ## What Problem This Library Solves:
 
 Modern applications often need to integrate a database before the final storage engine is known, or while keeping the project easily testable and portable across environments (backend, edge, or WebAssembly). Traditional ORMs and database libraries typically bind the application too early to a specific database driver, SQL dialect, or runtime environment.
 
-`tinywasm/orm` solves this by providing a minimal, explicit, engine-agnostic ORM core that allows developers to add database capabilities to a project without committing to a specific database engine upfront.
+`webtyp/orm` solves this by providing a minimal, explicit, engine-agnostic ORM core that allows developers to add database capabilities to a project without committing to a specific database engine upfront.
 
 Instead of coupling application logic directly to a database driver, the ORM separates responsibilities into clear layers:
 
@@ -44,7 +44,7 @@ This design intentionally avoids some features commonly found in traditional ORM
 
 ## When to Use This ORM
 
-`tinywasm/orm` is a good fit when:
+`webtyp/orm` is a good fit when:
 - You want to keep your application independent from a specific database.
 - You need strong testability and clean dependency injection.
 - Your project targets WebAssembly or constrained environments.

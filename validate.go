@@ -1,9 +1,9 @@
 package orm
 
 import (
-	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/storage"
+	"webtyp.com/fmt"
+	"webtyp.com/model"
+	"webtyp.com/storage"
 )
 
 func validateQuery(action storage.Action, m model.Model) error {

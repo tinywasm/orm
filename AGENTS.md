@@ -1,14 +1,14 @@
-# AGENTS.md — tinywasm/orm
+# AGENTS.md — webtyp/orm
 
 Working notes for AI agents operating in this library. For end-user docs see [README.md](README.md). For tag reference see [docs/](docs/).
 
 ## Mission of this package
 
-`tinywasm/orm` provides:
+`webtyp/orm` provides:
 
-1. **An ergonomic optional layer over `tinywasm/storage`** (`db.go`, `tx.go`, `qb.go`, `reexport.go`) — `*orm.DB`, query builder, `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)`. Isomorphic: compiles for Go and WASM.
+1. **An ergonomic optional layer over `webtyp/storage`** (`db.go`, `tx.go`, `qb.go`, `reexport.go`) — `*orm.DB`, query builder, `Create`/`Update`/`Delete`/`Query(ReadOne/ReadAll)`. Isomorphic: compiles for Go and WASM.
 
-The runtime is reflection-free — `Fielder` interface (defined in `tinywasm/fmt`) is the only contract. All struct introspection happens at codegen time.
+The runtime is reflection-free — `Fielder` interface (defined in `webtyp/fmt`) is the only contract. All struct introspection happens at codegen time.
 
 ## Architectural rules (do not violate)
 
@@ -20,22 +20,22 @@ adds meaningful, unavoidable size to every wasm binary that ends up importing th
 round-trips without a real driver), there is no "backend-only" escape hatch via `//go:build !wasm`
 anymore: the map has to not exist at all, not just be excluded from one build target.
 
-- For a **string→string** pair, use `github.com/tinywasm/fmt.KeyValue{Key, Value string}`.
+- For a **string→string** pair, use `webtyp.com/fmt.KeyValue{Key, Value string}`.
 - For anything else (typed values, non-string keys, or an in-memory "table" of rows), use a small
   local slice-of-structs and scan it linearly — see `storage/mem`'s `dbCell`/`dbRow`/`dbTable`
   for the pattern. These collections are always small (a handful
   of registered adapters, a handful of schema columns), so a linear scan costs nothing in practice and
-  it's what the whole ecosystem already does (e.g. `tinywasm/fmt.TagPairs` returns `[]KeyValue`, not a
+  it's what the whole ecosystem already does (e.g. `webtyp/fmt.TagPairs` returns `[]KeyValue`, not a
   map).
 - If you're tempted to add a map "just for a lookup cache," don't — reach for a linear scan first, and
   only reconsider with a profiler backing you up, never on a hunch.
 
 ### Root package (`orm`) — isomorphic, zero dialect
 
-- **No `database/sql` import in the root package.** The root `orm` package compiles for both Go and WASM. Never import `database/sql`, `database/sql/driver`, or any DB driver. Use only `github.com/tinywasm/fmt` and the stdlib.
+- **No `database/sql` import in the root package.** The root `orm` package compiles for both Go and WASM. Never import `database/sql`, `database/sql/driver`, or any DB driver. Use only `webtyp.com/fmt` and the stdlib.
 - **Agnostic API only.** `qb.go`, `db.go` must never contain dialect-specific SQL, driver types, or engine-specific error values (e.g. `sql.ErrNoRows`).
-- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrValidation`, `ErrEmptyTable`, `ErrNoTxSupport`. `qb.go` compares `storage.ErrNoRows` (returned by a backend's `Scanner`) and translates it to `ErrNotFound`. **Executor adapters** (`tinywasm/postgres`, `tinywasm/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `storage.ErrNoRows` inside their `Scanner` implementation.
-- **Executor contract.** Adapters implement `storage.Executor` (defined in `tinywasm/storage`, not this package): (1) wrap `sql.ErrNoRows` → `storage.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
+- **Use `orm`-owned sentinels.** `errors.go` defines `ErrNotFound`, `ErrValidation`, `ErrEmptyTable`, `ErrNoTxSupport`. `qb.go` compares `storage.ErrNoRows` (returned by a backend's `Scanner`) and translates it to `ErrNotFound`. **Executor adapters** (`webtyp/postgres`, `webtyp/sqlt`) are responsible for mapping their driver-specific errors (e.g. `sql.ErrNoRows`) to `storage.ErrNoRows` inside their `Scanner` implementation.
+- **Executor contract.** Adapters implement `storage.Executor` (defined in `webtyp/storage`, not this package): (1) wrap `sql.ErrNoRows` → `storage.ErrNoRows`; (2) never leak `database/sql` types into `orm` core.
 - **Do not use `tinygo` as a build tag** — it is not a standard Go constraint recognized by the Go toolchain. Use `GOOS=js GOARCH=wasm` to build for wasm, and `gotest -tinygo` to test against the TinyGo compiler specifically.
 - **Struct tags are processed at build-time, not runtime.** `fmt.Field` has no `Tag` field. If you ever feel you need to inspect a tag in WASM code, you are wrong — push the work into `ormc`.
 
@@ -50,14 +50,14 @@ anymore: the map has to not exist at all, not just be excluded from one build ta
 | `tests/` | Test fixtures + `_test.go` files |
 | `docs/` | Architecture, design rationale, tag reference |
 
-> **Nota:** El contrato de almacenamiento vive en `github.com/tinywasm/storage` — este repo no lo redefine.
+> **Nota:** El contrato de almacenamiento vive en `webtyp.com/storage` — este repo no lo redefine.
 
 ## Testing
 
 Install once:
 
 ```bash
-go install github.com/tinywasm/devflow/cmd/gotest@latest
+go install webtyp.com/devflow/cmd/gotest@latest
 ```
 
 Run:
